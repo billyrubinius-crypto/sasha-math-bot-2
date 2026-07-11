@@ -1038,6 +1038,20 @@
                 p_reason: `streak_day_${thisPosition}`
             });
             if (rpcError) throw rpcError;
+
+            // Бонус возвращения (SPEC_STAGE1.md, раздел 5): разрыв ≥7 дней перед этой ежедневкой
+            // в цепочке ВСЕХ когда-либо принятых ежедневок (не только текущей серии) — отдельным
+            // начислением поверх обычной награды. Первая когда-либо принятая ежедневка (thisIndex=0,
+            // предыдущей просто нет) бонус не даёт — возвращаться не из чего.
+            const thisIndex = dates.indexOf(thisScheduledDate);
+            if (thisIndex > 0 && daysBetweenDates(dates[thisIndex - 1], thisScheduledDate) >= 7) {
+                const { error: bonusError } = await db.rpc('add_huikons', {
+                    p_student_id: studentId,
+                    p_amount: 20,
+                    p_reason: 'bonus_return'
+                });
+                if (bonusError) throw bonusError;
+            }
         }
 
         // Флат-бонус за приём еженедельного/индивидуального задания (не связан со стриком — тот только для ежедневных)
@@ -1112,6 +1126,13 @@
             const mm = String(result.getUTCMonth() + 1).padStart(2, '0');
             const dd = String(result.getUTCDate()).padStart(2, '0');
             return `${yy}-${mm}-${dd}`;
+        }
+
+        // Календарных дней между двумя датами YYYY-MM-DD (b - a) — Bot 2.0, G10
+        function daysBetweenDates(a, b) {
+            const [ay, am, ad] = a.split('-').map(Number);
+            const [by, bm, bd] = b.split('-').map(Number);
+            return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
         }
 
         async function scheduleWeek() {
