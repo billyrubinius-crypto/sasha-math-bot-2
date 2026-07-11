@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Sasha Math - Teacher Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root { 
+            --primary: #2481cc; 
+            --bg: #f5f5f5; 
+            --success: #28a745; 
+            --danger: #dc3545;
+            --safe-top: env(safe-area-inset-top, 20px); 
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, sans-serif; 
+            margin: 0; 
+            background: var(--bg); 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        
+        /* Экран входа */
+        #login-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 3000; }
+        .login-box { background: white; padding: 30px; border-radius: 16px; text-align: center; width: 85%; max-width: 320px; }
+        .login-box input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+
+        /* Верхние табы */
+        .top-tabs { 
+            display: flex; 
+            background: white; 
+            border-bottom: 1px solid #eee; 
+            flex-shrink: 0; 
+            padding-top: var(--safe-top); 
+            z-index: 100;
+        }
+        .tab-btn { 
+            flex: 1; 
+            padding: 15px; 
+            text-align: center; 
+            font-weight: 600; 
+            color: #999; 
+            cursor: pointer; 
+            border-bottom: 3px solid transparent; 
+            transition: all 0.2s; 
+        }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        /* Под-табы для проверки */
+        .sub-tabs {
+            display: flex;
+            background: #f9f9f9;
+            padding: 10px 15px;
+            gap: 10px;
+            border-bottom: 1px solid #eee;
+            flex-shrink: 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .sub-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            background: white;
+            border: 1px solid #ddd;
+            color: #666;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .sub-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tab-count-badge {
+            display: inline-block; margin-left: 6px; background: var(--danger); color: white;
+            font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; vertical-align: middle;
+        }
+        .sub-tab.active .tab-count-badge { background: rgba(255,255,255,0.3); }
+
+        /* Контейнеры контента */
+        .content-area { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 15px; 
+            display: none; 
+            -webkit-overflow-scrolling: touch; 
+        }
+        .content-area.active { display: block; }
+
+        /* Стили для планирования недели */
+        .week-planner { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        }
+        .day-row { 
+            display: grid; 
+            grid-template-columns: 80px 1fr; 
+            gap: 12px; 
+            margin-bottom: 12px; 
+            align-items: start; 
+        }
+        .day-label { 
+            font-weight: bold; 
+            font-size: 14px; 
+            padding-top: 8px; 
+        }
+        .day-inputs { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 6px; 
+        }
+        .day-inputs input, .day-inputs textarea { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+            font-size: 14px; 
+            width: 100%; 
+            font-family: inherit;
+        }
+        
+        .btn-primary { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+
+        /* Кнопка загрузки PDF рядом с полем ссылки */
+        .url-with-upload { display: flex; gap: 6px; }
+        .url-with-upload input[type="url"] { flex: 1; min-width: 0; }
+        .pdf-upload-btn {
+            display: flex; align-items: center; justify-content: center;
+            width: 42px; flex-shrink: 0; cursor: pointer;
+            background: white; border: 1px solid #ddd; border-radius: 6px; font-size: 18px;
+        }
+        .pdf-upload-btn input[type="file"] { display: none; }
+        .pdf-upload-btn.uploading { opacity: 0.5; pointer-events: none; }
+        .btn-secondary { background: #6c757d; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+
+        /* Список работ для проверки */
+        .submission-card { 
+            background: white; border-radius: 12px; padding: 15px; margin-bottom: 10px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.1s;
+        }
+        .submission-card:active { transform: scale(0.98); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .student-name { font-weight: bold; font-size: 16px; }
+        .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+        .badge-daily { background: #e3f2fd; color: #1565c0; }
+        .badge-weekly { background: #f3e5f5; color: #7b1fa2; }
+        .badge-individual { background: #fff3e0; color: #ef6c00; }
+        .card-meta { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .card-link { color: var(--primary); font-size: 12px; text-decoration: none; display: inline-block; margin-bottom: 8px; word-break: break-all; }
+
+        /* Под-вкладки внутри "Планирование" */
+        .plan-view, .archive-view { display: none; }
+        .plan-view.active, .archive-view.active { display: block; }
+
+        /* Поиск ученика по username */
+        .username-suggestions {
+            display: none; position: absolute; top: 42px; left: 0; right: 0; background: white;
+            border: 1px solid #ddd; border-radius: 6px; max-height: 220px; overflow-y: auto;
+            z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .username-suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .username-suggestion-item:last-child { border-bottom: none; }
+        .username-suggestion-item:hover { background: #f5f5f5; }
+
+        /* Модальные окна */
+        #review-modal, #penalty-modal, #edit-group-modal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+            z-index: 2000; align-items: center; justify-content: center; padding: 20px;
+        }
+        #review-modal.active, #penalty-modal.active, #edit-group-modal.active { display: flex; }
+        .modal-content { 
+            background: white; border-radius: 16px; width: 100%; max-width: 500px; 
+            max-height: 90vh; overflow-y: auto; padding: 20px; position: relative;
+        }
+        .close-modal { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+        .review-photo { width: 100%; border-radius: 8px; margin: 0; cursor: zoom-in; background: #eee; min-height: 200px; object-fit: contain; }
+        .action-buttons { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-success { background: var(--success); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; flex: 1; cursor: pointer; }
+        .btn-danger { background: var(--danger); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; flex: 1; cursor: pointer; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; min-height: 80px; font-family: inherit; margin-top: 10px; }
+
+        /* Штрафы */
+        .penalty-options { display: flex; gap: 10px; margin: 15px 0; justify-content: center; }
+        .penalty-btn { padding: 10px 15px; border: 2px solid var(--danger); background: white; color: var(--danger); border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .penalty-btn.selected { background: var(--danger); color: white; }
+        .warning-text { color: var(--danger); font-size: 13px; margin-top: 10px; text-align: center; }
+
+        /* Lightbox */
+        #lightbox { display: none; position: fixed; inset: 0; background: black; z-index: 3000; touch-action: none; overflow: hidden; }
+        #lightbox.active { display: block; }
+        #lb-img { width: 100%; height: 100%; object-fit: contain; transform-origin: center center; will-change: transform; user-select: none; -webkit-user-drag: none; }
+        #lb-img.can-pan { cursor: grab; }
+        #lb-img.can-pan.dragging { cursor: grabbing; }
+        .lb-close { position: absolute; top: calc(20px + var(--safe-top)); right: 20px; color: white; font-size: 30px; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; z-index: 3001; pointer-events: auto; }
+
+        /* Адаптив для мобильных */
+        @media (max-width: 600px) {
+            .day-row { 
+                grid-template-columns: 1fr; 
+                gap: 6px; 
+            }
+            .day-label { padding-top: 0; margin-bottom: 2px; }
+            .action-buttons { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Вход -->
+    <div id="login-screen">
+        <div class="login-box">
+            <h2>👨‍🏫 Учительская</h2>
+            <input type="password" id="pass" placeholder="Пароль">
+            <button onclick="checkPass()">Войти</button>
+            <p id="err" style="color:red; display:none; margin-top:10px;">Неверно!</p>
+        </div>
+    </div>
+
+    <!-- Табы навигации -->
+    <div class="top-tabs">
+        <div class="tab-btn active" onclick="switchTab('check', this)">✅ Проверка</div>
+        <div class="tab-btn" onclick="switchTab('plan', this)">📅 Планирование</div>
+    </div>
+
+    <!-- Под-табы для проверки -->
+    <div id="sub-tabs-container" class="sub-tabs">
+        <div class="sub-tab active" onclick="switchSubTab('pending', this)">📥 На проверке<span id="pending-count-badge" class="tab-count-badge" style="display:none;"></span></div>
+        <div class="sub-tab" onclick="switchSubTab('archive', this)">📂 Архив</div>
+    </div>
+
+    <!-- Вкладка проверки -->
+    <div id="tab-check" class="content-area active">
+        <div id="submissions-list">
+            <div style="text-align:center; padding:40px; color:#999;">Загрузка работ...</div>
+        </div>
+    </div>
+
+    <!-- Вкладка планирования -->
+    <div id="tab-plan" class="content-area">
+        <div class="sub-tabs" id="plan-sub-tabs">
+            <div class="sub-tab active" onclick="switchPlanSubTab('create', this)">📝 Планирование</div>
+            <div class="sub-tab" onclick="switchPlanSubTab('draft', this)">📦 Черновик</div>
+            <div class="sub-tab" onclick="switchPlanSubTab('current', this)">🗓️ Текущая неделя</div>
+            <div class="sub-tab" onclick="switchPlanSubTab('archive', this)">🗄️ Архив</div>
+        </div>
+
+        <!-- Планирование: создание нового -->
+        <div id="plan-create" class="plan-view active">
+            <div class="week-planner">
+                <h3 style="margin-top:0">🗓️ Запланировать следующую неделю</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Задания станут активными автоматически в 00:00 МСК указанной даты.</p>
+
+                <div style="margin-bottom:15px;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Кому назначить:</label>
+                    <div id="week-group-list" style="display:flex; flex-direction:column; gap:8px; padding:10px; border:1px solid #ddd; border-radius:6px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
+                            <input type="checkbox" id="week-group-all" checked onchange="onWeekGroupAllChange()"> Все ученики
+                        </label>
+                    </div>
+                </div>
+
+                <div id="days-container"></div>
+
+                <!-- Блок еженедельного задания -->
+                <div style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px; border-left:4px solid var(--primary);">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">🔥 Еженедельное задание:</label>
+                    <input type="text" id="weekly-title" placeholder="Название" style="width:100%; padding:8px; margin-bottom:5px; border:1px solid #ddd; border-radius:6px;">
+                    <div class="url-with-upload" style="margin-bottom:5px;">
+                        <input type="url" id="weekly-url" placeholder="Ссылка на задачу" style="padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <label class="pdf-upload-btn">📎<input type="file" accept="application/pdf" onchange="handlePdfUpload(event, 'weekly-url')"></label>
+                    </div>
+                    <textarea id="weekly-comment" placeholder="Комментарий ученику (необязательно)" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:6px; min-height:40px; resize:none;"></textarea>
+                </div>
+
+                <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Дата активации:</label>
+                    <input type="date" id="activation-date" style="width:100%; max-width:100%; box-sizing:border-box; -webkit-appearance:none; appearance:none; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+
+                <button class="btn-primary" id="btn-schedule-week" onclick="scheduleWeek()">🚀 Запланировать неделю</button>
+            </div>
+
+            <div class="week-planner">
+                <h3 style="margin-top:0">🎯 Индивидуальное задание</h3>
+                <div style="position:relative;">
+                    <input type="text" id="indiv-username-input" placeholder="Введите username ученика" autocomplete="off"
+                        style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;"
+                        oninput="onIndivUsernameInput()"
+                        onblur="setTimeout(() => { document.getElementById('indiv-username-suggestions').style.display = 'none'; }, 150)">
+                    <div id="indiv-username-suggestions" class="username-suggestions"></div>
+                </div>
+                <input type="text" id="indiv-title" placeholder="Название" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+                <div class="url-with-upload" style="margin-bottom:10px;">
+                    <input type="url" id="indiv-url" placeholder="Ссылка на задачу" style="padding:10px; border:1px solid #ddd; border-radius:6px;">
+                    <label class="pdf-upload-btn">📎<input type="file" accept="application/pdf" onchange="handlePdfUpload(event, 'indiv-url')"></label>
+                </div>
+                <textarea id="indiv-comment" placeholder="Комментарий ученику" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; min-height:60px;"></textarea>
+                <button class="btn-primary" id="btn-assign-indiv" onclick="assignIndividual()" style="margin-top:10px;">Назначить индивидуально</button>
+            </div>
+        </div>
+
+        <!-- Черновик: недели, ждущие своей даты активации -->
+        <div id="plan-draft" class="plan-view">
+            <div id="draft-list"></div>
+        </div>
+
+        <!-- Текущая неделя: уже идёт, будущие дни можно редактировать -->
+        <div id="plan-current" class="plan-view">
+            <div id="current-week-list"></div>
+        </div>
+
+        <!-- Архив -->
+        <div id="plan-archive" class="plan-view">
+            <div class="sub-tabs" id="archive-sub-tabs">
+                <div class="sub-tab active" onclick="switchArchiveSubTab('daily', this)">Ежедневные</div>
+                <div class="sub-tab" onclick="switchArchiveSubTab('weekly', this)">Еженедельные</div>
+                <div class="sub-tab" onclick="switchArchiveSubTab('individual', this)">Индивидуальные</div>
+            </div>
+
+            <div id="archive-daily" class="archive-view active"></div>
+            <div id="archive-weekly" class="archive-view"></div>
+            <div id="archive-individual" class="archive-view">
+                <div class="sub-tabs" id="archive-individual-sub-tabs">
+                    <div class="sub-tab active" onclick="switchIndividualArchiveView('active', this)">Активные</div>
+                    <div class="sub-tab" onclick="switchIndividualArchiveView('done', this)">Сданные</div>
+                </div>
+                <div id="archive-individual-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования недели (Текущая неделя) -->
+    <div id="edit-group-modal">
+        <div class="modal-content" style="max-width:500px;">
+            <button class="close-modal" onclick="closeGroupEdit()">✕</button>
+            <h3 style="margin-top:0">✏️ Редактировать задание</h3>
+            <input type="text" id="edit-group-title" placeholder="Название" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+            <div class="url-with-upload" style="margin-bottom:10px;">
+                <input type="url" id="edit-group-url" placeholder="Ссылка на задачу" style="padding:10px; border:1px solid #ddd; border-radius:6px;">
+                <label class="pdf-upload-btn">📎<input type="file" accept="application/pdf" onchange="handlePdfUpload(event, 'edit-group-url')"></label>
+            </div>
+            <textarea id="edit-group-comment" placeholder="Комментарий ученику" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; min-height:60px;"></textarea>
+            <p style="font-size:12px; color:#666;">Изменение применится сразу ко всем ученикам, которым назначена эта неделя.</p>
+            <button class="btn-primary" onclick="saveGroupEdit()">💾 Сохранить</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно проверки -->
+    <div id="review-modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeReview()">✕</button>
+            <h3 id="rev-student" style="margin-top:0"></h3>
+            <div id="rev-type" class="badge" style="margin-bottom:10px; display:inline-block;"></div>
+            <div id="rev-comment-teacher" style="font-size:13px; color:#666; margin-bottom:10px; font-style:italic;"></div>
+            <a id="rev-link" href="#" target="_blank" class="card-link">🔗 Открыть исходник задачи</a>
+            
+            <!-- Контейнер фото с навигацией -->
+            <div style="position:relative; background:#eee; border-radius:8px; overflow:hidden; min-height:200px; display:flex; align-items:center; justify-content:center; margin: 15px 0;">
+                <img id="rev-photo" class="review-photo" src="" onclick="openLightbox()" style="margin:0; cursor:zoom-in;">
+                
+                <!-- Кнопки листания -->
+                <button id="prev-photo-btn" onclick="changeReviewPhoto(-1)" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.5); color:white; border:none; border-radius:50%; width:36px; height:36px; font-size:18px; cursor:pointer; display:none;">‹</button>
+                <button id="next-photo-btn" onclick="changeReviewPhoto(1)" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.5); color:white; border:none; border-radius:50%; width:36px; height:36px; font-size:18px; cursor:pointer; display:none;">›</button>
+                
+                <!-- Счетчик фото -->
+                <div id="photo-counter" style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:12px; font-size:12px; display:none;">1 / 1</div>
+            </div>
+            
+            <textarea id="rev-feedback" placeholder="Комментарий при проверке..."></textarea>
+            
+            <div class="action-buttons">
+                <button class="btn-success" onclick="submitReview('approved')">✅ Принять</button>
+                <button class="btn-danger" onclick="submitReview('rejected')">❌ Вернуть</button>
+            </div>
+            <button class="btn-secondary" style="margin-top:10px;" onclick="showPenaltyModal()">⚠️ Оштрафовать</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно штрафа -->
+    <div id="penalty-modal">
+        <div class="modal-content" style="max-width:400px;">
+            <button class="close-modal" onclick="closePenalty()">✕</button>
+            <h3 style="margin-top:0; text-align:center;">⚠️ Списать хуиконы</h3>
+            <p style="text-align:center; font-size:14px; color:#666;">Текущий баланс: <b id="pen-balance">0</b></p>
+            
+            <div class="penalty-options">
+                <button class="penalty-btn" onclick="selectPenalty(-5)">-5</button>
+                <button class="penalty-btn" onclick="selectPenalty(-10)">-10</button>
+                <button class="penalty-btn selected" onclick="selectPenalty(-20)">-20</button>
+                <button class="penalty-btn" onclick="selectPenalty(-50)">-50</button>
+            </div>
+            
+            <textarea id="pen-reason" placeholder="Обязательно укажите причину штрафа..." style="min-height:60px;"></textarea>
+            <p id="pen-warning" class="warning-text"></p>
+            
+            <button class="btn-danger" style="width:100%; margin-top:15px;" onclick="applyPenalty()">Списать хуиконы</button>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div id="lightbox" onclick="closeLightbox()">
+        <button class="lb-close" onclick="event.stopPropagation(); closeLightbox()">✕</button>
+        <img id="lb-img" src="" onclick="event.stopPropagation()" style="position: relative; z-index: 3000;">
+    </div>
+
+    <script>
+        // Bot 2.0 dev-окружение — НЕ прод. См. bot2/BOT2_CONTEXT.md в приватном репозитории.
+        const SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b';
+        const PASS = 'sasha2024';
+
+        // Cloudinary Config — тот же аккаунт, что и в index.html, для загрузки PDF с заданиями
+        const CLOUDINARY_CLOUD_NAME = 'ddrn3vxm0';
+        const CLOUDINARY_UPLOAD_PRESET = 'sasha-math-dz';
+
+        // Загружает PDF в Cloudinary и подставляет получившуюся ссылку в указанное поле
+        async function handlePdfUpload(event, targetInputId) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const label = event.target.closest('.pdf-upload-btn');
+            const targetInput = document.getElementById(targetInputId);
+
+            label.classList.add('uploading');
+            try {
+                const url = await uploadPdfToCloudinary(file);
+                targetInput.value = url;
+            } catch (e) {
+                alert('Ошибка загрузки PDF: ' + e.message);
+            } finally {
+                label.classList.remove('uploading');
+                event.target.value = '';
+            }
+        }
+
+        async function uploadPdfToCloudinary(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            formData.append('folder', 'sasha-math-tasks');
+
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Ошибка загрузки в Cloudinary');
+            const data = await res.json();
+            return data.secure_url;
+        }
+
+        let db, currentSubmissionId = null, selectedPenalty = -20, studentsList = [];
+        let currentCheckView = 'pending';
+
+        // Текущая дата в Москве (YYYY-MM-DD), не зависит от часового пояса устройства учителя
+        function getTodayMSK() {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+        }
+
+        // Ссылка без http(s):// браузер считает относительным путём текущей страницы — достраиваем схему
+        function normalizeUrl(url) {
+            if (!url) return '';
+            return /^https?:\/\//i.test(url) ? url : 'https://' + url;
+        }
+
+        // Экранирует пользовательский текст перед вставкой через innerHTML (имена, названия заданий,
+        // комментарии, названия групп и т.п. — всё, что вводит человек, а не сам код)
+        function esc(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
+        }
+
+        // Переменные для навигации по фото внутри модального окна
+        let reviewPhotos = [];
+        let reviewPhotoIndex = 0;
+
+        // Переменные для зума и перетаскивания lightbox
+        let lbScale = 1;
+        let lbPanX = 0;
+        let lbPanY = 0;
+        let initialDist = 0;
+        let initialScale = 1;
+        let isPinching = false;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let panStartX = 0;
+        let panStartY = 0;
+        let didDrag = false;
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            if (sessionStorage.getItem('auth')) showApp();
+            
+            // Генерация полей для дней недели
+            const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+            const container = document.getElementById('days-container');
+            days.forEach((day, i) => {
+                container.innerHTML += `
+                    <div class="day-row">
+                        <div class="day-label">${day}</div>
+                        <div class="day-inputs">
+                            <input type="text" id="day-title-${i}" placeholder="Название задания">
+                            <div class="url-with-upload">
+                                <input type="url" id="day-url-${i}" placeholder="Ссылка на РешуЕГЭ">
+                                <label class="pdf-upload-btn">📎<input type="file" accept="application/pdf" onchange="handlePdfUpload(event, 'day-url-${i}')"></label>
+                            </div>
+                            <textarea id="day-comment-${i}" placeholder="Комментарий ученику (необязательно)" style="padding:8px; border:1px solid #ddd; border-radius:6px; font-size:13px; width:100%; min-height:40px; resize:none;"></textarea>
+                        </div>
+                    </div>`;
+            });
+
+            // Установка даты активации по умолчанию (следующий понедельник по московскому времени)
+            const todayMSKStr = getTodayMSK();
+            const [ny, nm, nd] = todayMSKStr.split('-').map(Number);
+            const todayWeekday = new Date(Date.UTC(ny, nm - 1, nd)).getUTCDay();
+            const daysUntilNextMonday = (1 + 7 - todayWeekday) % 7 || 7;
+            document.getElementById('activation-date').value = addDaysToDate(todayMSKStr, daysUntilNextMonday);
+
+            // === ЗУМ И ПЕРЕТАСКИВАНИЕ ДЛЯ LIGHTBOX ===
+            const lbImg = document.getElementById('lb-img');
+            const lbWrapper = document.getElementById('lightbox');
+
+            // 1. Зум колесиком мыши (ПК)
+            lbWrapper.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                applyZoom(delta);
+            }, { passive: false });
+
+            // 2. Перетаскивание мышью (ПК)
+            lbImg.addEventListener('mousedown', (e) => {
+                if (lbScale <= 1 || e.button !== 0) return;
+                e.preventDefault();
+                isDragging = true;
+                didDrag = false;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                panStartX = lbPanX;
+                panStartY = lbPanY;
+                lbImg.classList.add('dragging');
+                lbImg.style.transition = 'none';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const dx = e.clientX - dragStartX;
+                const dy = e.clientY - dragStartY;
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag = true;
+                lbPanX = panStartX + dx;
+                lbPanY = panStartY + dy;
+                constrainPan();
+                updateLightboxTransform();
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (!isDragging) return;
+                isDragging = false;
+                lbImg.classList.remove('dragging');
+                lbImg.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                if (didDrag) setTimeout(() => { didDrag = false; }, 150);
+            });
+
+            // 3. Тач: зум двумя пальцами и перетаскивание одним при зуме
+            lbWrapper.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    isPinching = true;
+                    isDragging = false;
+                    initialDist = Math.hypot(
+                        e.touches[0].pageX - e.touches[1].pageX,
+                        e.touches[0].pageY - e.touches[1].pageY
+                    );
+                    initialScale = lbScale;
+                    lbImg.style.transition = 'none';
+                } else if (e.touches.length === 1 && lbScale > 1) {
+                    isDragging = true;
+                    didDrag = false;
+                    dragStartX = e.touches[0].clientX;
+                    dragStartY = e.touches[0].clientY;
+                    panStartX = lbPanX;
+                    panStartY = lbPanY;
+                    lbImg.style.transition = 'none';
+                }
+            }, { passive: false });
+
+            lbWrapper.addEventListener('touchmove', (e) => {
+                if (isPinching && e.touches.length === 2) {
+                    e.preventDefault();
+                    const dist = Math.hypot(
+                        e.touches[0].pageX - e.touches[1].pageX,
+                        e.touches[0].pageY - e.touches[1].pageY
+                    );
+
+                    lbScale = Math.min(Math.max(initialScale * (dist / initialDist), 1), 4);
+                    if (lbScale <= 1) {
+                        lbPanX = 0;
+                        lbPanY = 0;
+                    } else {
+                        constrainPan();
+                    }
+                    updateLightboxTransform();
+                } else if (isDragging && e.touches.length === 1 && lbScale > 1) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - dragStartX;
+                    const dy = e.touches[0].clientY - dragStartY;
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag = true;
+                    lbPanX = panStartX + dx;
+                    lbPanY = panStartY + dy;
+                    constrainPan();
+                    updateLightboxTransform();
+                }
+            }, { passive: false });
+
+            lbWrapper.addEventListener('touchend', () => {
+                if (isPinching) {
+                    isPinching = false;
+                    lbImg.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                    if (lbScale <= 1) resetZoom();
+                    else constrainPan();
+                }
+                if (isDragging) {
+                    isDragging = false;
+                    lbImg.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                    if (didDrag) setTimeout(() => { didDrag = false; }, 150);
+                }
+            });
+        });
+
+        function applyZoom(factor) {
+            lbScale *= factor;
+            lbScale = Math.min(Math.max(lbScale, 1), 4);
+            if (lbScale <= 1) {
+                lbPanX = 0;
+                lbPanY = 0;
+            } else {
+                constrainPan();
+            }
+            updateLightboxTransform();
+        }
+
+        function resetZoom() {
+            lbScale = 1;
+            lbPanX = 0;
+            lbPanY = 0;
+            didDrag = false;
+            updateLightboxTransform();
+        }
+
+        function constrainPan() {
+            if (lbScale <= 1) {
+                lbPanX = 0;
+                lbPanY = 0;
+                return;
+            }
+            const wrapper = document.getElementById('lightbox');
+            const img = document.getElementById('lb-img');
+            if (!wrapper || !img || !img.naturalWidth) return;
+
+            const vw = wrapper.clientWidth;
+            const vh = wrapper.clientHeight;
+            const ratio = Math.min(vw / img.naturalWidth, vh / img.naturalHeight);
+            const baseW = img.naturalWidth * ratio;
+            const baseH = img.naturalHeight * ratio;
+            const maxX = Math.max(0, (baseW * lbScale - vw) / 2);
+            const maxY = Math.max(0, (baseH * lbScale - vh) / 2);
+
+            lbPanX = Math.min(maxX, Math.max(-maxX, lbPanX));
+            lbPanY = Math.min(maxY, Math.max(-maxY, lbPanY));
+        }
+
+        function updateLightboxTransform() {
+            const img = document.getElementById('lb-img');
+            if (img) {
+                img.style.transform = `translate(${lbPanX}px, ${lbPanY}px) scale(${lbScale})`;
+                img.classList.toggle('can-pan', lbScale > 1);
+                if (!isPinching && !isDragging) {
+                    img.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                }
+            }
+        }
+
+        function checkPass() {
+            if (document.getElementById('pass').value === PASS) {
+                sessionStorage.setItem('auth', '1');
+                showApp();
+            } else document.getElementById('err').style.display = 'block';
+        }
+
+        async function showApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            await loadStudents();
+            loadSubmissions();
+        }
+
+        function switchTab(tab, el) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.content-area').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            
+            document.getElementById('sub-tabs-container').style.display = tab === 'check' ? 'flex' : 'none';
+            
+            if (tab === 'check') loadSubmissions();
+        }
+
+        function switchSubTab(view, el) {
+            currentCheckView = view;
+            document.querySelectorAll('#sub-tabs-container .sub-tab').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            loadSubmissions();
+        }
+
+        async function loadStudents() {
+            const { data } = await db.from('students').select('telegram_id, name, group_name');
+            studentsList = data || [];
+            populateGroupFilter();
+        }
+
+        function populateGroupFilter() {
+            const container = document.getElementById('week-group-list');
+            if (!container) return;
+            const groups = [...new Set(studentsList.map(s => s.group_name).filter(Boolean))].sort();
+
+            container.querySelectorAll('.week-group-item').forEach(el => el.remove());
+            groups.forEach(g => {
+                const label = document.createElement('label');
+                label.className = 'week-group-item';
+                label.style.cssText = 'display:flex; align-items:center; gap:8px;';
+                // Название группы — через DOM API, а не строкой в innerHTML: esc() не защищает
+                // атрибут value="..." от кавычек (только текстовое содержимое), а group_name — не код,
+                // а введённое помощником значение из Google Sheets
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'week-group-checkbox';
+                checkbox.value = g;
+                checkbox.onchange = onWeekGroupPick;
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(' ' + g));
+                container.appendChild(label);
+            });
+        }
+
+        // "Все ученики" и конкретные группы взаимоисключающие
+        function onWeekGroupAllChange() {
+            if (document.getElementById('week-group-all').checked) {
+                document.querySelectorAll('.week-group-checkbox').forEach(cb => cb.checked = false);
+            }
+        }
+
+        function onWeekGroupPick() {
+            const anyChecked = [...document.querySelectorAll('.week-group-checkbox')].some(cb => cb.checked);
+            document.getElementById('week-group-all').checked = !anyChecked;
+        }
+
+        function getSelectedWeekGroups() {
+            return [...document.querySelectorAll('.week-group-checkbox:checked')].map(cb => cb.value);
+        }
+
+        async function updatePendingCount() {
+            const badge = document.getElementById('pending-count-badge');
+            if (!badge) return;
+            const { count, error } = await db
+                .from('assignments')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'submitted');
+
+            if (error || !count) {
+                badge.style.display = 'none';
+                badge.innerText = '';
+                return;
+            }
+            badge.innerText = count;
+            badge.style.display = 'inline-block';
+        }
+
+        async function loadSubmissions() {
+            const list = document.getElementById('submissions-list');
+            list.innerHTML = '<div style="text-align:center; padding:40px;">Загрузка...</div>';
+            updatePendingCount();
+
+            let query = db.from('assignments').select('*, students(name, group_name)').order('submitted_at', { ascending: false });
+
+            if (currentCheckView === 'pending') {
+                query = query.eq('status', 'submitted');
+            } else {
+                // Архив принятых/возвращённых работ растёт неограниченно — без лимита Supabase молча
+                // режет ответ на 1000 строк, и часть архива беззвучно пропадает (T7)
+                query = query.eq('status', 'checked').limit(200);
+            }
+
+            const { data, error } = await query;
+            if (error) return list.innerHTML = `<div style="color:red; padding:20px">${error.message}</div>`;
+
+            if (!data.length) {
+                const msg = currentCheckView === 'pending' ? 'Нет работ на проверку 🎉' : 'Архив пуст';
+                return list.innerHTML = `<div style="text-align:center; padding:40px; color:#999">${msg}</div>`;
+            }
+
+            renderGroupedSubmissions(list, data);
+        }
+
+        // Группирует сданные работы по группе ученика, внутри группы — по типу задания
+        const submissionTypeOrder = [
+            { key: 'daily', label: '📅 Ежедневные' },
+            { key: 'weekly', label: '🔥 Еженедельные' },
+            { key: 'individual', label: '🎯 Индивидуальные' }
+        ];
+
+        function renderGroupedSubmissions(list, data) {
+            list.innerHTML = '';
+
+            const groups = {};
+            data.forEach(sub => {
+                const groupName = sub.students?.group_name || 'Без группы';
+                if (!groups[groupName]) groups[groupName] = {};
+                if (!groups[groupName][sub.type]) groups[groupName][sub.type] = [];
+                groups[groupName][sub.type].push(sub);
+            });
+
+            const groupNames = Object.keys(groups).sort((a, b) => {
+                if (a === 'Без группы') return 1;
+                if (b === 'Без группы') return -1;
+                return a.localeCompare(b);
+            });
+
+            groupNames.forEach(groupName => {
+                const groupHeader = document.createElement('h3');
+                groupHeader.style.margin = '20px 0 10px';
+                groupHeader.innerText = `👥 ${groupName}`;
+                list.appendChild(groupHeader);
+
+                submissionTypeOrder.forEach(({ key, label }) => {
+                    const subs = groups[groupName][key];
+                    if (!subs || !subs.length) return;
+
+                    const typeHeader = document.createElement('div');
+                    typeHeader.style.cssText = 'font-size:13px; font-weight:600; color:#666; margin:10px 0 6px;';
+                    typeHeader.innerText = `${label} (${subs.length})`;
+                    list.appendChild(typeHeader);
+
+                    subs.forEach(sub => list.appendChild(buildSubmissionCard(sub)));
+                });
+            });
+        }
+
+        function buildSubmissionCard(sub) {
+            const card = document.createElement('div');
+            card.className = 'submission-card';
+            card.onclick = () => openReview(sub);
+
+            const typeLabels = { daily: 'Ежедневное', weekly: 'Еженедельное', individual: 'Индивидуальное' };
+            const badgeClass = `badge-${sub.type}`;
+            const statusBadge = sub.approval_status === 'approved' ? 'badge-approved' : 'badge-rejected';
+            const statusText = sub.approval_status === 'approved' ? 'Принято' : 'Возврат';
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="student-name">${esc(sub.students?.name || 'Unknown')}</span>
+                    <span class="badge ${badgeClass}">${typeLabels[sub.type]}</span>
+                </div>
+                <div class="card-meta">${esc(sub.title || 'Без названия')} • ${new Date(sub.submitted_at || sub.created_at).toLocaleString('ru')}</div>
+                ${currentCheckView === 'archive' ? `<span class="badge ${statusBadge}" style="margin-top:5px;">${statusText}</span>` : ''}
+                ${sub.content_url ? `<a href="${normalizeUrl(sub.content_url)}" target="_blank" class="card-link">🔗 Исходник</a>` : ''}
+            `;
+            return card;
+        }
+
+        function openReview(sub) {
+            currentSubmissionId = sub.id;
+            document.getElementById('rev-student').innerText = sub.students?.name || 'Unknown';
+            
+            const typeLabels = { daily: 'Ежедневное', weekly: 'Еженедельное', individual: 'Индивидуальное' };
+            const badge = document.getElementById('rev-type');
+            badge.innerText = typeLabels[sub.type];
+            badge.className = `badge badge-${sub.type}`;
+            
+            document.getElementById('rev-comment-teacher').innerText = sub.teacher_comment || 'Нет комментария от учителя';
+            document.getElementById('rev-link').href = sub.content_url ? normalizeUrl(sub.content_url) : '#';
+            document.getElementById('rev-link').style.display = sub.content_url ? 'inline-block' : 'none';
+            document.getElementById('rev-feedback').value = sub.teacher_feedback || '';
+            
+            try {
+                reviewPhotos = JSON.parse(sub.photo_url);
+                if (!Array.isArray(reviewPhotos)) reviewPhotos = [reviewPhotos];
+            } catch { reviewPhotos = [sub.photo_url]; }
+            
+            reviewPhotoIndex = 0;
+            updateReviewPhotoDisplay();
+            
+            document.getElementById('review-modal').classList.add('active');
+        }
+
+        function closeReview() {
+            document.getElementById('review-modal').classList.remove('active');
+            currentSubmissionId = null;
+        }
+
+        function updateReviewPhotoDisplay() {
+            const img = document.getElementById('rev-photo');
+            const prevBtn = document.getElementById('prev-photo-btn');
+            const nextBtn = document.getElementById('next-photo-btn');
+            const counter = document.getElementById('photo-counter');
+            
+            if (!img || !reviewPhotos.length) return;
+            
+            img.src = reviewPhotos[reviewPhotoIndex];
+            
+            if (reviewPhotos.length > 1) {
+                prevBtn.style.display = 'block';
+                nextBtn.style.display = 'block';
+                counter.style.display = 'block';
+                counter.innerText = `${reviewPhotoIndex + 1} / ${reviewPhotos.length}`;
+                
+                prevBtn.disabled = reviewPhotoIndex === 0;
+                nextBtn.disabled = reviewPhotoIndex === reviewPhotos.length - 1;
+                prevBtn.style.opacity = reviewPhotoIndex === 0 ? '0.3' : '1';
+                nextBtn.style.opacity = reviewPhotoIndex === reviewPhotos.length - 1 ? '0.3' : '1';
+            } else {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+                counter.style.display = 'none';
+            }
+        }
+
+        function changeReviewPhoto(dir) {
+            reviewPhotoIndex += dir;
+            if (reviewPhotoIndex < 0) reviewPhotoIndex = 0;
+            if (reviewPhotoIndex >= reviewPhotos.length) reviewPhotoIndex = reviewPhotos.length - 1;
+            updateReviewPhotoDisplay();
+        }
+
+        function openLightbox() {
+            if (reviewPhotos.length > 0) {
+                document.getElementById('lb-img').src = reviewPhotos[reviewPhotoIndex];
+                resetZoom();
+                document.getElementById('lightbox').classList.add('active');
+            }
+        }
+
+        function closeLightbox() {
+            if (didDrag || isDragging) return;
+            document.getElementById('lightbox').classList.remove('active');
+            resetZoom();
+        }
+
+        async function submitReview(status) {
+            if (!currentSubmissionId) return;
+            const feedback = document.getElementById('rev-feedback').value.trim();
+            
+            try {
+                // Состояние читаем до обновления: повторное «Принять» уже принятой работы (открытой из Архива) не должно начислять бонус ещё раз
+                const { data: sub } = await db.from('assignments').select('student_id, type, status, approval_status, scheduled_date').eq('id', currentSubmissionId).single();
+                const alreadyApproved = sub.status === 'checked' && sub.approval_status === 'approved';
+
+                await db.from('assignments').update({
+                    status: 'checked',
+                    approval_status: status,
+                    teacher_feedback: feedback,
+                    checked_at: new Date().toISOString()
+                }).eq('id', currentSubmissionId);
+
+                if (status === 'approved' && !alreadyApproved) {
+                    if (sub.type === 'daily') {
+                        await processStreak(sub.student_id, sub.scheduled_date);
+                    } else {
+                        await awardApprovalBonus(sub.student_id, sub.type);
+                    }
+                }
+                
+                alert(status === 'approved' ? 'Работа принята!' : 'Работа возвращена!');
+                closeReview();
+                loadSubmissions();
+            } catch(e) { alert('Ошибка: ' + e.message); }
+        }
+
+        // Стрик считается пересчётом цепочки подряд идущих scheduled_date с принятыми ежедневками,
+        // а не датой, когда учитель нажал «Принять» — так пачка проверки, пропущенный день проверки
+        // и приём из архива не в хронологическом порядке не портят счёт, а старые залипшие стрики
+        // сами исправляются при следующем принятии. thisScheduledDate — дата именно той ежедневки,
+        // которую только что приняли (её награда считается по её месту в цепочке, не по сегодняшней дате).
+        async function processStreak(studentId, thisScheduledDate) {
+            const { data: rows, error } = await db
+                .from('assignments')
+                .select('scheduled_date')
+                .eq('student_id', studentId)
+                .eq('type', 'daily')
+                .eq('status', 'checked')
+                .eq('approval_status', 'approved')
+                .order('scheduled_date', { ascending: false })
+                .limit(400);
+            if (error) throw error;
+
+            const dates = [...new Set((rows || []).map(r => r.scheduled_date))].sort();
+
+            const positionByDate = {};
+            let position = 0;
+            let prevDate = null;
+            for (const d of dates) {
+                position = (prevDate && addDaysToDate(prevDate, 1) === d) ? position + 1 : 1;
+                positionByDate[d] = position;
+                prevDate = d;
+            }
+
+            const lastDate = dates[dates.length - 1];
+            const currentStreak = lastDate ? positionByDate[lastDate] : 0;
+            const thisPosition = positionByDate[thisScheduledDate] || 1;
+            const reward = thisPosition === 1 ? 5 : thisPosition === 2 ? 10 : 15;
+
+            await db.from('students').update({
+                current_streak: currentStreak,
+                last_submission_date_msk: lastDate
+            }).eq('telegram_id', studentId);
+
+            const { error: rpcError } = await db.rpc('add_huikons', {
+                p_student_id: studentId,
+                p_amount: reward,
+                p_reason: `streak_day_${thisPosition}`
+            });
+            if (rpcError) throw rpcError;
+        }
+
+        // Флат-бонус за приём еженедельного/индивидуального задания (не связан со стриком — тот только для ежедневных)
+        async function awardApprovalBonus(studentId, type) {
+            const bonuses = { weekly: 20, individual: 15 };
+            const reward = bonuses[type];
+            if (!reward) return;
+
+            const { error: rpcError } = await db.rpc('add_huikons', {
+                p_student_id: studentId,
+                p_amount: reward,
+                p_reason: `${type}_approved`
+            });
+            if (rpcError) throw rpcError;
+        }
+
+        async function showPenaltyModal() {
+            document.getElementById('penalty-modal').classList.add('active');
+            selectedPenalty = -20;
+            updatePenaltyButtons();
+
+            const balanceEl = document.getElementById('pen-balance');
+            balanceEl.innerText = '...';
+            if (!currentSubmissionId) return;
+
+            const { data: sub } = await db.from('assignments').select('student_id').eq('id', currentSubmissionId).single();
+            if (!sub) return;
+            const { data: student } = await db.from('students').select('huikons').eq('telegram_id', sub.student_id).single();
+            balanceEl.innerText = student ? (student.huikons || 0) : '?';
+        }
+
+        function closePenalty() {
+            document.getElementById('penalty-modal').classList.remove('active');
+        }
+
+        function selectPenalty(amount) {
+            selectedPenalty = amount;
+            updatePenaltyButtons();
+        }
+
+        function updatePenaltyButtons() {
+            document.querySelectorAll('.penalty-btn').forEach(btn => {
+                btn.classList.toggle('selected', parseInt(btn.innerText) === selectedPenalty);
+            });
+        }
+
+        async function applyPenalty() {
+            const reason = document.getElementById('pen-reason').value.trim();
+            if (!reason) return alert('Укажите причину штрафа!');
+
+            const { data: sub } = await db.from('assignments').select('student_id').eq('id', currentSubmissionId).single();
+
+            try {
+                // Кламп нулём и фактически списанная сумма в историю теперь считаются атомарно внутри RPC
+                const { data: result, error: rpcError } = await db.rpc('add_huikons', {
+                    p_student_id: sub.student_id,
+                    p_amount: selectedPenalty,
+                    p_reason: `penalty: ${reason}`
+                }).single();
+                if (rpcError) throw rpcError;
+
+                alert(`Списано ${Math.abs(result.actual_change)} хуиконов. Новый баланс: ${result.new_balance}`);
+                closePenalty();
+                closeReview();
+            } catch(e) { alert('Ошибка: ' + e.message); }
+        }
+
+        function addDaysToDate(dateStr, days) {
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const result = new Date(Date.UTC(y, m - 1, d + days));
+            const yy = result.getUTCFullYear();
+            const mm = String(result.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(result.getUTCDate()).padStart(2, '0');
+            return `${yy}-${mm}-${dd}`;
+        }
+
+        async function scheduleWeek() {
+            const date = document.getElementById('activation-date').value;
+            if (!date) return alert('Выберите дату активации!');
+            
+            const assignments = [];
+            
+            for (let i = 0; i < 7; i++) {
+                const title = document.getElementById(`day-title-${i}`).value.trim();
+                const url = document.getElementById(`day-url-${i}`).value.trim();
+                const comment = document.getElementById(`day-comment-${i}`).value.trim();
+                
+                if (title && url) {
+                    assignments.push({ title, content_url: url, teacher_comment: comment, day_of_week: i + 1, type: 'daily' });
+                }
+            }
+            
+            const weeklyTitle = document.getElementById('weekly-title').value.trim();
+            const weeklyUrl = document.getElementById('weekly-url').value.trim();
+            const weeklyComment = document.getElementById('weekly-comment').value.trim();
+            
+            if (weeklyTitle && weeklyUrl) {
+                assignments.push({ title: weeklyTitle, content_url: weeklyUrl, teacher_comment: weeklyComment, type: 'weekly' });
+            }
+            
+            if (!assignments.length) return alert('Заполните хотя бы одно задание!');
+
+            // Блокируем кнопку на время сохранения — двойной клик вставил бы всю неделю дважды
+            const btn = document.getElementById('btn-schedule-week');
+            btn.disabled = true;
+            try {
+                const selectedGroups = getSelectedWeekGroups();
+                let studentsQuery = db.from('students').select('telegram_id');
+                if (selectedGroups.length) studentsQuery = studentsQuery.in('group_name', selectedGroups);
+                const { data: students } = await studentsQuery;
+                if (!students || !students.length) return alert(selectedGroups.length ? 'В выбранных группах нет учеников!' : 'Нет учеников в базе!');
+                const assignedGroupLabel = selectedGroups.length ? selectedGroups.join(', ') : 'Все ученики';
+
+                const bulkInsert = [];
+                students.forEach(stu => {
+                    assignments.forEach(asn => {
+                        const asnDate = asn.day_of_week ? addDaysToDate(date, asn.day_of_week - 1) : date;
+                        bulkInsert.push({
+                            student_id: stu.telegram_id,
+                            ...asn,
+                            scheduled_date: asnDate,
+                            activation_status: 'scheduled',
+                            week_label: date,
+                            status: 'assigned',
+                            assigned_group: assignedGroupLabel
+                        });
+                    });
+                });
+
+                await db.from('assignments').insert(bulkInsert);
+                alert(`Запланировано ${bulkInsert.length} заданий на ${date}!`);
+                for (let i = 0; i < 7; i++) {
+                    document.getElementById(`day-title-${i}`).value = '';
+                    document.getElementById(`day-url-${i}`).value = '';
+                    document.getElementById(`day-comment-${i}`).value = '';
+                }
+                document.getElementById('weekly-title').value = '';
+                document.getElementById('weekly-url').value = '';
+                document.getElementById('weekly-comment').value = '';
+                document.getElementById('week-group-all').checked = true;
+                document.querySelectorAll('.week-group-checkbox').forEach(cb => cb.checked = false);
+            } catch(e) { alert('Ошибка: ' + e.message); }
+            finally { btn.disabled = false; }
+        }
+
+        // --- ПОИСК УЧЕНИКА ПО USERNAME (индивидуальное задание) ---
+        let selectedIndivStudentId = null;
+        let indivSearchTimeout = null;
+
+        function onIndivUsernameInput() {
+            selectedIndivStudentId = null; // при ручном изменении текста выбор сбрасывается — нужно выбрать заново из подсказок
+            const query = document.getElementById('indiv-username-input').value.trim();
+            const box = document.getElementById('indiv-username-suggestions');
+            clearTimeout(indivSearchTimeout);
+
+            if (!query) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+            indivSearchTimeout = setTimeout(async () => {
+                const { data } = await db.from('students')
+                    .select('telegram_id, name, telegram_username')
+                    .ilike('telegram_username', `%${query}%`)
+                    .not('telegram_username', 'is', null)
+                    .limit(8);
+
+                if (!data || data.length === 0) {
+                    box.innerHTML = '<div class="username-suggestion-item" style="color:#999; cursor:default;">Не найдено</div>';
+                    box.style.display = 'block';
+                    return;
+                }
+
+                box.innerHTML = '';
+                data.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = 'username-suggestion-item';
+                    item.innerHTML = `<b>@${esc(s.telegram_username)}</b> — ${esc(s.name || '')}`;
+                    item.onclick = () => selectIndivStudent(s.telegram_id, s.telegram_username, s.name);
+                    box.appendChild(item);
+                });
+                box.style.display = 'block';
+            }, 250);
+        }
+
+        function selectIndivStudent(telegramId, username, name) {
+            selectedIndivStudentId = telegramId;
+            document.getElementById('indiv-username-input').value = username;
+            document.getElementById('indiv-username-suggestions').style.display = 'none';
+        }
+
+        async function assignIndividual() {
+            const title = document.getElementById('indiv-title').value.trim();
+            const url = document.getElementById('indiv-url').value.trim();
+            const comment = document.getElementById('indiv-comment').value.trim();
+
+            if (!selectedIndivStudentId || !title) return alert('Выберите ученика из подсказок и укажите название!');
+
+            // Блокируем кнопку на время сохранения — двойной клик назначил бы задание дважды
+            const btn = document.getElementById('btn-assign-indiv');
+            btn.disabled = true;
+            try {
+                await db.from('assignments').insert([{
+                    student_id: selectedIndivStudentId,
+                    type: 'individual',
+                    title,
+                    content_url: url,
+                    teacher_comment: comment,
+                    activation_status: 'active',
+                    status: 'assigned'
+                }]);
+                alert('Индивидуальное задание назначено!');
+                document.getElementById('indiv-username-input').value = '';
+                selectedIndivStudentId = null;
+                document.getElementById('indiv-title').value = '';
+                document.getElementById('indiv-url').value = '';
+                document.getElementById('indiv-comment').value = '';
+            } catch(e) { alert('Ошибка: ' + e.message); }
+            finally { btn.disabled = false; }
+        }
+
+        // --- ПОДВКЛАДКИ ВНУТРИ "ПЛАНИРОВАНИЕ" ---
+        let currentPlanSubTab = 'create';
+        let currentArchiveSubTab = 'daily';
+        let currentIndividualArchiveView = 'active';
+
+        function switchPlanSubTab(view, el) {
+            currentPlanSubTab = view;
+            document.querySelectorAll('#plan-sub-tabs .sub-tab').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('.plan-view').forEach(v => v.classList.remove('active'));
+            document.getElementById('plan-' + view).classList.add('active');
+
+            if (view === 'draft') loadDrafts();
+            else if (view === 'current') loadCurrentWeek();
+            else if (view === 'archive') loadArchiveWeeks('daily', 'archive-daily');
+        }
+
+        function switchArchiveSubTab(view, el) {
+            currentArchiveSubTab = view;
+            document.querySelectorAll('#archive-sub-tabs .sub-tab').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            document.querySelectorAll('.archive-view').forEach(v => v.classList.remove('active'));
+            document.getElementById('archive-' + view).classList.add('active');
+
+            if (view === 'daily') loadArchiveWeeks('daily', 'archive-daily');
+            else if (view === 'weekly') loadArchiveWeeks('weekly', 'archive-weekly');
+            else if (view === 'individual') loadArchiveIndividual(currentIndividualArchiveView);
+        }
+
+        function switchIndividualArchiveView(view, el) {
+            currentIndividualArchiveView = view;
+            document.querySelectorAll('#archive-individual-sub-tabs .sub-tab').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            loadArchiveIndividual(view);
+        }
+
+        // --- ЧЕРНОВИК: недели, дата активации которых ещё не наступила ---
+        async function loadDrafts() {
+            const container = document.getElementById('draft-list');
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:#999;">Загрузка...</div>';
+
+            const today = getTodayMSK();
+            const { data, error } = await db.from('assignments')
+                .select('id, week_label, type, day_of_week, title, content_url, teacher_comment, scheduled_date, assigned_group')
+                .in('type', ['daily', 'weekly'])
+                .gt('week_label', today)
+                .order('week_label', { ascending: true });
+
+            if (error) { container.innerHTML = `<div style="color:red; padding:20px;">${error.message}</div>`; return; }
+            renderWeekGroups(container, data, { editable: true, deletable: true, today, emptyText: 'Нет запланированных недель' });
+        }
+
+        // --- ТЕКУЩАЯ НЕДЕЛЯ: сегодня попадает в её пн–вс, ещё не наступившие дни редактируемы ---
+        async function loadCurrentWeek() {
+            const container = document.getElementById('current-week-list');
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:#999;">Загрузка...</div>';
+
+            const today = getTodayMSK();
+            const { data, error } = await db.from('assignments')
+                .select('id, week_label, type, day_of_week, title, content_url, teacher_comment, scheduled_date, assigned_group')
+                .in('type', ['daily', 'weekly'])
+                .lte('week_label', today)
+                .order('week_label', { ascending: true });
+
+            if (error) { container.innerHTML = `<div style="color:red; padding:20px;">${error.message}</div>`; return; }
+
+            const currentLabels = new Set(
+                [...new Set((data || []).map(a => a.week_label))].filter(wl => addDaysToDate(wl, 6) >= today)
+            );
+            const filtered = (data || []).filter(a => currentLabels.has(a.week_label));
+            renderWeekGroups(container, filtered, { editable: true, today, emptyText: 'Сейчас нет текущей недели' });
+        }
+
+        // --- АРХИВ: недели, которые полностью закончились ---
+        async function loadArchiveWeeks(type, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:#999;">Загрузка...</div>';
+
+            const today = getTodayMSK();
+            // Фильтр завершённых недель перенесён из клиента в запрос (T7): неделя архивна, когда с даты
+            // активации прошло 6 дней. Это тот же критерий, что и в клиентском фильтре ниже
+            // (addDaysToDate(wl, 6) < today  ⟺  wl < addDaysToDate(today, -6)), но теперь Supabase не тянет
+            // текущие/будущие недели — на архивных данных ответ не упирается в молчаливый предел 1000 строк.
+            const archiveCutoff = addDaysToDate(today, -6);
+            const { data, error } = await db.from('assignments')
+                .select('id, week_label, type, day_of_week, title, content_url, teacher_comment, scheduled_date, assigned_group')
+                .eq('type', type)
+                .lt('week_label', archiveCutoff)
+                .order('week_label', { ascending: false });
+
+            if (error) { container.innerHTML = `<div style="color:red; padding:20px;">${error.message}</div>`; return; }
+
+            const archivedLabels = new Set(
+                [...new Set((data || []).map(a => a.week_label))].filter(wl => addDaysToDate(wl, 6) < today)
+            );
+            const filtered = (data || []).filter(a => archivedLabels.has(a.week_label));
+            renderWeekGroups(container, filtered, { editable: false, emptyText: 'Архив пуст' });
+        }
+
+        // Группирует строки по неделе, затем по (тип, день недели) — контент одинаков для всех учеников этой недели.
+        // Ключ недели — week_label + assigned_group: на одну дату активации могут существовать разные недели
+        // для разных групп, и без учёта группы они сливались бы в одну (а правка/удаление задевали бы чужую неделю).
+        let weekGroupRegistry = [];
+        let weekDeleteRegistry = [];
+
+        // Дополняет запрос фильтром по снимку группы; у недель, созданных до появления assigned_group, поле NULL
+        function filterByAssignedGroup(query, assignedGroup) {
+            return assignedGroup ? query.eq('assigned_group', assignedGroup) : query.is('assigned_group', null);
+        }
+
+        function renderWeekGroups(container, rows, opts) {
+            opts = opts || {};
+            weekGroupRegistry = [];
+            weekDeleteRegistry = [];
+
+            if (!rows || rows.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">${opts.emptyText || 'Пусто'}</div>`;
+                return;
+            }
+
+            const weeks = {};
+            rows.forEach(r => {
+                const wKey = r.week_label + '||' + (r.assigned_group || '');
+                if (!weeks[wKey]) weeks[wKey] = { weekLabel: r.week_label, assignedGroup: r.assigned_group || null, items: {} };
+                const key = r.type === 'daily' ? `daily-${r.day_of_week}` : 'weekly';
+                if (!weeks[wKey].items[key]) weeks[wKey].items[key] = { ...r, count: 0 };
+                weeks[wKey].items[key].count++;
+            });
+
+            const dayNames = ['', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+            const weekKeys = Object.keys(weeks).sort();
+
+            container.innerHTML = weekKeys.map(wKey => {
+                const week = weeks[wKey];
+                const items = week.items;
+                const itemKeys = Object.keys(items).sort((a, b) => {
+                    if (a === 'weekly') return 1;
+                    if (b === 'weekly') return -1;
+                    return parseInt(a.split('-')[1]) - parseInt(b.split('-')[1]);
+                });
+
+                const itemsHtml = itemKeys.map(key => {
+                    const item = items[key];
+                    const label = key === 'weekly' ? '🔥 Еженедельное' : `📅 ${dayNames[item.day_of_week]}`;
+                    const canEdit = opts.editable && (item.type === 'weekly' || item.scheduled_date > opts.today);
+
+                    let editButton = '';
+                    let deleteButton = '';
+                    if (canEdit) {
+                        const idx = weekGroupRegistry.length;
+                        weekGroupRegistry.push({
+                            weekLabel: week.weekLabel, type: item.type, dayOfWeek: item.day_of_week || null,
+                            assignedGroup: week.assignedGroup,
+                            title: item.title, url: item.content_url, comment: item.teacher_comment
+                        });
+                        editButton = `<button class="btn-secondary" style="margin-top:8px;" onclick="openEditGroup(${idx})">✏️ Редактировать</button>`;
+                        if (opts.deletable) {
+                            deleteButton = `<button class="btn-danger" style="margin-top:8px; padding:8px;" onclick="deleteGroup(${idx})">🗑️ Удалить</button>`;
+                        }
+                    }
+
+                    return `
+                        <div class="submission-card" style="cursor:default;">
+                            <div class="card-header">
+                                <span class="student-name">${label}</span>
+                                <span style="font-size:12px; color:#999;">${item.count} уч.</span>
+                            </div>
+                            <div class="card-meta">${esc(item.title || 'Без названия')}</div>
+                            ${item.content_url ? `<a href="${normalizeUrl(item.content_url)}" target="_blank" class="card-link">🔗 Ссылка</a>` : ''}
+                            ${editButton}
+                            ${deleteButton}
+                        </div>
+                    `;
+                }).join('');
+
+                const groupLabel = week.assignedGroup || 'Группа не указана';
+                let deleteWeekButton = '';
+                if (opts.deletable) {
+                    const wIdx = weekDeleteRegistry.length;
+                    weekDeleteRegistry.push({ weekLabel: week.weekLabel, assignedGroup: week.assignedGroup });
+                    deleteWeekButton = `<button class="btn-danger" style="width:auto; padding:6px 14px; font-size:12px; margin:0;" onclick="deleteWholeWeek(${wIdx})">🗑️ Удалить неделю</button>`;
+                }
+                return `<div style="margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                        <h4 style="margin:0;">Неделя от ${week.weekLabel}</h4>
+                        ${deleteWeekButton}
+                    </div>
+                    <div style="font-size:13px; color:#666; margin-bottom:10px;">👥 ${esc(groupLabel)}</div>
+                    ${itemsHtml}
+                </div>`;
+            }).join('');
+        }
+
+        let currentEditGroup = null;
+
+        function openEditGroup(idx) {
+            currentEditGroup = weekGroupRegistry[idx];
+            document.getElementById('edit-group-title').value = currentEditGroup.title || '';
+            document.getElementById('edit-group-url').value = currentEditGroup.url || '';
+            document.getElementById('edit-group-comment').value = currentEditGroup.comment || '';
+            document.getElementById('edit-group-modal').classList.add('active');
+        }
+
+        function closeGroupEdit() {
+            document.getElementById('edit-group-modal').classList.remove('active');
+            currentEditGroup = null;
+        }
+
+        async function saveGroupEdit() {
+            const g = currentEditGroup;
+            if (!g) return;
+
+            const title = document.getElementById('edit-group-title').value.trim();
+            const url = document.getElementById('edit-group-url').value.trim();
+            const comment = document.getElementById('edit-group-comment').value.trim();
+            if (!title) return alert('Укажите название!');
+
+            let query = db.from('assignments').update({ title, content_url: url, teacher_comment: comment })
+                .eq('week_label', g.weekLabel)
+                .eq('type', g.type);
+            if (g.type === 'daily') query = query.eq('day_of_week', g.dayOfWeek);
+            query = filterByAssignedGroup(query, g.assignedGroup);
+
+            try {
+                await query;
+                alert('Изменения сохранены для всех учеников этой недели!');
+                closeGroupEdit();
+                if (currentPlanSubTab === 'draft') loadDrafts();
+                else if (currentPlanSubTab === 'current') loadCurrentWeek();
+            } catch(e) { alert('Ошибка: ' + e.message); }
+        }
+
+        // Удаление недели целиком (только из Черновика — неделя ещё не началась)
+        async function deleteWholeWeek(idx) {
+            const w = weekDeleteRegistry[idx];
+            if (!w) return;
+            if (!confirm(`Удалить всю неделю от ${w.weekLabel} (${w.assignedGroup || 'группа не указана'}) целиком (все дни и еженедельное задание) для всех учеников? Отменить будет нельзя.`)) return;
+
+            try {
+                await filterByAssignedGroup(db.from('assignments').delete().eq('week_label', w.weekLabel), w.assignedGroup);
+                alert('Неделя удалена.');
+                loadDrafts();
+            } catch(e) { alert('Ошибка: ' + e.message); }
+        }
+
+        async function deleteGroup(idx) {
+            const g = weekGroupRegistry[idx];
+            if (!g) return;
+            if (!confirm('Удалить это задание для всех учеников этой недели? Отменить будет нельзя.')) return;
+
+            let query = db.from('assignments').delete()
+                .eq('week_label', g.weekLabel)
+                .eq('type', g.type);
+            if (g.type === 'daily') query = query.eq('day_of_week', g.dayOfWeek);
+            query = filterByAssignedGroup(query, g.assignedGroup);
+
+            try {
+                await query;
+                alert('Удалено.');
+                loadDrafts();
+            } catch(e) { alert('Ошибка: ' + e.message); }
+        }
+
+        // --- АРХИВ ИНДИВИДУАЛЬНЫХ ЗАДАНИЙ ---
+        async function loadArchiveIndividual(view) {
+            const container = document.getElementById('archive-individual-list');
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:#999;">Загрузка...</div>';
+
+            let query = db.from('assignments').select('*, students(name)').eq('type', 'individual').order('created_at', { ascending: false }).limit(200);
+            query = view === 'active' ? query.eq('status', 'assigned') : query.in('status', ['submitted', 'checked']);
+
+            const { data, error } = await query;
+            if (error) { container.innerHTML = `<div style="color:red; padding:20px;">${error.message}</div>`; return; }
+
+            if (!data.length) {
+                container.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">${view === 'active' ? 'Нет активных индивидуальных заданий' : 'Архив пуст'}</div>`;
+                return;
+            }
+
+            container.innerHTML = data.map(a => `
+                <div class="submission-card" style="cursor:default;">
+                    <div class="card-header">
+                        <span class="student-name">${esc(a.students?.name || 'Unknown')}</span>
+                        <span class="badge badge-individual">Индивидуальное</span>
+                    </div>
+                    <div class="card-meta">${esc(a.title || 'Без названия')} • ${new Date(a.created_at).toLocaleString('ru')}</div>
+                    ${a.content_url ? `<a href="${normalizeUrl(a.content_url)}" target="_blank" class="card-link">🔗 Исходник</a>` : ''}
+                    ${view === 'active' ? `<button class="btn-danger" style="margin-top:8px; padding:8px;" onclick="deleteIndividualAssignment('${a.id}')">🗑️ Удалить</button>` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function deleteIndividualAssignment(id) {
+            if (!confirm('Удалить это индивидуальное задание? Отменить будет нельзя.')) return;
+            try {
+                await db.from('assignments').delete().eq('id', id);
+                alert('Удалено.');
+                loadArchiveIndividual('active');
+            } catch(e) { alert('Ошибка: ' + e.message); }
+        }
+    </script>
+</body>
+</html>

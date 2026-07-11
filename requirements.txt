@@ -1,0 +1,5 @@
+aiogram
+requests
+httpx
+matplotlib
+python-dotenv

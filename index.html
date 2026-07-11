@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sasha Math Bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        :root {
+            --tg-bg: var(--tg-theme-bg-color, #fff);
+            --tg-text: var(--tg-theme-text-color, #000);
+            --tg-hint: var(--tg-theme-hint-color, #999);
+            --tg-link: var(--tg-theme-link-color, #2481cc);
+            --tg-btn: var(--tg-theme-button-color, #2481cc);
+            --tg-btn-text: var(--tg-theme-button-text-color, #fff);
+            --tg-secondary: var(--tg-theme-secondary-bg-color, #f0f0f0);
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; padding: 0; padding-bottom: 75px;
+            background-color: var(--tg-bg); color: var(--tg-text);
+            display: flex; flex-direction: column; min-height: 100vh;
+        }
+
+        .screen { display: none; padding: 20px; animation: fadeIn 0.3s ease; }
+        .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Профиль */
+        .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-top: 10px; }
+        .avatar-container {
+            width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+            background: var(--tg-secondary); overflow: hidden; position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .avatar-img { width: 100%; height: 100%; object-fit: cover; }
+        .avatar-placeholder {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            font-size: 16px; font-weight: bold; color: var(--tg-link); background: rgba(36,129,204,0.1);
+        }
+        .user-name { font-size: 16px; font-weight: 700; margin: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .group-badge {
+            display: inline-block; flex-shrink: 0; margin-left: auto;
+            background: var(--tg-secondary); color: var(--tg-hint);
+            padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;
+        }
+        .group-badge.assigned { background: rgba(36,129,204,0.12); color: var(--tg-link); }
+        .streak-badge {
+            display: inline-block; background: #ff9800; color: white;
+            padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 12px;
+        }
+
+        /* Прогресс стрика */
+        .streak-dots { display: flex; gap: 8px; margin-bottom: 6px; }
+        .streak-dot { flex: 1; text-align: center; padding: 6px 0; border-radius: 10px; background: var(--tg-secondary); font-size: 12px; font-weight: 700; color: var(--tg-hint); }
+        .streak-dot.filled { background: #ff9800; color: white; }
+        .streak-note { font-size: 12px; color: var(--tg-hint); text-align: center; }
+
+        /* Сводка заданий */
+        .assignments-summary { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .summary-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+        .summary-row { display: flex; justify-content: space-between; text-align: center; }
+        .summary-item { flex: 1; }
+        .summary-count { display: block; font-size: 22px; font-weight: 800; color: var(--tg-link); }
+        .summary-label { display: block; font-size: 11px; opacity: 0.7; margin-top: 4px; }
+        .summary-empty { text-align: center; padding: 10px; opacity: 0.6; font-size: 14px; }
+
+        /* График пробников */
+        .mock-chart-section { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .chart-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+        .chart-empty { text-align: center; padding: 20px 10px; opacity: 0.6; font-size: 14px; }
+        .exam-info-box { margin-top: 10px; text-align: center; font-size: 13px; padding: 8px; background: var(--tg-bg); border-radius: 10px; min-height: 18px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: var(--tg-secondary); border-radius: 16px; padding: 18px 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .stat-val { font-size: 26px; font-weight: 800; color: var(--tg-link); margin-bottom: 6px; }
+        .stat-label { font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* История баланса */
+        .history-section { margin-top: 20px; }
+        .history-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .history-list { list-style: none; padding: 0; margin: 0; background: var(--tg-secondary); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .history-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 14px 16px; border-bottom: 1px solid rgba(128,128,128,0.1); 
+        }
+        .history-item:last-child { border-bottom: none; }
+        .hist-info { flex: 1; }
+        .hist-reason { font-weight: 600; font-size: 14px; }
+        .hist-date { font-size: 11px; color: var(--tg-hint); margin-top: 3px; }
+        .hist-amount { font-weight: 800; font-size: 16px; }
+        .hist-positive { color: #28a745; }
+        .hist-negative { color: #dc3545; }
+
+        /* Домашка */
+        .dz-section { background: var(--tg-secondary); border-radius: 20px; padding: 25px; margin-top: 10px; }
+        .dz-title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }
+        
+        .tabs-hw { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; color: var(--tg-hint); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab-btn.active { color: var(--tg-link); border-bottom-color: var(--tg-link); }
+        
+        .hw-view { display: none; }
+        .hw-view.active { display: block; }
+
+        .input-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
+        select { 
+            padding: 14px; border-radius: 12px; border: 1px solid rgba(128,128,128,0.2); 
+            background: var(--tg-bg); color: var(--tg-text); font-size: 16px; outline: none; width: 100%;
+        }
+        
+        button.primary { 
+            width: 100%; padding: 14px; border-radius: 12px; border: none; 
+            background: var(--tg-btn); color: var(--tg-btn-text); font-weight: 700; font-size: 15px; cursor: pointer;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .dz-status { text-align: center; font-size: 13px; min-height: 20px; margin-top: 10px; font-weight: 500; }
+
+        /* Загрузка файла (MULTI) */
+        .file-upload-area { 
+            border: 2px dashed rgba(128,128,128,0.3); border-radius: 12px; padding: 20px; 
+            text-align: center; margin-bottom: 15px; cursor: pointer; transition: all 0.2s;
+            background: var(--tg-bg);
+        }
+        .file-upload-area:hover { border-color: var(--tg-link); background: rgba(36,129,204,0.05); }
+        .file-upload-area.has-file { border-color: #28a745; background: rgba(40,167,69,0.05); }
+        #file-input { display: none; }
+        .upload-icon { font-size: 40px; margin-bottom: 10px; }
+        .upload-text { font-size: 14px; color: var(--tg-hint); }
+        
+        .file-list { margin-top: 10px; text-align: left; }
+        .file-item { 
+            background: rgba(0,0,0,0.05); padding: 8px 12px; border-radius: 8px; 
+            margin-bottom: 5px; font-size: 13px; display: flex; justify-content: space-between;
+        }
+
+        /* Список моих работ */
+        .my-hw-list { list-style: none; padding: 0; margin: 0; }
+        .my-hw-item { 
+            background: var(--tg-secondary); border-radius: 12px; padding: 15px; margin-bottom: 12px;
+            border-left: 4px solid transparent;
+        }
+        .my-hw-item.status-pending { border-left-color: #ffc107; }
+        .my-hw-item.status-approved { border-left-color: #28a745; }
+        .my-hw-item.status-rejected { border-left-color: #dc3545; }
+        
+        .hw-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .hw-variant { font-weight: bold; font-size: 16px; }
+        .hw-pages { font-size: 12px; color: var(--tg-hint); margin-left: 5px; }
+        .hw-date { font-size: 11px; color: var(--tg-hint); }
+        .hw-badge { font-size: 10px; padding: 3px 8px; border-radius: 10px; font-weight: bold; text-transform: uppercase; }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-approved { background: #d4edda; color: #155724; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+        
+        .hw-comment { 
+            margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.05); 
+            border-radius: 8px; font-size: 13px; color: var(--tg-text);
+        }
+        .hw-comment.rejected { background: rgba(220, 53, 69, 0.1); color: #721c24; }
+
+        /* Лидерборд */
+        .leaderboard-list { list-style: none; padding: 0; margin: 0; background: var(--tg-secondary); border-radius: 16px; overflow: hidden; }
+        .lb-item { 
+            display: flex; align-items: center; padding: 14px 16px; border-bottom: 1px solid rgba(128,128,128,0.1); 
+        }
+        .lb-item:last-child { border-bottom: none; }
+        .lb-rank { width: 35px; font-weight: 800; color: var(--tg-hint); font-size: 16px; }
+        .lb-name { flex: 1; font-weight: 600; font-size: 15px; }
+        .lb-score { font-weight: 800; color: var(--tg-link); font-size: 16px; }
+        .lb-me { background: rgba(36, 129, 204, 0.15); }
+
+        /* Ещё: FAQ и связь с учителем */
+        .faq-section { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .faq-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+        .faq-item { border-bottom: 1px solid rgba(128,128,128,0.15); padding: 10px 0; }
+        .faq-item:last-child { border-bottom: none; }
+        .faq-item summary { cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item summary::before { content: '▸ '; color: var(--tg-link); }
+        .faq-item[open] summary::before { content: '▾ '; }
+        .faq-answer { margin-top: 8px; font-size: 13px; color: var(--tg-hint); line-height: 1.4; }
+        .more-link-btn {
+            display: block; text-align: center; background: var(--tg-btn); color: var(--tg-btn-text);
+            padding: 14px; border-radius: 12px; font-weight: 700; font-size: 15px; text-decoration: none;
+        }
+
+        /* Нижнее меню */
+        .bottom-nav { 
+            position: fixed; bottom: 0; left: 0; right: 0; height: 65px; 
+            background: var(--tg-bg); display: flex; border-top: 1px solid rgba(128,128,128,0.15);
+            z-index: 100; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+        .nav-btn { 
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            border: none; background: transparent; color: var(--tg-hint); font-size: 11px; cursor: pointer;
+            transition: color 0.2s; padding: 8px 0;
+        }
+        .nav-btn.active { color: var(--tg-link); }
+        .nav-icon { font-size: 22px; margin-bottom: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН 1: ПРОФИЛЬ -->
+    <div id="screen-profile" class="screen active">
+        <div class="profile-header">
+            <div class="avatar-container" id="user-avatar-container"></div>
+            <h2 class="user-name" id="user-name">Загрузка...</h2>
+            <div class="group-badge" id="group-badge" style="display:none;"></div>
+        </div>
+
+        <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
+        <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
+
+        <div class="assignments-summary" id="assignments-summary">
+            <div class="summary-empty">Загрузка...</div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
+            <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">Хуиконы</div></div>
+            <div class="stat-card"><div class="stat-val" id="val-lives">-</div><div class="stat-label">Жизни</div></div>
+        </div>
+
+        <div class="mock-chart-section" id="mock-chart-section">
+            <div class="chart-title">📊 Результаты пробников</div>
+            <div id="mock-chart-container">
+                <div class="chart-empty">Загрузка...</div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="history-title"> История изменений</div>
+            <ul class="history-list" id="balance-history-list">
+                <li style="text-align:center; padding:20px; opacity:0.5;">Загрузка...</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 2: ДОМАШКА -->
+    <div id="screen-homework" class="screen">
+        <div class="tabs-hw">
+            <button class="tab-btn active" onclick="switchHwTab('upload')" style="font-size: 16px; font-weight: 700;">✏️ Решить домашку</button>
+            <button class="tab-btn" onclick="switchHwTab('archive')" style="font-size: 16px; font-weight: 700;">🤓 Мои работы</button>
+        </div>
+
+        <!-- Вкладка загрузки -->
+        <div id="hw-upload" class="hw-view active">
+            <div class="dz-section">
+                <div class="dz-title" style="font-size: 24px; margin-bottom: 10px;">✏️ Решить домашку</div>
+                
+                <!-- Инструкция -->
+                <p style="text-align:center; font-size:13px; color:var(--tg-hint); margin-bottom:20px; line-height:1.4;">
+                    Выбери задание ниже, перейди по ссылке, реши его и вернись сюда, чтобы загрузить фото решения.
+                </p>
+
+                <!-- Выбор задания -->
+                <div class="input-group">
+                    <label style="font-size:18px; font-weight:800; color:var(--tg-text); margin-bottom:5px;">Какое ДЗ решаешь?</label>
+                    <select id="assignment-select" onchange="showAssignmentDetails()">
+                        <option value="">Выбери задание из списка...</option>
+                    </select>
+                </div>
+
+                <!-- Карточка с деталями выбранного задания -->
+                <div id="assignment-details" style="display:none; background:var(--tg-bg); border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid rgba(128,128,128,0.2);">
+                    <div style="font-weight:bold; margin-bottom:8px; font-size:15px;" id="detail-title"></div>
+                    <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:14px; display:inline-block; word-break:break-all;">🔗 Открыть условие задачи</a>
+                    <div id="detail-feedback" style="display:none; margin-top:10px; padding:10px; background:rgba(220,53,69,0.1); border-radius:8px; font-size:13px; color:#721c24;"></div>
+                </div>
+
+                <!-- Загрузка фото -->
+                <div class="file-upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-text">Нажми, чтобы выбрать фото (можно несколько)</div>
+                    <div id="file-list" class="file-list"></div>
+                </div>
+                <input type="file" id="file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
+
+                <button class="primary" id="btn-upload-dz" onclick="uploadDZ()" disabled style="font-size: 16px; padding: 16px;">📤 Загрузить ДЗ для проверки</button>
+                <div id="dz-status" class="dz-status"></div>
+            </div>
+            
+            <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 13px;">
+                Хуиконы начисляются сразу за загрузку и ещё раз — после проверки учителем.<br>
+                Размер награды зависит от типа задания.
+            </div>
+        </div>
+
+        <!-- Вкладка архива -->
+        <div id="hw-archive" class="hw-view">
+            <ul class="my-hw-list" id="my-hw-list">
+                <li style="text-align:center; padding:20px; opacity:0.5;">Загрузка истории...</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 3: ЛИДЕРБОРД -->
+    <div id="screen-leaderboard" class="screen">
+        <h2 style="text-align: center; margin-bottom: 20px; font-size: 22px;"> Топ учеников</h2>
+        <ul class="leaderboard-list" id="lb-list">
+            <li style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</li>
+        </ul>
+    </div>
+
+    <!-- ЭКРАН 4: ЕЩЁ -->
+    <div id="screen-more" class="screen">
+        <h2 style="text-align: center; margin-bottom: 20px; font-size: 22px;">⚙️ Ещё</h2>
+
+        <div class="faq-section">
+            <div class="faq-title">❓ Частые вопросы</div>
+
+            <details class="faq-item">
+                <summary>Как начисляются хуиконы за домашку?</summary>
+                <div class="faq-answer">Сразу при загрузке: 5 за ежедневное, 30 за еженедельное, 15 за индивидуальное. После проверки учителем — ещё бонус: за ежедневное — за серию дней подряд (5/10/15), за еженедельное — +20, за индивидуальное — +15.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary>Что будет, если работу вернут?</summary>
+                <div class="faq-answer">Хуиконы, начисленные при загрузке, не забирают обратно — просто не будет дополнительного бонуса за приём. Нужно доработать решение и сдать заново.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary>Как считается серия (стрик)?</summary>
+                <div class="faq-answer">За ежедневные задания, сданные без пропуска дня подряд. Пропуск дня обнуляет серию.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary>До какого времени можно сдать задание?</summary>
+                <div class="faq-answer">Ежедневное — до 23:59 по Москве в свой день. Еженедельное — до понедельника 00:00. У индивидуальных заданий дедлайна нет.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary>Почему у меня «Без группы»?</summary>
+                <div class="faq-answer">Группу назначает помощник или учитель — если её ещё нет, обратись к ним.</div>
+            </details>
+        </div>
+
+        <button class="more-link-btn" style="width:100%; border:none; cursor:pointer; margin-bottom:12px;" onclick="inviteParent()">👪 Пригласить родителя</button>
+        <a href="https://t.me/tomhardy10" target="_blank" class="more-link-btn">💬 Связаться с учителем</a>
+    </div>
+
+    <!-- НИЖНЕЕ МЕНЮ -->
+    <div class="bottom-nav">
+        <button class="nav-btn active" onclick="switchTab('profile')">
+            <span class="nav-icon">👤</span> Профиль
+        </button>
+        <button class="nav-btn" onclick="switchTab('homework')">
+            <span class="nav-icon">📚</span> Домашка
+        </button>
+        <button class="nav-btn" onclick="switchTab('leaderboard')">
+            <span class="nav-icon">🏆</span> Лидеры
+        </button>
+        <button class="nav-btn" onclick="switchTab('more')">
+            <span class="nav-icon">⚙️</span> Ещё
+        </button>
+    </div>
+
+    <script>
+        // --- КОНФИГУРАЦИЯ ---
+        // Bot 2.0 dev-окружение — НЕ прод. См. bot2/BOT2_CONTEXT.md в приватном репозитории.
+        const SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b';
+        
+        // Cloudinary Config
+        const CLOUDINARY_CLOUD_NAME = 'ddrn3vxm0';
+        const CLOUDINARY_UPLOAD_PRESET = 'sasha-math-dz';
+
+        // Бот для родителей — username нужен для ссылки-приглашения
+        const PARENT_BOT_USERNAME = 'sashamathparents_bot';
+        
+        let currentUser = null;
+        let db = null;
+        let selectedFiles = [];
+        let activeAssignments = [];
+
+        function log(msg) { console.log(msg); }
+
+        // Экранирует пользовательский текст перед вставкой через innerHTML (имена, названия заданий,
+        // комментарии учителя и т.п. — всё, что вводит человек, а не сам код)
+        function esc(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
+        }
+
+        // Текущая дата в Москве (YYYY-MM-DD), не зависит от часового пояса устройства ученика
+        function getTodayMSK() {
+            return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+        }
+
+        // Момент времени, соответствующий указанным часам/минутам по московскому времени (МСК = UTC+3 круглый год)
+        function moscowDateTimeToInstant(y, m, d, hh, mm) {
+            return new Date(Date.UTC(y, m - 1, d, hh, mm) - 3 * 60 * 60 * 1000);
+        }
+
+        // Ссылка без http(s):// браузер считает относительным путём текущей страницы — достраиваем схему
+        function normalizeUrl(url) {
+            if (!url) return '';
+            return /^https?:\/\//i.test(url) ? url : 'https://' + url;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const tg = window.Telegram.WebApp;
+                tg.ready(); tg.expand();
+
+                db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                
+                const tgUser = tg.initDataUnsafe?.user;
+                
+                if (tgUser && tgUser.id) {
+                    currentUser = tgUser;
+                } else {
+                    currentUser = null;
+                    document.getElementById('user-name').innerText = 'Ошибка доступа';
+                    log('❌ Нет данных пользователя.');
+                    return; 
+                }
+
+                document.getElementById('user-name').innerText = currentUser.first_name;
+                setupAvatar(currentUser);
+                
+                // 1. Активируем задания, если пора
+                await checkAndActivateAssignments();
+                
+                // 2. Загружаем профиль и активные задания
+                await loadProfile();
+                await loadActiveAssignments();
+            } catch (e) {
+                log('❌ КРИТИЧЕСКАЯ ОШИБКА ИНИЦИАЛИЗАЦИИ: ' + e.message);
+                document.getElementById('user-name').innerText = 'Ошибка запуска';
+            }
+        });
+
+        // Бессрочная реферальная ссылка-приглашение для родителей/родственников — код в ссылке это просто telegram_id ученика
+        function inviteParent() {
+            if (!currentUser) return;
+            const inviteLink = `https://t.me/${PARENT_BOT_USERNAME}?start=${currentUser.id}`;
+            const shareText = 'Подключись к моим результатам в Sasha Math!';
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
+            window.Telegram.WebApp.openTelegramLink(shareUrl);
+        }
+
+        function setupAvatar(user) {
+            const container = document.getElementById('user-avatar-container');
+            if (user.photo_url) {
+                container.innerHTML = `<img src="${user.photo_url}" class="avatar-img">`;
+            } else {
+                const initial = user.first_name ? user.first_name[0].toUpperCase() : '?';
+                container.innerHTML = `<div class="avatar-placeholder">${esc(initial)}</div>`;
+            }
+        }
+
+        // --- АКТИВАЦИЯ ЗАДАНИЙ (АВТОПИЛОТ) ---
+        async function checkAndActivateAssignments() {
+            const todayMSK = getTodayMSK();
+            
+            // Ищем запланированные задания для текущего пользователя, срок которых настал
+            const { data: toActivate, error } = await db
+                .from('assignments')
+                .select('id')
+                .eq('student_id', currentUser.id)
+                .eq('activation_status', 'scheduled')
+                .lte('scheduled_date', todayMSK);
+
+            if (error) { log('Ошибка активации: ' + error.message); return; }
+
+            if (toActivate && toActivate.length > 0) {
+                // Массово меняем статус на active
+                const ids = toActivate.map(a => a.id);
+                await db.from('assignments')
+                    .update({ activation_status: 'active' })
+                    .in('id', ids);
+                log(`✅ Активировано ${ids.length} заданий.`);
+            }
+        }
+
+        // --- ПРОФИЛЬ И ИСТОРИЯ ---
+        async function loadProfile(isRetryAfterInsert) {
+            try {
+                let { data, error } = await db.from('students').select('*').eq('telegram_id', currentUser.id).single();
+
+                if (error && error.code === 'PGRST116') {
+                    // Повторяем не больше одного раза: если insert не удался, без этого select→insert зациклились бы навсегда
+                    if (isRetryAfterInsert) throw new Error('Не удалось создать профиль ученика');
+                    const { error: insertError } = await db.from('students').insert([{
+                        telegram_id: currentUser.id, name: currentUser.first_name,
+                        telegram_username: currentUser.username || null,
+                        rating: 50, huikons: 0, lives: 3, current_streak: 0
+                    }]);
+                    if (insertError) throw insertError;
+                    return loadProfile(true);
+                } else if (error) { throw error; }
+                
+                document.getElementById('val-rating').innerText = data.rating;
+                document.getElementById('val-huikons').innerText = data.huikons;
+                document.getElementById('val-lives').innerText = '❤️'.repeat(data.lives);
+
+                // Отображение группы
+                const groupBadge = document.getElementById('group-badge');
+                groupBadge.style.display = 'inline-block';
+                if (data.group_name) {
+                    groupBadge.innerText = data.group_name;
+                    groupBadge.classList.add('assigned');
+                } else {
+                    groupBadge.innerText = 'Без группы';
+                    groupBadge.classList.remove('assigned');
+                }
+
+                // Отображение стрика
+                const streakEl = document.getElementById('streak-display');
+                if (data.current_streak > 0) {
+                    streakEl.style.display = 'inline-block';
+                    streakEl.innerText = `🔥 ${data.current_streak} дней подряд`;
+                } else {
+                    streakEl.style.display = 'none';
+                }
+                renderStreakProgress(data.current_streak);
+
+                currentUser.stats = data;
+                loadBalanceHistory();
+                loadAssignmentsSummary();
+                loadMockExamChart();
+
+            } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
+        }
+
+        // Мини-индикатор прогресса стрика: 3 уровня награды (5 / 10 / 15 хуиконов за 1/2/3+ дня подряд)
+        function renderStreakProgress(streak) {
+            const el = document.getElementById('streak-progress');
+            if (!streak || streak <= 0) { el.style.display = 'none'; return; }
+
+            const tiers = [5, 10, 15];
+            const filled = Math.min(streak, 3);
+            const dots = tiers.map((val, i) => `<div class="streak-dot ${i < filled ? 'filled' : ''}">${val}</div>`).join('');
+            const note = streak >= 3 ? 'Максимальный уровень награды 🔥' : `Ещё ${3 - streak} дн. до максимальной награды`;
+
+            el.innerHTML = `<div class="streak-dots">${dots}</div><div class="streak-note">${note}</div>`;
+            el.style.display = 'block';
+        }
+
+        // --- СВОДКА ПО ДОСТУПНЫМ ЗАДАНИЯМ (для экрана профиля) ---
+        async function loadAssignmentsSummary() {
+            const el = document.getElementById('assignments-summary');
+            try {
+                const { data, error } = await db
+                    .from('assignments')
+                    .select('type, scheduled_date')
+                    .eq('student_id', currentUser.id)
+                    .eq('status', 'assigned')
+                    .eq('activation_status', 'active');
+
+                if (error) throw error;
+
+                const todayMSK = getTodayMSK();
+                const relevant = (data || []).filter(a => a.type !== 'daily' || a.scheduled_date === todayMSK);
+
+                if (relevant.length === 0) {
+                    el.innerHTML = `<div class="summary-empty">🕊️ Нет активных заданий</div>`;
+                    return;
+                }
+
+                const counts = { daily: 0, weekly: 0, individual: 0 };
+                relevant.forEach(a => { if (counts[a.type] !== undefined) counts[a.type]++; });
+
+                el.innerHTML = `
+                    <div class="summary-title">📋 Доступные задания</div>
+                    <div class="summary-row">
+                        <div class="summary-item"><span class="summary-count">${counts.daily}</span><span class="summary-label">📅 Ежедневные</span></div>
+                        <div class="summary-item"><span class="summary-count">${counts.weekly}</span><span class="summary-label">🔥 Еженедельное</span></div>
+                        <div class="summary-item"><span class="summary-count">${counts.individual}</span><span class="summary-label">🎯 Индивидуальные</span></div>
+                    </div>
+                `;
+            } catch (e) {
+                el.innerHTML = `<div class="summary-empty" style="color:#f44336;">Ошибка загрузки заданий</div>`;
+                log(e.message);
+            }
+        }
+
+        // --- ГРАФИК РЕЗУЛЬТАТОВ ПРОБНИКОВ ---
+        let mockExamPoints = [];
+
+        async function loadMockExamChart() {
+            const container = document.getElementById('mock-chart-container');
+            try {
+                const { data, error } = await db
+                    .from('mock_exam_results')
+                    .select('exam_name, score, exam_date, created_at')
+                    .eq('student_id', currentUser.id)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = `<div class="chart-empty">🧮 Пока нет результатов пробников</div>`;
+                    return;
+                }
+
+                renderMockChart(container, data);
+            } catch (e) {
+                container.innerHTML = `<div class="chart-empty" style="color:#f44336;">Ошибка загрузки графика</div>`;
+                log(e.message);
+            }
+        }
+
+        // Свой SVG-график без внешних библиотек: точка = один пробник, ось X — название пробника (в порядке синхронизации)
+        function renderMockChart(container, points) {
+            mockExamPoints = points;
+
+            const W = 320, H = 140;
+            const padL = 32, padR = 12, padT = 10, padB = 26;
+            const plotW = W - padL - padR;
+            const plotH = H - padT - padB;
+
+            const scores = points.map(p => Number(p.score) || 0);
+            // Ось начинается с 40 для читаемости разброса, но если есть балл ниже — опускаем её,
+            // чтобы низкий результат не отображался «прилипшим» к отметке 40 (то есть выше реального)
+            const minScore = Math.min(40, Math.floor(Math.min(...scores) / 10) * 10);
+            const maxScore = Math.max(minScore + 20, Math.ceil(Math.max(...scores) / 10) * 10);
+
+            const xFor = (i) => points.length > 1 ? padL + (plotW * i / (points.length - 1)) : padL + plotW / 2;
+            const yFor = (v) => {
+                const y = padT + plotH - (plotH * (v - minScore) / (maxScore - minScore));
+                return Math.min(padT + plotH, Math.max(padT, y));
+            };
+
+            const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+                const y = padT + plotH * (1 - f);
+                const val = Math.round(minScore + (maxScore - minScore) * f);
+                return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="rgba(128,128,128,0.15)" stroke-width="1"/>
+                        <text x="${padL - 6}" y="${y + 4}" font-size="9" text-anchor="end" fill="var(--tg-hint)">${val}</text>`;
+            }).join('');
+
+            const linePoints = points.map((p, i) => `${xFor(i)},${yFor(Number(p.score) || 0)}`).join(' ');
+
+            const dots = points.map((p, i) => {
+                const x = xFor(i), y = yFor(Number(p.score) || 0);
+                return `<circle cx="${x}" cy="${y}" r="5" fill="var(--tg-link)" stroke="var(--tg-bg)" stroke-width="2" style="cursor:pointer" onclick="showExamInfo(${i})"/>`;
+            }).join('');
+
+            const labels = points.map((p, i) => {
+                const x = xFor(i);
+                return `<text x="${x}" y="${H - padB + 16}" font-size="9" text-anchor="middle" fill="var(--tg-hint)">№${i + 1}</text>`;
+            }).join('');
+
+            container.innerHTML = `
+                <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;">
+                    ${gridLines}
+                    <polyline points="${linePoints}" fill="none" stroke="var(--tg-link)" stroke-width="1.5" opacity="0.4"/>
+                    ${dots}
+                    ${labels}
+                </svg>
+                <div id="exam-info-box" class="exam-info-box">Нажми на точку, чтобы увидеть детали</div>
+            `;
+        }
+
+        // exam_date — чистая дата (YYYY-MM-DD, без времени), парсим вручную, чтобы не словить сдвиг на день из-за часового пояса браузера
+        function formatPlainDate(dateStr) {
+            const [y, m, d] = dateStr.split('-');
+            return `${d}.${m}.${y}`;
+        }
+
+        function showExamInfo(index) {
+            const p = mockExamPoints[index];
+            const box = document.getElementById('exam-info-box');
+            if (!p || !box) return;
+            const date = p.exam_date ? formatPlainDate(p.exam_date)
+                : (p.created_at ? new Date(p.created_at).toLocaleDateString('ru-RU') : '—');
+            box.innerHTML = `<b>${esc(p.exam_name || 'Пробник')}</b> • ${esc(p.score)} баллов • ${date}`;
+        }
+
+        async function loadBalanceHistory() {
+            const list = document.getElementById('balance-history-list');
+            try {
+                const { data, error } = await db
+                    .from('balance_history')
+                    .select('*')
+                    .eq('student_id', currentUser.id)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    list.innerHTML = '<li style="text-align:center; padding:20px; opacity:0.5;">📭 История пока пуста</li>';
+                    return;
+                }
+                
+                list.innerHTML = '';
+                data.forEach(item => {
+                    const isPositive = item.change_amount > 0;
+                    const reasonMap = {
+                        'dz_upload_daily': 'Загрузка ежедневного ДЗ',
+                        'dz_upload_weekly': 'Загрузка еженедельного ДЗ',
+                        'dz_upload_individual': 'Загрузка индивидуального задания',
+                        'streak_day_1': 'Серия 1 день 🔥',
+                        'streak_day_2': 'Серия 2 дня 🔥',
+                        'streak_day_3': 'Серия 3+ дней 🔥',
+                        'weekly_approved': 'Еженедельное принято ✅',
+                        'individual_approved': 'Индивидуальное принято ✅'
+                    };
+                  // Специальная логика для штрафов
+                    let displayReason = reasonMap[item.reason];
+                    if (!displayReason && item.reason && item.reason.startsWith('penalty:')) {
+                        // Берем текст после "penalty: "
+                        const penaltyText = item.reason.replace('penalty: ', '');
+                        displayReason = `⚠️ Штраф: ${penaltyText}`;
+                    }
+                    if (!displayReason) {
+                        displayReason = item.reason || 'Начисление';
+                    }
+                    const li = document.createElement('li');
+                    li.className = 'history-item';
+                    li.innerHTML = `
+                        <div class="hist-info">
+                            <div class="hist-reason">${esc(displayReason)}</div>
+                            <div class="hist-date">${new Date(item.created_at).toLocaleDateString('ru-RU')}</div>
+                        </div>                        
+                        <div class="hist-amount ${isPositive ? 'hist-positive' : 'hist-negative'}">
+                            ${isPositive ? '+' : ''}${item.change_amount}
+                        </div>
+                    `;
+                    list.appendChild(li);
+                });
+                
+            } catch (e) { 
+                list.innerHTML = '<li style="text-align:center; color:red; padding:20px;">Ошибка загрузки истории</li>';
+                log(e.message); 
+            }
+        }
+
+        // --- ЗАГРУЗКА АКТИВНЫХ ЗАДАНИЙ (ИСПРАВЛЕНО) ---
+        async function loadActiveAssignments() {
+            const select = document.getElementById('assignment-select');
+            select.innerHTML = '<option value="">Выбери задание из списка...</option>';
+            
+            try {
+                // Берём задания ученика, у которых activation_status = 'active': либо ещё не сданные ('assigned'),
+                // либо возвращённые учителем на переделку ('checked' + approval_status='rejected')
+                const { data, error } = await db
+                    .from('assignments')
+                    .select('*')
+                    .eq('student_id', currentUser.id)
+                    .eq('activation_status', 'active')
+                    .or('status.eq.assigned,and(status.eq.checked,approval_status.eq.rejected)')
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                // Ежедневное задание доступно только в свой день (по МСК) — просроченные больше не показываем
+                const todayMSK = getTodayMSK();
+                activeAssignments = (data || []).filter(a => a.type !== 'daily' || a.scheduled_date === todayMSK);
+
+                if (activeAssignments.length === 0) {
+                    select.innerHTML = '<option value="">Нет активных заданий 🕊️</option>';
+                    select.disabled = true;
+                    return;
+                }
+
+                select.disabled = false;
+                activeAssignments.forEach(asn => {
+                    const option = document.createElement('option');
+                    option.value = asn.id;
+
+                    const typeLabel = asn.type === 'daily' ? '📅' : asn.type === 'weekly' ? '🔥' : '👤';
+                    const retryLabel = asn.status === 'checked' ? ' (переделать)' : '';
+                    option.innerText = `${typeLabel} ${asn.title || 'Без названия'}${retryLabel}`;
+                    select.appendChild(option);
+                });
+                
+            } catch (e) {
+                log('Ошибка загрузки заданий: ' + e.message);
+            }
+        }
+
+        // Показывает ссылку и название выбранного задания
+        function showAssignmentDetails() {
+            const select = document.getElementById('assignment-select');
+            const detailsDiv = document.getElementById('assignment-details');
+            const btn = document.getElementById('btn-upload-dz');
+            const assignmentId = select.value;
+            
+            if (!assignmentId) {
+                detailsDiv.style.display = 'none';
+                btn.disabled = true;
+                return;
+            }
+            
+            const assignment = activeAssignments.find(a => a.id === assignmentId);
+            if (assignment) {
+                document.getElementById('detail-title').innerText = assignment.title || 'Без названия';
+                const linkEl = document.getElementById('detail-link');
+                if (assignment.content_url) {
+                    linkEl.href = normalizeUrl(assignment.content_url);
+                    linkEl.style.display = 'inline-block';
+                } else {
+                    linkEl.style.display = 'none';
+                }
+
+                const feedbackEl = document.getElementById('detail-feedback');
+                if (assignment.status === 'checked' && assignment.teacher_feedback) {
+                    feedbackEl.innerText = `❌ Комментарий учителя: ${assignment.teacher_feedback}`;
+                    feedbackEl.style.display = 'block';
+                } else {
+                    feedbackEl.style.display = 'none';
+                }
+
+                detailsDiv.style.display = 'block';
+                btn.disabled = false;
+            }
+        }
+
+        // --- ЗАГРУЗКА ФОТО И ДЗ (ИСПРАВЛЕННАЯ ЛОГИКА ДЕДЛАЙНОВ) ---
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+            
+            selectedFiles = files;
+            const area = document.getElementById('upload-area');
+            const fileListDiv = document.getElementById('file-list');
+            const btn = document.getElementById('btn-upload-dz');
+            
+            fileListDiv.innerHTML = '';
+            files.forEach((file, index) => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `<span>${index + 1}. ${esc(file.name)}</span>`;
+                fileListDiv.appendChild(div);
+            });
+            
+            area.classList.add('has-file');
+            area.querySelector('.upload-text').innerText = `Выбрано файлов: ${files.length}`;
+            area.querySelector('.upload-icon').style.display = 'none';
+            
+            btn.disabled = false;
+        }
+
+        async function uploadToCloudinary(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            formData.append('folder', 'sasha-math-dz');
+            
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!res.ok) throw new Error('Ошибка загрузки в Cloudinary');
+            const data = await res.json();
+            return data.secure_url;
+        }
+
+        async function uploadDZ() {
+            const btn = document.getElementById('btn-upload-dz');
+            const select = document.getElementById('assignment-select');
+            const status = document.getElementById('dz-status');
+            const assignmentId = select.value;
+
+            if (!assignmentId) { status.innerText = "⚠️ Выбери задание из списка!"; status.style.color = "#ff9800"; return; }
+            if (selectedFiles.length === 0) { status.innerText = "⚠️ Выберите фото!"; status.style.color = "#ff9800"; return; }
+            
+            // === ЛОГИКА ДЕДЛАЙНОВ И НАГРАД ===
+            const assignment = activeAssignments.find(a => a.id === assignmentId);
+            if (!assignment) return;
+
+            let rewardPoints = 5; // Базовая награда
+            const nowInstant = new Date();
+            let deadlineMSK = null;
+
+            // Определяем награду и дедлайн в зависимости от типа
+            if (assignment.type === 'individual') {
+                rewardPoints = 15; // Индивидуальное сложнее
+                deadlineMSK = null; // Без дедлайна (или можно поставить через месяц)
+            } else if (assignment.type === 'weekly') {
+                rewardPoints = 30; // Еженедельное самое ценное
+                const [ty, tm, td] = getTodayMSK().split('-').map(Number);
+                const currentDay = new Date(Date.UTC(ty, tm - 1, td)).getUTCDay();
+                let daysUntilMonday = (1 - currentDay + 7) % 7;
+                if (daysUntilMonday === 0) daysUntilMonday = 7;
+                const monday = new Date(Date.UTC(ty, tm - 1, td + daysUntilMonday));
+                deadlineMSK = moscowDateTimeToInstant(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), 0, 0);
+            } else {
+                // Ежедневное
+                rewardPoints = 5;
+                let dateStr = assignment.scheduled_date;
+                if (!dateStr) {
+                     status.innerText = "⚠️ Ошибка даты задания"; return;
+                }
+                if (dateStr instanceof Date) dateStr = dateStr.toISOString().split('T')[0];
+                else if (typeof dateStr === 'string' && dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+
+                const [year, month, day] = dateStr.split('-').map(Number);
+                deadlineMSK = moscowDateTimeToInstant(year, month, day, 23, 61); // 23:59 МСК + 2 минуты буфера
+            }
+
+            // Проверка дедлайна (только если он установлен)
+            if (deadlineMSK && nowInstant > deadlineMSK) {
+                status.innerText = `⏰ Время вышло! Дедлайн: ${deadlineMSK.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК`;
+                status.style.color = "#f44336";
+                return;
+            }
+            // ==============================
+
+            btn.disabled = true;
+            status.innerText = `📤 Загрузка фото...`; 
+            status.style.color = "var(--tg-text)";
+
+            try {
+                // 1. Загружаем все фото в Cloudinary
+                const photoUrls = [];
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    status.innerText = ` Загрузка фото (${i + 1}/${selectedFiles.length})...`;
+                    const url = await uploadToCloudinary(selectedFiles[i]);
+                    photoUrls.push(url);
+                }
+                
+                status.innerText = "💾 Сохранение в базу...";
+                
+                // 2. Обновляем запись в assignments
+                const { error: dbError } = await db.from('assignments').update({
+                    photo_url: JSON.stringify(photoUrls),
+                    status: 'submitted',
+                    submitted_at: new Date().toISOString()
+                }).eq('id', assignmentId);
+                
+                if (dbError) throw dbError;
+
+                // 3. Начисляем баллы за загрузку — но только за первую сдачу, не за пересдачу возвращённой работы
+                //    (хуиконы за неё уже были начислены при первой загрузке и не отзывались при возврате)
+                const isResubmission = assignment.status === 'checked';
+                if (!isResubmission) {
+                    const { error: rpcError } = await db.rpc('add_huikons', {
+                        p_student_id: currentUser.id,
+                        p_amount: rewardPoints,
+                        p_reason: `dz_upload_${assignment.type}` // Сохраняем тип для истории
+                    });
+                    if (rpcError) throw rpcError;
+                }
+
+                status.innerText = isResubmission ? '✅ Работа пересдана на проверку!' : `✅ ДЗ загружено! (+${rewardPoints} хуиконов)`;
+                status.style.color = "#4caf50";
+                
+                // Сброс формы
+                selectedFiles = [];
+                document.getElementById('file-list').innerHTML = '';
+                document.getElementById('upload-area').classList.remove('has-file');
+                document.getElementById('upload-area').querySelector('.upload-text').innerText = 'Нажми, чтобы выбрать фото (можно несколько)';
+                document.getElementById('upload-area').querySelector('.upload-icon').style.display = 'block';
+                select.value = "";
+                showAssignmentDetails();
+                
+                await loadProfile();
+                loadMyHomework();
+                loadActiveAssignments();
+
+            } catch (e) {
+                status.innerText = " Ошибка: " + e.message;
+                status.style.color = "#f44336";
+                log(e.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- МОИ РАБОТЫ (АРХИВ) ---
+        async function loadMyHomework() {
+            const list = document.getElementById('my-hw-list');
+            try {
+                const { data, error } = await db
+                    .from('assignments')
+                    .select('*')
+                    .eq('student_id', currentUser.id)
+                    .neq('status', 'assigned')
+                    .order('submitted_at', { ascending: false })
+                    .limit(100);
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    list.innerHTML = '<li style="text-align:center; padding:20px; opacity:0.5;">Ты еще не сдавал ДЗ</li>';
+                    return;
+                }
+                
+                list.innerHTML = '';
+                data.forEach(hw => {
+                    const li = document.createElement('li');
+                    li.className = `my-hw-item status-${hw.status}`;
+                    
+                    const date = hw.submitted_at ? new Date(hw.submitted_at).toLocaleDateString('ru-RU') : '-';
+                    const statusText = hw.status === 'submitted' ? 'На проверке' : 
+                                     hw.approval_status === 'approved' ? 'Принято' : 'Возврат';
+                    const badgeClass = hw.status === 'submitted' ? 'badge-pending' : 
+                                     hw.approval_status === 'approved' ? 'badge-approved' : 'badge-rejected';
+                    
+                    let pagesCount = 1;
+                    try {
+                        const photos = JSON.parse(hw.photo_url);
+                        pagesCount = Array.isArray(photos) ? photos.length : 1;
+                    } catch(e) {}
+                    
+                    let commentHtml = '';
+                    if (hw.teacher_feedback) {
+                        const isRejected = hw.approval_status === 'rejected';
+                        commentHtml = `<div class="hw-comment ${isRejected ? 'rejected' : ''}">
+                             ${esc(hw.teacher_feedback)}
+                        </div>`;
+                    }
+
+                    li.innerHTML = `
+                        <div class="hw-header">
+                            <div>
+                                <div class="hw-variant">${esc(hw.title || 'ДЗ')} <span class="hw-pages">📄 x${pagesCount}</span></div>
+                                <div class="hw-date">${date}</div>
+                            </div>
+                            <span class="hw-badge ${badgeClass}">${statusText}</span>
+                        </div>
+                        ${commentHtml}
+                    `;
+                    list.appendChild(li);
+                });
+                
+            } catch (e) {
+                list.innerHTML = '<li style="text-align:center; color:red; padding:20px;">Ошибка загрузки</li>';
+                log(e.message);
+            }
+        }
+
+        // --- ЛИДЕРБОРД ---
+        async function loadLeaderboard() {
+            const list = document.getElementById('lb-list');
+            list.innerHTML = '<li style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</li>';
+            
+            try {
+                const { data, error } = await db
+                    .from('students')
+                    .select('name, rating, telegram_id')
+                    .order('rating', { ascending: false })
+                    .limit(10);
+                
+                if (error) throw error;
+                list.innerHTML = '';
+                
+                data.forEach((student, index) => {
+                    const isMe = student.telegram_id === currentUser.id;
+                    const li = document.createElement('li');
+                    li.className = `lb-item ${isMe ? 'lb-me' : ''}`;
+                    
+                    let rankDisplay = `#${index + 1}`;
+                    if (index === 0) rankDisplay = '🥇';
+                    if (index === 1) rankDisplay = '🥈';
+                    if (index === 2) rankDisplay = '🥉';
+
+                    li.innerHTML = `
+                        <div class="lb-rank">${rankDisplay}</div>
+                        <div class="lb-name">${esc(student.name)} ${isMe ? '(Вы)' : ''}</div>
+                        <div class="lb-score">${student.rating} ⭐</div>
+                    `;
+                    list.appendChild(li);
+                });
+
+            } catch (e) {
+                list.innerHTML = '<li style="text-align:center; color:#f44336; padding:30px;">Ошибка</li>';
+            }
+        }
+
+        // --- НАВИГАЦИЯ ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+            if (tabName === 'profile') {
+                document.getElementById('screen-profile').classList.add('active');
+                document.querySelectorAll('.nav-btn')[0].classList.add('active');
+                loadProfile();
+            } else if (tabName === 'homework') {
+                document.getElementById('screen-homework').classList.add('active');
+                document.querySelectorAll('.nav-btn')[1].classList.add('active');
+                loadMyHomework();
+                loadActiveAssignments();
+            } else if (tabName === 'leaderboard') {
+                document.getElementById('screen-leaderboard').classList.add('active');
+                document.querySelectorAll('.nav-btn')[2].classList.add('active');
+                loadLeaderboard();
+            } else if (tabName === 'more') {
+                document.getElementById('screen-more').classList.add('active');
+                document.querySelectorAll('.nav-btn')[3].classList.add('active');
+            }
+        }
+
+        function switchHwTab(viewName) {
+            document.querySelectorAll('.hw-view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            if (viewName === 'upload') {
+                document.getElementById('hw-upload').classList.add('active');
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                loadActiveAssignments();
+            } else {
+                document.getElementById('hw-archive').classList.add('active');
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                loadMyHomework();
+            }
+        }
+    </script>
+</body>
+</html>
