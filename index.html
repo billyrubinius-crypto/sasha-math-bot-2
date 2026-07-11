@@ -231,6 +231,11 @@
             </div>
         </div>
 
+        <div class="history-section" id="season-history-section" style="display:none;">
+            <div class="history-title">🏅 История сезонов</div>
+            <ul class="history-list" id="season-history-list"></ul>
+        </div>
+
         <div class="history-section">
             <div class="history-title"> История изменений</div>
             <ul class="history-list" id="balance-history-list">
@@ -299,7 +304,8 @@
 
     <!-- ЭКРАН 3: ЛИДЕРБОРД -->
     <div id="screen-leaderboard" class="screen">
-        <h2 style="text-align: center; margin-bottom: 20px; font-size: 22px;"> Топ учеников</h2>
+        <h2 style="text-align: center; margin-bottom: 4px; font-size: 22px;"> Топ учеников</h2>
+        <div id="lb-season-label" style="text-align:center; opacity:0.6; font-size:13px; margin-bottom:16px;"></div>
         <ul class="leaderboard-list" id="lb-list">
             <li style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</li>
         </ul>
@@ -498,7 +504,9 @@
                     const { error: insertError } = await db.from('students').insert([{
                         telegram_id: currentUser.id, name: currentUser.first_name,
                         telegram_username: currentUser.username || null,
-                        rating: 50, huikons: 0, lives: 3, current_streak: 0
+                        // rating = очки текущего сезона (см. database/migrations/005), не старый
+                        // рейтинг — новый ученик стартует с 0, а не с наследственных 50
+                        rating: 0, huikons: 0, lives: 3, current_streak: 0
                     }]);
                     if (insertError) throw insertError;
                     return loadProfile(true);
@@ -532,6 +540,7 @@
                 loadBalanceHistory();
                 loadAssignmentsSummary();
                 loadMockExamChart();
+                loadSeasonHistory();
 
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
         }
@@ -734,9 +743,50 @@
                     list.appendChild(li);
                 });
                 
-            } catch (e) { 
+            } catch (e) {
                 list.innerHTML = '<li style="text-align:center; color:red; padding:20px;">Ошибка загрузки истории</li>';
-                log(e.message); 
+                log(e.message);
+            }
+        }
+
+        // Архив закрытых сезонов (season_results пишется один раз при закрытии сезона, G8).
+        // Пусто до первого закрытия — секция в этом случае скрыта целиком, а не показывает
+        // пустой список.
+        async function loadSeasonHistory() {
+            const section = document.getElementById('season-history-section');
+            const list = document.getElementById('season-history-list');
+            try {
+                const { data, error } = await db
+                    .from('season_results')
+                    .select('season_id, points, place')
+                    .eq('student_id', currentUser.id)
+                    .order('season_id', { ascending: false })
+                    .limit(10);
+
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                section.style.display = '';
+                list.innerHTML = '';
+                data.forEach(item => {
+                    const placeDisplay = item.place === 1 ? '🥇' : item.place === 2 ? '🥈' : item.place === 3 ? '🥉' : `#${item.place}`;
+                    const li = document.createElement('li');
+                    li.className = 'history-item';
+                    li.innerHTML = `
+                        <div class="hist-info">
+                            <div class="hist-reason">Сезон №${item.season_id} — ${placeDisplay} место</div>
+                        </div>
+                        <div class="hist-amount">${item.points} ⭐</div>
+                    `;
+                    list.appendChild(li);
+                });
+
+            } catch (e) {
+                section.style.display = 'none';
+                log('❌ Ошибка истории сезонов: ' + e.message);
             }
         }
 
@@ -1038,17 +1088,38 @@
         }
 
         // --- ЛИДЕРБОРД ---
+        // students.rating = очки ТЕКУЩЕГО сезона (database/migrations/005) — лидерборд сортирует
+        // по нему без изменений с этапа, когда rating было мёртвым полем.
+        //
+        // Номер сезона для подписи берётся из seasons.id (открытая строка, end_date is null).
+        // Строку создаёт первый, кто открыл лидерборд после применения миграции 005 или после
+        // закрытия предыдущего сезона (G8) — тот же паттерн, что loadProfile() уже использует
+        // для ленивого создания записи students при первом входе. Гонку двух одновременных
+        // созданий предотвращает частичный уникальный индекс idx_seasons_one_active (миграция
+        // 005): при конфликте просто перечитываем уже созданную кем-то строку.
+        async function getCurrentSeasonId() {
+            const { data } = await db.from('seasons').select('id').is('end_date', null).order('id', { ascending: false }).limit(1);
+            if (data && data.length) return data[0].id;
+
+            const { data: inserted, error } = await db.from('seasons').insert({ start_date: getTodayMSK() }).select('id').single();
+            if (error) {
+                const { data: retry } = await db.from('seasons').select('id').is('end_date', null).order('id', { ascending: false }).limit(1);
+                return retry && retry.length ? retry[0].id : null;
+            }
+            return inserted.id;
+        }
+
         async function loadLeaderboard() {
             const list = document.getElementById('lb-list');
             list.innerHTML = '<li style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</li>';
-            
+
             try {
-                const { data, error } = await db
-                    .from('students')
-                    .select('name, rating, telegram_id')
-                    .order('rating', { ascending: false })
-                    .limit(10);
-                
+                const [{ data, error }, seasonId] = await Promise.all([
+                    db.from('students').select('name, rating, telegram_id').order('rating', { ascending: false }).limit(10),
+                    getCurrentSeasonId()
+                ]);
+                document.getElementById('lb-season-label').innerText = seasonId ? `Сезон №${seasonId}` : '';
+
                 if (error) throw error;
                 list.innerHTML = '';
                 
