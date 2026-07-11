@@ -304,6 +304,12 @@
                 <textarea id="indiv-comment" placeholder="Комментарий ученику" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; min-height:60px;"></textarea>
                 <button class="btn-primary" id="btn-assign-indiv" onclick="assignIndividual()" style="margin-top:10px;">Назначить индивидуально</button>
             </div>
+
+            <div class="week-planner">
+                <h3 style="margin-top:0">🏁 Сезон</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Закрытие сезона: итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон. Делается вручную раз в 2 недели.</p>
+                <button class="btn-danger" id="btn-close-season" onclick="closeSeason()" style="width:100%;">🏁 Закрыть сезон</button>
+            </div>
         </div>
 
         <!-- Черновик: недели, ждущие своей даты активации -->
@@ -1082,6 +1088,33 @@
                 p_amount: seasonPoints[type]
             });
             if (seasonError) throw seasonError;
+        }
+
+        // Закрытие сезона (G8): вся операция — одна транзакция RPC close_season (миграция 006):
+        // архив мест всех учеников, награды топ-3 (100/60/30), обнуление очков, открытие
+        // следующего сезона. Сезон, открытый сегодня, RPC закрыть не даст — двойной клик безопасен.
+        async function closeSeason() {
+            const btn = document.getElementById('btn-close-season');
+            try {
+                const { data: seasons, error } = await db.from('seasons').select('id, start_date').is('end_date', null).order('id', { ascending: false }).limit(1);
+                if (error) throw error;
+                if (!seasons || !seasons.length) {
+                    alert('Нет открытого сезона — он появится, когда кто-то откроет лидерборд.');
+                    return;
+                }
+                const season = seasons[0];
+                const startText = new Date(season.start_date).toLocaleDateString('ru-RU');
+                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, очки всех учеников обнулятся. Действие необратимо.`)) return;
+
+                btn.disabled = true;
+                const { data, error: rpcError } = await db.rpc('close_season');
+                if (rpcError) throw rpcError;
+                alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\nНовый сезон открыт.`);
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         async function showPenaltyModal() {

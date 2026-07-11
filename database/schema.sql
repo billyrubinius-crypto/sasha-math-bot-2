@@ -241,6 +241,73 @@ AS $function$
   group by a.type;
 $function$;
 
+-- close_season — закрытие сезона одной транзакцией (миграция 006, задача G8):
+-- архив итогов в season_results (места по rank(), равные очки = одно место),
+-- награды топ-3 с ненулевыми очками (100/60/30, GAME_DESIGN.md §5) через add_huikons
+-- (reason='season_place_N'), обнуление rating, end_date у закрытого сезона, открытие
+-- следующего. Сезон, открытый сегодня, закрыть нельзя (защита от двойного клика).
+-- Полная мотивация решений — в шапке миграции 006.
+CREATE OR REPLACE FUNCTION public.close_season()
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_season_id bigint;
+  v_start_date date;
+  v_today date := (now() at time zone 'Europe/Moscow')::date;
+  v_archived integer;
+  v_awarded integer := 0;
+  v_reward integer;
+  r record;
+begin
+  select id, start_date into v_season_id, v_start_date
+    from seasons
+    where end_date is null
+    order by id desc
+    limit 1
+    for update;
+
+  if v_season_id is null then
+    raise exception 'Нет открытого сезона';
+  end if;
+
+  if v_start_date >= v_today then
+    raise exception 'Сезон №% открыт сегодня — закрывать можно не раньше следующего дня', v_season_id;
+  end if;
+
+  -- Блокируем учеников до снимка очков (гонка с add_season_points, см. миграцию 006).
+  perform 1 from students for update;
+
+  insert into season_results (season_id, student_id, points, place)
+  select v_season_id, s.telegram_id, s.rating,
+         rank() over (order by s.rating desc)
+    from students s;
+  get diagnostics v_archived = row_count;
+
+  for r in
+    select student_id, place
+      from season_results
+      where season_id = v_season_id and place <= 3 and points > 0
+  loop
+    v_reward := case r.place when 1 then 100 when 2 then 60 else 30 end;
+    perform add_huikons(r.student_id, v_reward, 'season_place_' || r.place);
+    v_awarded := v_awarded + 1;
+  end loop;
+
+  update students set rating = 0 where rating <> 0;
+
+  update seasons set end_date = v_today where id = v_season_id;
+
+  insert into seasons (start_date) values (v_today);
+
+  return json_build_object(
+    'season_id', v_season_id,
+    'archived', v_archived,
+    'awarded', v_awarded
+  );
+end;
+$function$;
+
 -- add_season_points — атомарное начисление очков сезона (миграция 005, задача G3).
 -- PostgREST не умеет относительный update, поэтому rating = rating + N делается здесь.
 -- Очки сезона — отдельная валюта от бубликов: в balance_history НЕ пишет.
