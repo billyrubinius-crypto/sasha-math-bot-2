@@ -1039,6 +1039,14 @@
             });
             if (rpcError) throw rpcError;
 
+            // Очки сезона (SPEC_STAGE1.md, раздел 3): «принятая ежедневка» (10) + «каждый день
+            // стрика в сезоне» (2) — одно и то же событие приёма ежедневки, начисляются вместе.
+            const { error: seasonError } = await db.rpc('add_season_points', {
+                p_student_id: studentId,
+                p_amount: 12
+            });
+            if (seasonError) throw seasonError;
+
             // Бонус возвращения (SPEC_STAGE1.md, раздел 5): разрыв ≥7 дней перед этой ежедневкой
             // в цепочке ВСЕХ когда-либо принятых ежедневок (не только текущей серии) — отдельным
             // начислением поверх обычной награды. Первая когда-либо принятая ежедневка (thisIndex=0,
@@ -1066,6 +1074,14 @@
                 p_reason: `${type}_approved`
             });
             if (rpcError) throw rpcError;
+
+            // Очки сезона (SPEC_STAGE1.md, раздел 3): недельное +40, индивидуальное +30.
+            const seasonPoints = { weekly: 40, individual: 30 };
+            const { error: seasonError } = await db.rpc('add_season_points', {
+                p_student_id: studentId,
+                p_amount: seasonPoints[type]
+            });
+            if (seasonError) throw seasonError;
         }
 
         async function showPenaltyModal() {
