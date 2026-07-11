@@ -73,7 +73,7 @@
         .chart-empty { text-align: center; padding: 20px 10px; opacity: 0.6; font-size: 14px; }
         .exam-info-box { margin-top: 10px; text-align: center; font-size: 13px; padding: 8px; background: var(--tg-bg); border-radius: 10px; min-height: 18px; }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
         .stat-card { background: var(--tg-secondary); border-radius: 16px; padding: 18px 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .stat-val { font-size: 26px; font-weight: 800; color: var(--tg-link); margin-bottom: 6px; }
         .stat-label { font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -222,7 +222,6 @@
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
             <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
-            <div class="stat-card"><div class="stat-val" id="val-lives">-</div><div class="stat-label">Жизни</div></div>
         </div>
 
         <div class="mock-chart-section" id="mock-chart-section">
@@ -507,7 +506,6 @@
                 
                 document.getElementById('val-rating').innerText = data.rating;
                 document.getElementById('val-huikons').innerText = data.huikons;
-                document.getElementById('val-lives').innerText = '❤️'.repeat(data.lives);
 
                 // Отображение группы
                 const groupBadge = document.getElementById('group-badge');
