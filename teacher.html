@@ -387,7 +387,7 @@
     <div id="penalty-modal">
         <div class="modal-content" style="max-width:400px;">
             <button class="close-modal" onclick="closePenalty()">✕</button>
-            <h3 style="margin-top:0; text-align:center;">⚠️ Списать хуиконы</h3>
+            <h3 style="margin-top:0; text-align:center;">⚠️ Списать бублики</h3>
             <p style="text-align:center; font-size:14px; color:#666;">Текущий баланс: <b id="pen-balance">0</b></p>
             
             <div class="penalty-options">
@@ -400,7 +400,7 @@
             <textarea id="pen-reason" placeholder="Обязательно укажите причину штрафа..." style="min-height:60px;"></textarea>
             <p id="pen-warning" class="warning-text"></p>
             
-            <button class="btn-danger" style="width:100%; margin-top:15px;" onclick="applyPenalty()">Списать хуиконы</button>
+            <button class="btn-danger" style="width:100%; margin-top:15px;" onclick="applyPenalty()">Списать бублики</button>
         </div>
     </div>
 
@@ -476,6 +476,15 @@
             const div = document.createElement('div');
             div.textContent = str ?? '';
             return div.innerHTML;
+        }
+
+        // Склонение слова «бублик» по числу (1 бублик / 2 бублика / 5 бубликов) — Bot 2.0, G1
+        function pluralBubliks(n) {
+            const abs = Math.abs(n);
+            const mod10 = abs % 10, mod100 = abs % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'бублик';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'бублика';
+            return 'бубликов';
         }
 
         // Переменные для навигации по фото внутри модального окна
@@ -1089,7 +1098,7 @@
                 }).single();
                 if (rpcError) throw rpcError;
 
-                alert(`Списано ${Math.abs(result.actual_change)} хуиконов. Новый баланс: ${result.new_balance}`);
+                alert(`Списано ${Math.abs(result.actual_change)} ${pluralBubliks(result.actual_change)}. Новый баланс: ${result.new_balance} 🥯`);
                 closePenalty();
                 closeReview();
             } catch(e) { alert('Ошибка: ' + e.message); }

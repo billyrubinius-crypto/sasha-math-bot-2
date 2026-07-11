@@ -221,7 +221,7 @@
 
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
-            <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">Хуиконы</div></div>
+            <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
             <div class="stat-card"><div class="stat-val" id="val-lives">-</div><div class="stat-label">Жизни</div></div>
         </div>
 
@@ -285,7 +285,7 @@
             </div>
             
             <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 13px;">
-                Хуиконы начисляются сразу за загрузку и ещё раз — после проверки учителем.<br>
+                Бублики начисляются сразу за загрузку и ещё раз — после проверки учителем.<br>
                 Размер награды зависит от типа задания.
             </div>
         </div>
@@ -314,13 +314,13 @@
             <div class="faq-title">❓ Частые вопросы</div>
 
             <details class="faq-item">
-                <summary>Как начисляются хуиконы за домашку?</summary>
+                <summary>Как начисляются бублики за домашку?</summary>
                 <div class="faq-answer">Сразу при загрузке: 5 за ежедневное, 30 за еженедельное, 15 за индивидуальное. После проверки учителем — ещё бонус: за ежедневное — за серию дней подряд (5/10/15), за еженедельное — +20, за индивидуальное — +15.</div>
             </details>
 
             <details class="faq-item">
                 <summary>Что будет, если работу вернут?</summary>
-                <div class="faq-answer">Хуиконы, начисленные при загрузке, не забирают обратно — просто не будет дополнительного бонуса за приём. Нужно доработать решение и сдать заново.</div>
+                <div class="faq-answer">Бублики, начисленные при загрузке, не забирают обратно — просто не будет дополнительного бонуса за приём. Нужно доработать решение и сдать заново.</div>
             </details>
 
             <details class="faq-item">
@@ -385,6 +385,15 @@
             const div = document.createElement('div');
             div.textContent = str ?? '';
             return div.innerHTML;
+        }
+
+        // Склонение слова «бублик» по числу (1 бублик / 2 бублика / 5 бубликов) — Bot 2.0, G1
+        function pluralBubliks(n) {
+            const abs = Math.abs(n);
+            const mod10 = abs % 10, mod100 = abs % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'бублик';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'бублика';
+            return 'бубликов';
         }
 
         // Текущая дата в Москве (YYYY-MM-DD), не зависит от часового пояса устройства ученика
@@ -529,7 +538,7 @@
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
         }
 
-        // Мини-индикатор прогресса стрика: 3 уровня награды (5 / 10 / 15 хуиконов за 1/2/3+ дня подряд)
+        // Мини-индикатор прогресса стрика: 3 уровня награды (5 / 10 / 15 бубликов за 1/2/3+ дня подряд)
         function renderStreakProgress(streak) {
             const el = document.getElementById('streak-progress');
             if (!streak || streak <= 0) { el.style.display = 'none'; return; }
@@ -931,7 +940,7 @@
                 if (dbError) throw dbError;
 
                 // 3. Начисляем баллы за загрузку — но только за первую сдачу, не за пересдачу возвращённой работы
-                //    (хуиконы за неё уже были начислены при первой загрузке и не отзывались при возврате)
+                //    (бублики за неё уже были начислены при первой загрузке и не отзывались при возврате)
                 const isResubmission = assignment.status === 'checked';
                 if (!isResubmission) {
                     const { error: rpcError } = await db.rpc('add_huikons', {
@@ -942,7 +951,7 @@
                     if (rpcError) throw rpcError;
                 }
 
-                status.innerText = isResubmission ? '✅ Работа пересдана на проверку!' : `✅ ДЗ загружено! (+${rewardPoints} хуиконов)`;
+                status.innerText = isResubmission ? '✅ Работа пересдана на проверку!' : `✅ ДЗ загружено! (+${rewardPoints} ${pluralBubliks(rewardPoints)} 🥯)`;
                 status.style.color = "#4caf50";
                 
                 // Сброс формы
