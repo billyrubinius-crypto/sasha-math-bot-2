@@ -182,6 +182,20 @@ create table public.student_items (
   unique (student_id, item_code)
 );
 
+-- streak_shield_uses — какие пропущенные дни покрыты щитом стрика (миграция 007, задача G9).
+-- Нужна для идемпотентного сшивания разрывов при пересчёте цепочки с нуля (см. шапку 007).
+create table public.streak_shield_uses (
+  id           uuid         primary key default gen_random_uuid(),
+  student_id   bigint       not null references public.students (telegram_id),
+  bridged_date date         not null,
+  created_at   timestamptz  not null default now(),
+  unique (student_id, bridged_date)
+);
+
+create index if not exists idx_streak_shield_uses_student
+  on public.streak_shield_uses (student_id);
+alter table public.streak_shield_uses disable row level security;  -- как и все таблицы проекта (T10)
+
 -- --- Индексы (кроме автоматических для PK/UNIQUE и idx_students_telegram_id выше) -----
 
 create index if not exists idx_assignments_activation
@@ -305,6 +319,92 @@ begin
     'archived', v_archived,
     'awarded', v_awarded
   );
+end;
+$function$;
+
+-- buy_streak_shield — атомарная покупка щита стрика (миграция 007, задача G9): лимит 2,
+-- цена 40 через add_huikons (reason='buy_streak_shield'), инкремент инвентаря. Мотивация
+-- атомарности и блокировок — в шапке миграции 007.
+CREATE OR REPLACE FUNCTION public.buy_streak_shield(p_student_id bigint)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_price  integer := 40;
+  v_max    integer := 2;
+  v_qty    integer;
+  v_balance integer;
+  v_new_balance integer;
+begin
+  select quantity into v_qty
+    from student_items
+    where student_id = p_student_id and item_code = 'streak_shield'
+    for update;
+  if v_qty is null then v_qty := 0; end if;
+
+  if v_qty >= v_max then
+    raise exception 'Лимит: не больше % щитов в запасе', v_max;
+  end if;
+
+  select huikons into v_balance
+    from students
+    where telegram_id = p_student_id
+    for update;
+  if v_balance is null then
+    raise exception 'Ученик % не найден', p_student_id;
+  end if;
+  if v_balance < v_price then
+    raise exception 'Недостаточно бубликов: нужно %, есть %', v_price, v_balance;
+  end if;
+
+  select new_balance into v_new_balance
+    from add_huikons(p_student_id, -v_price, 'buy_streak_shield');
+
+  insert into student_items (student_id, item_code, quantity)
+    values (p_student_id, 'streak_shield', 1)
+    on conflict (student_id, item_code)
+    do update set quantity = student_items.quantity + 1, updated_at = now();
+
+  select quantity into v_qty
+    from student_items
+    where student_id = p_student_id and item_code = 'streak_shield';
+
+  return json_build_object('quantity', v_qty, 'balance', v_new_balance);
+end;
+$function$;
+
+-- consume_streak_shield — атомарно покрыть один пропущенный день щитом (миграция 007, G9).
+-- Идемпотентно: true если день покрыт (сейчас или ранее), false если щита нет.
+CREATE OR REPLACE FUNCTION public.consume_streak_shield(p_student_id bigint, p_bridged_date date)
+ RETURNS boolean
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_qty integer;
+begin
+  if exists (select 1 from streak_shield_uses
+               where student_id = p_student_id and bridged_date = p_bridged_date) then
+    return true;
+  end if;
+
+  select quantity into v_qty
+    from student_items
+    where student_id = p_student_id and item_code = 'streak_shield'
+    for update;
+
+  if v_qty is null or v_qty <= 0 then
+    return false;
+  end if;
+
+  insert into streak_shield_uses (student_id, bridged_date)
+    values (p_student_id, p_bridged_date)
+    on conflict (student_id, bridged_date) do nothing;
+
+  update student_items
+    set quantity = quantity - 1, updated_at = now()
+    where student_id = p_student_id and item_code = 'streak_shield';
+
+  return true;
 end;
 $function$;
 

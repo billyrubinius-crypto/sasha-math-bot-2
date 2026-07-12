@@ -58,6 +58,17 @@
         .streak-dot.filled { background: #ff9800; color: white; }
         .streak-note { font-size: 12px; color: var(--tg-hint); text-align: center; }
 
+        /* Щит стрика (G9) */
+        .shield-widget {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            background: var(--tg-secondary); border-radius: 14px; padding: 12px 14px; margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .shield-info { font-size: 14px; font-weight: 600; }
+        .shield-info .shield-hint { display: block; font-size: 11px; color: var(--tg-hint); font-weight: 400; margin-top: 2px; }
+        .shield-buy-btn { background: #ff9800; color: white; border: none; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .shield-buy-btn:disabled { opacity: 0.5; cursor: default; }
+
         /* Сводка заданий */
         .assignments-summary { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .summary-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
@@ -227,6 +238,14 @@
 
         <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
         <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
+
+        <div class="shield-widget" id="shield-widget" style="display:none;">
+            <div class="shield-info">
+                <span id="shield-count">🛡 0 щитов</span>
+                <span class="shield-hint">Спасает стрик при пропуске одного дня</span>
+            </div>
+            <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 40 🥯</button>
+        </div>
 
         <div class="assignments-summary" id="assignments-summary">
             <div class="summary-empty">Загрузка...</div>
@@ -560,6 +579,7 @@
                 loadMockExamChart();
                 loadSeasonHistory();
                 loadAchievements();
+                loadShields();
 
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
         }
@@ -850,6 +870,59 @@
             } catch (e) {
                 section.style.display = 'none';
                 log('❌ Ошибка достижений: ' + e.message);
+            }
+        }
+
+        // Щит стрика (G9): счётчик в запасе + кнопка покупки. Лимит 2 щита, цена 40 бубликов —
+        // проверка и списание атомарны в RPC buy_streak_shield (teacher-логика та же таблица
+        // student_items). Кнопка блокируется при лимите; сама покупка защищена RPC от гонки.
+        const SHIELD_MAX = 2, SHIELD_PRICE = 40;
+
+        function pluralShields(n) {
+            const mod10 = n % 10, mod100 = n % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'щит';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'щита';
+            return 'щитов';
+        }
+
+        async function loadShields() {
+            const widget = document.getElementById('shield-widget');
+            const countEl = document.getElementById('shield-count');
+            const btn = document.getElementById('btn-buy-shield');
+            try {
+                const { data, error } = await db
+                    .from('student_items')
+                    .select('quantity')
+                    .eq('student_id', currentUser.id)
+                    .eq('item_code', 'streak_shield')
+                    .maybeSingle();
+                if (error) throw error;
+
+                const qty = data ? data.quantity : 0;
+                countEl.innerText = `🛡 ${qty} ${pluralShields(qty)}`;
+                btn.disabled = qty >= SHIELD_MAX;
+                btn.innerText = qty >= SHIELD_MAX ? 'Лимит 2 щита' : `Купить — ${SHIELD_PRICE} 🥯`;
+                widget.style.display = '';
+
+            } catch (e) {
+                widget.style.display = 'none';
+                log('❌ Ошибка щитов: ' + e.message);
+            }
+        }
+
+        async function buyStreakShield() {
+            const btn = document.getElementById('btn-buy-shield');
+            btn.disabled = true;
+            try {
+                const { data, error } = await db.rpc('buy_streak_shield', { p_student_id: currentUser.id });
+                if (error) throw error;
+                // Обновляем баланс и счётчик щитов по факту покупки
+                document.getElementById('val-huikons').innerText = data.balance;
+                await loadShields();
+                loadBalanceHistory();
+            } catch (e) {
+                alert('Не удалось купить щит: ' + (e.message || e));
+                btn.disabled = false;
             }
         }
 

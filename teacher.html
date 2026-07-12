@@ -1021,15 +1021,47 @@
 
             const dates = [...new Set((rows || []).map(r => r.scheduled_date))].sort();
 
+            // Щит стрика (G9): дни, покрытые щитом, персистятся в streak_shield_uses и
+            // участвуют в цепочке наравне с принятыми ежедневками. Читаем до пересчёта позиций.
+            const { data: shieldRows, error: shieldError } = await db
+                .from('streak_shield_uses')
+                .select('bridged_date')
+                .eq('student_id', studentId);
+            if (shieldError) throw shieldError;
+            const bridged = new Set((shieldRows || []).map(r => r.bridged_date));
+
+            // Разрыв ровно в 1 день перед только что принятой ежедневкой: если он ещё не
+            // покрыт и у ученика есть щит — списываем щит и покрываем пропущенный день, чтобы
+            // цепочка не рвалась. Только 1 день (два пропущенных подряд один щит не закрывает).
+            // Списание в момент пересчёта, а не кроном — рекомендация карточки G9.
+            // consume_streak_shield идемпотентна: повторный пересчёт того же разрыва щит не тратит.
+            const prevApproved = [...dates].reverse().find(d => d < thisScheduledDate);
+            if (prevApproved && daysBetweenDates(prevApproved, thisScheduledDate) === 2) {
+                const missingDay = addDaysToDate(prevApproved, 1);
+                if (!bridged.has(missingDay)) {
+                    const { data: consumed, error: consumeError } = await db.rpc('consume_streak_shield', {
+                        p_student_id: studentId,
+                        p_bridged_date: missingDay
+                    });
+                    if (consumeError) throw consumeError;
+                    if (consumed === true) bridged.add(missingDay);
+                }
+            }
+
+            // Эффективная цепочка = принятые ежедневки ∪ покрытые щитом дни.
+            const effectiveDates = [...new Set([...dates, ...bridged])].sort();
+
             const positionByDate = {};
             let position = 0;
             let prevDate = null;
-            for (const d of dates) {
+            for (const d of effectiveDates) {
                 position = (prevDate && addDaysToDate(prevDate, 1) === d) ? position + 1 : 1;
                 positionByDate[d] = position;
                 prevDate = d;
             }
 
+            // lastDate — последняя ПРИНЯТАЯ ежедневка (покрытый щитом день не является сдачей),
+            // но её позиция берётся из эффективной цепочки (с учётом сшитых дней).
             const lastDate = dates[dates.length - 1];
             const currentStreak = lastDate ? positionByDate[lastDate] : 0;
             const thisPosition = positionByDate[thisScheduledDate] || 1;
