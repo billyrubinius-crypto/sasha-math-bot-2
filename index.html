@@ -119,6 +119,39 @@
         .ach-name { font-size: 11px; font-weight: 600; margin-top: 6px; line-height: 1.2; }
         @media (max-width: 380px) { .ach-grid { grid-template-columns: repeat(3, 1fr); } }
 
+        /* Магазин «Бубличная» (S2) */
+        .shop-balance { text-align: center; font-size: 15px; font-weight: 700; margin-bottom: 18px; }
+        .shop-section-title { font-size: 16px; font-weight: bold; margin: 18px 0 4px; }
+        .shop-section-note { font-size: 12px; color: var(--tg-hint); margin-bottom: 12px; }
+        .shop-item {
+            display: flex; align-items: center; gap: 12px;
+            background: var(--tg-secondary); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .shop-preview {
+            width: 46px; height: 46px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: 24px;
+            background: var(--tg-bg); overflow: hidden;
+        }
+        .shop-body { flex: 1; min-width: 0; }
+        .shop-name { font-weight: 600; font-size: 14px; }
+        .shop-desc { font-size: 11px; color: var(--tg-hint); margin-top: 2px; }
+        .shop-action { flex-shrink: 0; text-align: right; }
+        .shop-buy-btn {
+            background: #ff9800; color: white; border: none; border-radius: 10px;
+            padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
+        .shop-buy-btn:disabled { opacity: 0.45; cursor: default; }
+        .shop-state { font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .shop-state.owned { color: #43a047; }
+        .shop-state.locked { color: var(--tg-hint); }
+        .shop-emoji-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .shop-emoji-chip {
+            font-size: 20px; padding: 4px 8px; border-radius: 8px; cursor: pointer;
+            background: var(--tg-bg); border: 1px solid rgba(128,128,128,0.2);
+        }
+        .shop-emoji-chip:disabled { opacity: 0.45; cursor: default; }
+
         /* Домашка */
         .dz-section { background: var(--tg-secondary); border-radius: 20px; padding: 25px; margin-top: 10px; }
         .dz-title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }
@@ -349,6 +382,15 @@
         </ul>
     </div>
 
+    <!-- ЭКРАН: МАГАЗИН (S2) -->
+    <div id="screen-shop" class="screen">
+        <h2 style="text-align: center; margin-bottom: 4px; font-size: 22px;">🥯 Бубличная</h2>
+        <div class="shop-balance" id="shop-balance"></div>
+        <div id="shop-content">
+            <div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>
+        </div>
+    </div>
+
     <!-- ЭКРАН 4: ЕЩЁ -->
     <div id="screen-more" class="screen">
         <h2 style="text-align: center; margin-bottom: 20px; font-size: 22px;">⚙️ Ещё</h2>
@@ -396,6 +438,9 @@
         </button>
         <button class="nav-btn" onclick="switchTab('leaderboard')">
             <span class="nav-icon">🏆</span> Лидеры
+        </button>
+        <button class="nav-btn" onclick="switchTab('shop')">
+            <span class="nav-icon">🥯</span> Магазин
         </button>
         <button class="nav-btn" onclick="switchTab('more')">
             <span class="nav-icon">⚙️</span> Ещё
@@ -894,6 +939,185 @@
             }
         }
 
+        // --- МАГАЗИН «БУБЛИЧНАЯ» (S2) ---
+        // Витрина строится из каталога shop_items (не хардкод). Ротационные товары показываются
+        // только для бандла текущего сезона (ensure_season_rotation, S1). Покупка — через RPC
+        // buy_item (щит делегируется в buy_streak_shield внутри RPC, здесь один путь).
+        // Динамика строится через DOM (textContent), а не innerHTML-строками — payload и названия
+        // товаров не могут исполниться как разметка.
+        async function loadShop() {
+            const content = document.getElementById('shop-content');
+            const balanceEl = document.getElementById('shop-balance');
+            content.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
+            try {
+                const [itemsRes, bundleRes, ownedRes, achRes, stRes] = await Promise.all([
+                    db.from('shop_items')
+                        .select('item_code,name,item_kind,slot,price,availability,rotation_bundle,condition_achievement,render_payload')
+                        .eq('active', true).order('sort_order'),
+                    db.rpc('ensure_season_rotation'),
+                    db.from('student_items').select('item_code,quantity').eq('student_id', currentUser.id),
+                    db.from('student_achievements').select('achievement_code').eq('student_id', currentUser.id),
+                    db.from('students').select('huikons').eq('telegram_id', currentUser.id).single()
+                ]);
+                if (itemsRes.error) throw itemsRes.error;
+
+                const items = itemsRes.data || [];
+                const currentBundle = bundleRes.data;              // null, если сезона/пула нет
+                const owned = new Map((ownedRes.data || []).map(r => [r.item_code, r.quantity]));
+                const earned = new Set((achRes.data || []).map(r => r.achievement_code));
+                const balance = stRes.data ? stRes.data.huikons : 0;
+                balanceEl.innerText = `Баланс: ${balance} ${pluralBubliks(balance)} 🥯`;
+
+                const rotation = items.filter(i => i.availability === 'rotation' && i.rotation_bundle === currentBundle);
+                const always = items.filter(i => i.availability === 'always');
+
+                content.innerHTML = '';
+                if (rotation.length) {
+                    content.appendChild(shopSectionTitle('✨ Витрина сезона',
+                        'Сезонные товары уходят с витрины в конце сезона — потом их не купить'));
+                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance)));
+                }
+                content.appendChild(shopSectionTitle('🥯 Всегда в магазине', ''));
+                always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance)));
+
+            } catch (e) {
+                content.innerHTML = '<div style="text-align:center; padding:30px; color:#f44336;">Ошибка загрузки магазина</div>';
+                log('❌ Магазин: ' + (e.message || e));
+            }
+        }
+
+        function shopSectionTitle(title, note) {
+            const wrap = document.createElement('div');
+            const t = document.createElement('div');
+            t.className = 'shop-section-title';
+            t.textContent = title;
+            wrap.appendChild(t);
+            if (note) {
+                const n = document.createElement('div');
+                n.className = 'shop-section-note';
+                n.textContent = note;
+                wrap.appendChild(n);
+            }
+            return wrap;
+        }
+
+        function shopPreview(item) {
+            const p = document.createElement('div');
+            p.className = 'shop-preview';
+            if (item.slot === 'name_color') {
+                if (item.render_payload === 'gold') {
+                    p.style.background = 'linear-gradient(135deg,#f9d423,#e6a817)';
+                } else if (/^#[0-9a-fA-F]{6}$/.test(item.render_payload || '')) {
+                    p.style.background = item.render_payload;   // валидный hex — иначе не трогаем
+                }
+                p.style.color = '#fff';
+                p.textContent = 'Aa';
+            } else {
+                const icons = { crown: '👑', title: '🏷️', frame: '🖼️', background: '🎨', status_emoji: '😀' };
+                p.textContent = item.item_kind === 'shield' ? '🛡️' : (icons[item.slot] || '🥯');
+            }
+            return p;
+        }
+
+        function shopBuyButton(item, balance, variant) {
+            const btn = document.createElement('button');
+            btn.className = 'shop-buy-btn';
+            if (balance < item.price) {
+                btn.disabled = true;
+                btn.textContent = 'Не хватает';
+            } else {
+                btn.textContent = 'Купить';
+                btn.onclick = () => buyShopItem(item.item_code, variant || null, btn);
+            }
+            return btn;
+        }
+
+        function renderShopItem(item, owned, earned, balance) {
+            const row = document.createElement('div');
+            row.className = 'shop-item';
+            row.appendChild(shopPreview(item));
+
+            const body = document.createElement('div');
+            body.className = 'shop-body';
+            const name = document.createElement('div');
+            name.className = 'shop-name';
+            name.textContent = item.name;
+            body.appendChild(name);
+            const desc = document.createElement('div');
+            desc.className = 'shop-desc';
+            desc.textContent = `${item.price} ${pluralBubliks(item.price)} 🥯`;
+            body.appendChild(desc);
+            row.appendChild(body);
+
+            const action = document.createElement('div');
+            action.className = 'shop-action';
+
+            if (item.item_kind === 'service') {
+                // Смена эмодзи-статуса: выбор варианта = покупка (30 🥯 за смену)
+                const chips = document.createElement('div');
+                chips.className = 'shop-emoji-chips';
+                (item.render_payload || '').split(/\s+/).filter(Boolean).forEach(em => {
+                    const chip = document.createElement('button');
+                    chip.className = 'shop-emoji-chip';
+                    chip.textContent = em;
+                    chip.disabled = balance < item.price;
+                    chip.onclick = () => buyShopItem(item.item_code, em, chip);
+                    chips.appendChild(chip);
+                });
+                body.appendChild(chips);
+            } else if (item.item_kind === 'shield') {
+                const qty = owned.get('streak_shield') || 0;
+                if (qty >= 2) {
+                    const s = document.createElement('span');
+                    s.className = 'shop-state owned';
+                    s.textContent = '🛡 2/2';
+                    action.appendChild(s);
+                } else {
+                    const label = document.createElement('div');
+                    label.className = 'shop-desc';
+                    label.style.marginBottom = '4px';
+                    label.textContent = `в запасе: ${qty}/2`;
+                    action.appendChild(label);
+                    action.appendChild(shopBuyButton(item, balance));
+                }
+            } else {
+                // Косметика
+                if (owned.has(item.item_code)) {
+                    const s = document.createElement('span');
+                    s.className = 'shop-state owned';
+                    s.textContent = '✓ Куплено';
+                    action.appendChild(s);
+                } else if (item.condition_achievement && !earned.has(item.condition_achievement)) {
+                    const s = document.createElement('span');
+                    s.className = 'shop-state locked';
+                    s.textContent = '🔒 Условие';
+                    action.appendChild(s);
+                } else {
+                    action.appendChild(shopBuyButton(item, balance));
+                }
+            }
+            row.appendChild(action);
+            return row;
+        }
+
+        async function buyShopItem(itemCode, variant, btn) {
+            if (btn) btn.disabled = true;
+            try {
+                const { data, error } = await db.rpc('buy_item', {
+                    p_student_id: currentUser.id, p_item_code: itemCode, p_variant: variant
+                });
+                if (error) throw error;
+                // Синхронизируем баланс на профиле, если он уже отрисован
+                const vh = document.getElementById('val-huikons');
+                if (vh && data && data.balance != null) vh.innerText = data.balance;
+                await loadShop();              // перерисовка витрины с новым балансом/владением
+                loadBalanceHistory();
+            } catch (e) {
+                alert('Не удалось купить: ' + (e.message || e));
+                if (btn) btn.disabled = false;
+            }
+        }
+
         // --- ЗАГРУЗКА АКТИВНЫХ ЗАДАНИЙ (ИСПРАВЛЕНО) ---
         async function loadActiveAssignments() {
             const select = document.getElementById('assignment-select');
@@ -1258,9 +1482,13 @@
                 document.getElementById('screen-leaderboard').classList.add('active');
                 document.querySelectorAll('.nav-btn')[2].classList.add('active');
                 loadLeaderboard();
+            } else if (tabName === 'shop') {
+                document.getElementById('screen-shop').classList.add('active');
+                document.querySelectorAll('.nav-btn')[3].classList.add('active');
+                loadShop();
             } else if (tabName === 'more') {
                 document.getElementById('screen-more').classList.add('active');
-                document.querySelectorAll('.nav-btn')[3].classList.add('active');
+                document.querySelectorAll('.nav-btn')[4].classList.add('active');
             }
         }
 
