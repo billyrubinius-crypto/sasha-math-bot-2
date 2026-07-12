@@ -188,6 +188,30 @@
             background: var(--tg-bg); border: 1px solid rgba(128,128,128,0.2);
         }
         .shop-emoji-chip:disabled { opacity: 0.45; cursor: default; }
+        .custom-title-text { font-size: 12px; font-weight: 600; margin-top: 5px; word-break: break-word; }
+        .custom-title-reason { font-size: 11px; color: #f44336; margin-top: 4px; line-height: 1.3; }
+        #custom-title-modal {
+            display: none; position: fixed; inset: 0; z-index: 2000; padding: 20px;
+            background: rgba(0,0,0,0.72); align-items: center; justify-content: center;
+        }
+        #custom-title-modal.active { display: flex; }
+        .custom-title-dialog {
+            width: 100%; max-width: 380px; background: var(--tg-secondary); color: var(--tg-text);
+            border-radius: 14px; padding: 18px; box-shadow: 0 12px 35px rgba(0,0,0,0.28);
+        }
+        .custom-title-input {
+            width: 100%; margin-top: 12px; padding: 11px 12px; border-radius: 10px;
+            border: 1px solid rgba(128,128,128,0.3); background: var(--tg-bg); color: var(--tg-text);
+            font: inherit;
+        }
+        .custom-title-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; font-size: 11px; color: var(--tg-hint); }
+        .custom-title-preview { min-height: 20px; margin-top: 12px; text-align: center; font-size: 13px; font-weight: 600; }
+        .custom-title-error { min-height: 17px; color: #f44336; font-size: 12px; margin-top: 8px; }
+        .custom-title-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .custom-title-actions button { flex: 1; border: none; border-radius: 10px; padding: 10px; font-weight: 700; cursor: pointer; }
+        .custom-title-cancel { background: var(--tg-bg); color: var(--tg-text); }
+        .custom-title-submit { background: #ff9800; color: white; }
+        .custom-title-submit:disabled { opacity: 0.45; cursor: default; }
 
         /* Домашка */
         .dz-section { background: var(--tg-secondary); border-radius: 20px; padding: 25px; margin-top: 10px; }
@@ -532,6 +556,26 @@
         <a href="https://t.me/tomhardy10" target="_blank" class="more-link-btn">💬 Связаться с учителем</a>
     </div>
 
+    <!-- Персональный титул (S8): первая отправка платная, retry после отказа бесплатен -->
+    <div id="custom-title-modal" onclick="if (event.target === this) closeCustomTitleModal()">
+        <div class="custom-title-dialog">
+            <div style="font-size:18px; font-weight:700;">Персональный титул</div>
+            <div id="custom-title-help" style="font-size:12px; color:var(--tg-hint); margin-top:5px;"></div>
+            <input id="custom-title-input" class="custom-title-input" type="text" autocomplete="off"
+                placeholder="Например: Гроза логарифмов" oninput="updateCustomTitleForm()">
+            <div class="custom-title-meta">
+                <span>От 3 до 24 символов, одна строка</span>
+                <span id="custom-title-count">0/24</span>
+            </div>
+            <div id="custom-title-preview" class="custom-title-preview"></div>
+            <div id="custom-title-error" class="custom-title-error"></div>
+            <div class="custom-title-actions">
+                <button class="custom-title-cancel" onclick="closeCustomTitleModal()">Отмена</button>
+                <button id="custom-title-submit" class="custom-title-submit" onclick="submitCustomTitle()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- НИЖНЕЕ МЕНЮ -->
     <div class="bottom-nav">
         <button class="nav-btn active" onclick="switchTab('profile')">
@@ -677,6 +721,13 @@
             return m ? m[1] : name;
         }
 
+        // У персонального титула публичным становится только одобренный variant из
+        // student_equipment; обычные титулы продолжают извлекаться из имени товара.
+        function equippedTitleText(title) {
+            if (!title) return '';
+            return title.item_code === 'title_custom' ? (title.variant || '') : titleText(title.name);
+        }
+
         // Применить цвет ника к элементу: 'gold' — градиент, валидный hex — цвет, иначе дефолт
         function applyNickColor(el, payload) {
             el.classList.remove('nick-gold');
@@ -712,7 +763,8 @@
         function applyProfileCosmetics(eq) {
             renderNick(document.getElementById('user-name'), currentUser.first_name || '', eq, '');
             const titleEl = document.getElementById('profile-title');
-            if (eq.title) { titleEl.textContent = titleText(eq.title.name); titleEl.style.display = 'block'; }
+            const title = equippedTitleText(eq.title);
+            if (title) { titleEl.textContent = title; titleEl.style.display = 'block'; }
             else { titleEl.style.display = 'none'; titleEl.textContent = ''; }
             applyAvatarFrame(document.getElementById('user-avatar-container'), eq);
             const scr = document.getElementById('screen-profile');
@@ -1385,7 +1437,7 @@
             const balanceEl = document.getElementById('shop-balance');
             content.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
             try {
-                const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes, seasonRes] = await Promise.all([
+                const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes, seasonRes, customTitleRes] = await Promise.all([
                     db.from('shop_items')
                         .select('item_code,name,item_kind,slot,price,availability,rotation_bundle,condition_achievement,render_payload')
                         .eq('active', true).order('sort_order'),
@@ -1396,9 +1448,13 @@
                     db.from('student_equipment').select('slot,item_code').eq('student_id', currentUser.id),
                     // Только для плашки «уйдёт через N дней» (S4) — не создаёт сезон, ensure_season_rotation
                     // и getCurrentSeasonId (лидерборд) уже отвечают за ленивое создание.
-                    db.from('seasons').select('start_date').is('end_date', null).order('id', { ascending: false }).limit(1).maybeSingle()
+                    db.from('seasons').select('start_date').is('end_date', null).order('id', { ascending: false }).limit(1).maybeSingle(),
+                    db.from('student_custom_titles')
+                        .select('title_text,status,teacher_comment')
+                        .eq('student_id', currentUser.id).maybeSingle()
                 ]);
                 if (itemsRes.error) throw itemsRes.error;
+                if (customTitleRes.error) throw customTitleRes.error;
 
                 const items = itemsRes.data || [];
                 const currentBundle = bundleRes.data;              // null, если сезона/пула нет
@@ -1408,6 +1464,7 @@
                 // slot → item_code надетого предмета (для кнопок Надеть/Снять на купленном)
                 const equippedBySlot = new Map((eqRes.data || []).map(r => [r.slot, r.item_code]));
                 const daysLeft = seasonRes.data ? daysLeftInSeason(seasonRes.data.start_date) : null;
+                const customTitle = customTitleRes.data || null;
                 balanceEl.innerText = `Баланс: ${balance} ${pluralBubliks(balance)} 🥯`;
 
                 const rotation = items.filter(i => i.availability === 'rotation' && i.rotation_bundle === currentBundle);
@@ -1417,14 +1474,14 @@
                 if (rotation.length) {
                     content.appendChild(shopSectionTitle('✨ Витрина сезона',
                         'Сезонные товары уходят с витрины в конце сезона — потом их не купить'));
-                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot, daysLeft)));
+                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot, daysLeft, customTitle)));
                 } else {
                     // Пул ротации исчерпан (все бандлы уже были на витрине в прошлых сезонах) —
                     // явное сообщение вместо молчаливого исчезновения секции (риск из карточки S4).
                     content.appendChild(shopSectionTitle('✨ Витрина сезона', 'Сезонных товаров сейчас нет — загляните в следующем сезоне'));
                 }
                 content.appendChild(shopSectionTitle('🥯 Всегда в магазине', ''));
-                always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot)));
+                always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot, null, customTitle)));
 
             } catch (e) {
                 content.innerHTML = '<div style="text-align:center; padding:30px; color:#f44336;">Ошибка загрузки магазина</div>';
@@ -1478,7 +1535,7 @@
             return btn;
         }
 
-        function renderShopItem(item, owned, earned, balance, equippedBySlot, daysLeft) {
+        function renderShopItem(item, owned, earned, balance, equippedBySlot, daysLeft, customTitle) {
             const row = document.createElement('div');
             row.className = 'shop-item';
             row.appendChild(shopPreview(item));
@@ -1504,7 +1561,36 @@
             const action = document.createElement('div');
             action.className = 'shop-action';
 
-            if (item.item_kind === 'service') {
+            if (item.item_code === 'title_custom' && customTitle && customTitle.status !== 'approved') {
+                const entered = document.createElement('div');
+                entered.className = 'custom-title-text';
+                entered.textContent = `«${customTitle.title_text}»`;
+                body.appendChild(entered);
+
+                if (customTitle.status === 'pending') {
+                    const state = document.createElement('span');
+                    state.className = 'shop-state locked';
+                    state.textContent = 'На модерации';
+                    action.appendChild(state);
+                } else {
+                    const reason = document.createElement('div');
+                    reason.className = 'custom-title-reason';
+                    reason.textContent = `Причина: ${customTitle.teacher_comment || 'нужно исправить текст'}`;
+                    body.appendChild(reason);
+                    const btn = document.createElement('button');
+                    btn.className = 'shop-buy-btn';
+                    btn.textContent = 'Исправить';
+                    btn.onclick = () => openCustomTitleModal(customTitle.title_text, true);
+                    action.appendChild(btn);
+                }
+            } else if (item.item_code === 'title_custom' && !customTitle) {
+                const btn = document.createElement('button');
+                btn.className = 'shop-buy-btn';
+                btn.disabled = balance < item.price;
+                btn.textContent = balance < item.price ? 'Не хватает' : 'Создать';
+                if (!btn.disabled) btn.onclick = () => openCustomTitleModal('', false);
+                action.appendChild(btn);
+            } else if (item.item_kind === 'service') {
                 // Смена эмодзи-статуса: выбор варианта = покупка (30 🥯 за смену)
                 const chips = document.createElement('div');
                 chips.className = 'shop-emoji-chips';
@@ -1591,6 +1677,66 @@
             } catch (e) {
                 alert('Не удалось купить: ' + (e.message || e));
                 if (btn) btn.disabled = false;
+            }
+        }
+
+        let customTitleIsRetry = false;
+
+        function customTitleValue() {
+            return document.getElementById('custom-title-input').value.trim().replace(/\s+/g, ' ');
+        }
+
+        function openCustomTitleModal(value, isRetry) {
+            customTitleIsRetry = !!isRetry;
+            const input = document.getElementById('custom-title-input');
+            input.value = value || '';
+            document.getElementById('custom-title-help').textContent = customTitleIsRetry
+                ? 'Исправление после отказа бесплатно. Новый текст снова проверит учитель.'
+                : 'После отправки спишется 2000 бубликов. Учитель проверит текст до публикации.';
+            document.getElementById('custom-title-submit').textContent = customTitleIsRetry
+                ? 'Отправить повторно'
+                : 'Отправить — 2000 🥯';
+            document.getElementById('custom-title-error').textContent = '';
+            document.getElementById('custom-title-modal').classList.add('active');
+            updateCustomTitleForm();
+            input.focus();
+        }
+
+        function closeCustomTitleModal() {
+            document.getElementById('custom-title-modal').classList.remove('active');
+        }
+
+        function updateCustomTitleForm() {
+            const value = customTitleValue();
+            const length = [...value].length;
+            document.getElementById('custom-title-count').textContent = `${length}/24`;
+            document.getElementById('custom-title-preview').textContent = value ? `«${value}»` : '';
+            document.getElementById('custom-title-submit').disabled = length < 3 || length > 24;
+            document.getElementById('custom-title-error').textContent = length > 24 ? 'Сократи титул до 24 символов' : '';
+        }
+
+        async function submitCustomTitle() {
+            const title = customTitleValue();
+            const length = [...title].length;
+            if (length < 3 || length > 24) return updateCustomTitleForm();
+
+            const btn = document.getElementById('custom-title-submit');
+            btn.disabled = true;
+            document.getElementById('custom-title-error').textContent = '';
+            try {
+                const { data, error } = await db.rpc('submit_custom_title', {
+                    p_student_id: currentUser.id,
+                    p_title_text: title
+                });
+                if (error) throw error;
+                const balance = document.getElementById('val-huikons');
+                if (balance && data && data.balance != null) balance.innerText = data.balance;
+                closeCustomTitleModal();
+                await loadShop();
+                if (!customTitleIsRetry) loadBalanceHistory();
+            } catch (e) {
+                document.getElementById('custom-title-error').textContent = e.message || String(e);
+                btn.disabled = false;
             }
         }
 
@@ -1968,9 +2114,12 @@
                     renderNick(line, student.name || '', eq, isMe ? ' (Вы)' : '');
                     wrap.appendChild(line);
                     if (eq.title) {
-                        const t = document.createElement('div');
-                        t.className = 'lb-title'; t.textContent = titleText(eq.title.name);
-                        wrap.appendChild(t);
+                        const title = equippedTitleText(eq.title);
+                        if (title) {
+                            const t = document.createElement('div');
+                            t.className = 'lb-title'; t.textContent = title;
+                            wrap.appendChild(t);
+                        }
                     }
 
                     const score = document.createElement('div');

@@ -240,6 +240,30 @@ create index if not exists idx_student_equipment_student
   on public.student_equipment (student_id);
 alter table public.student_equipment disable row level security;
 
+-- student_custom_titles — одно оплаченное право/текущая заявка на персональный титул
+-- (миграция 010, S8). До approved текст не попадает в student_items/student_equipment;
+-- после approved одобренный текст хранится в student_equipment.variant.
+create table public.student_custom_titles (
+  student_id       bigint       primary key references public.students (telegram_id),
+  title_text       text         not null,
+  status           text         not null check (status in ('pending', 'rejected', 'approved')),
+  teacher_comment  text,
+  purchased_at     timestamptz  not null default now(),
+  submitted_at     timestamptz  not null default now(),
+  reviewed_at      timestamptz,
+  updated_at       timestamptz  not null default now(),
+  check (char_length(title_text) between 3 and 24),
+  check (title_text = btrim(title_text)),
+  check (title_text !~ '[[:cntrl:]]'),
+  check (teacher_comment is null or char_length(btrim(teacher_comment)) between 3 and 200),
+  check (
+    (status = 'pending'  and teacher_comment is null     and reviewed_at is null) or
+    (status = 'rejected' and teacher_comment is not null and reviewed_at is not null) or
+    (status = 'approved' and teacher_comment is null     and reviewed_at is not null)
+  )
+);
+alter table public.student_custom_titles disable row level security;
+
 -- student_showcase — витрина профиля: 3 слота, предмет ИЛИ достижение (миграция 009, S7).
 -- Отдельная таблица, не расширение student_equipment: item_code там жёстко ссылается на
 -- shop_items (FK), а витрина должна показывать ещё и student_achievements.achievement_code —
@@ -468,7 +492,8 @@ begin
 end;
 $function$;
 
--- ensure_season_rotation / buy_item / equip_item — RPC магазина (миграция 008, задача S1).
+-- ensure_season_rotation / buy_item / equip_item — RPC магазина (миграция 008, задача S1;
+-- buy_item/equip_item точечно расширены миграцией 010 для персонального титула S8).
 -- Тела и мотивация решений — в миграции 008 (ленивое назначение бандла открытому сезону;
 -- единая покупка с делегированием щита, явной проверкой баланса, gate по достижению и
 -- автоэкипировкой; бесплатное переодевание купленного). Сид каталога — тоже в миграции 008.
@@ -508,6 +533,153 @@ begin
 end;
 $function$;
 
+-- submit_custom_title / review_custom_title — покупка права и модерация персонального
+-- титула (миграция 010, S8). Первая отправка списывает цену через add_huikons; retry после
+-- rejected бесплатен; только approved создаёт владение и публичную экипировку.
+CREATE OR REPLACE FUNCTION public.submit_custom_title(p_student_id bigint, p_title_text text)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_title       text;
+  v_status      text;
+  v_price       integer;
+  v_balance     integer;
+  v_new_balance integer;
+begin
+  if p_title_text is null or p_title_text ~ '[[:cntrl:]]' then
+    raise exception 'Титул должен быть одной строкой без управляющих символов';
+  end if;
+
+  v_title := regexp_replace(btrim(p_title_text), '[[:space:]]+', ' ', 'g');
+  if char_length(v_title) < 3 or char_length(v_title) > 24 then
+    raise exception 'Длина титула должна быть от 3 до 24 символов';
+  end if;
+
+  select huikons into v_balance
+    from public.students
+    where telegram_id = p_student_id
+    for update;
+  if v_balance is null then
+    raise exception 'Ученик % не найден', p_student_id;
+  end if;
+
+  select status into v_status
+    from public.student_custom_titles
+    where student_id = p_student_id
+    for update;
+
+  if v_status = 'pending' then
+    raise exception 'Титул уже находится на модерации';
+  elsif v_status = 'approved' then
+    raise exception 'Персональный титул уже одобрен и не может быть изменён';
+  elsif v_status = 'rejected' then
+    update public.student_custom_titles
+      set title_text = v_title,
+          status = 'pending',
+          teacher_comment = null,
+          submitted_at = now(),
+          reviewed_at = null,
+          updated_at = now()
+      where student_id = p_student_id;
+
+    return json_build_object('status', 'pending', 'balance', v_balance, 'charged', 0);
+  end if;
+
+  select price into v_price
+    from public.shop_items
+    where item_code = 'title_custom' and active;
+  if v_price is null then
+    raise exception 'Персональный титул сейчас недоступен';
+  end if;
+  if v_balance < v_price then
+    raise exception 'Недостаточно бубликов: нужно %, есть %', v_price, v_balance;
+  end if;
+
+  select new_balance into v_new_balance
+    from public.add_huikons(p_student_id, -v_price, 'buy_title_custom');
+
+  insert into public.student_custom_titles (student_id, title_text, status)
+    values (p_student_id, v_title, 'pending');
+
+  return json_build_object(
+    'status', 'pending',
+    'balance', v_new_balance,
+    'charged', v_price
+  );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.review_custom_title(
+  p_student_id bigint,
+  p_decision text,
+  p_teacher_comment text DEFAULT null
+)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_title   text;
+  v_status  text;
+  v_comment text;
+begin
+  if p_decision is null or p_decision not in ('approved', 'rejected') then
+    raise exception 'Решение должно быть approved или rejected';
+  end if;
+
+  select title_text, status into v_title, v_status
+    from public.student_custom_titles
+    where student_id = p_student_id
+    for update;
+  if v_status is null then
+    raise exception 'Заявка ученика % не найдена', p_student_id;
+  end if;
+  if v_status <> 'pending' then
+    raise exception 'Заявка уже рассмотрена: %', v_status;
+  end if;
+
+  if p_decision = 'rejected' then
+    if p_teacher_comment is null or p_teacher_comment ~ '[[:cntrl:]]' then
+      raise exception 'При отказе нужна причина одной строкой';
+    end if;
+    v_comment := regexp_replace(btrim(p_teacher_comment), '[[:space:]]+', ' ', 'g');
+    if char_length(v_comment) < 3 or char_length(v_comment) > 200 then
+      raise exception 'Причина отказа должна быть от 3 до 200 символов';
+    end if;
+
+    update public.student_custom_titles
+      set status = 'rejected',
+          teacher_comment = v_comment,
+          reviewed_at = now(),
+          updated_at = now()
+      where student_id = p_student_id;
+
+    return json_build_object('status', 'rejected');
+  end if;
+
+  update public.student_custom_titles
+    set status = 'approved',
+        teacher_comment = null,
+        reviewed_at = now(),
+        updated_at = now()
+    where student_id = p_student_id;
+
+  insert into public.student_items (student_id, item_code, quantity)
+    values (p_student_id, 'title_custom', 1)
+    on conflict (student_id, item_code)
+    do update set quantity = greatest(student_items.quantity, 1), updated_at = now();
+
+  insert into public.student_equipment (student_id, slot, item_code, variant)
+    values (p_student_id, 'title', 'title_custom', v_title)
+    on conflict (student_id, slot)
+    do update set item_code = excluded.item_code,
+                  variant = excluded.variant,
+                  updated_at = now();
+
+  return json_build_object('status', 'approved', 'title_text', v_title);
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.buy_item(p_student_id bigint, p_item_code text, p_variant text DEFAULT null)
  RETURNS json
  LANGUAGE plpgsql
@@ -521,6 +693,10 @@ begin
   select * into v_item from shop_items where item_code = p_item_code and active;
   if v_item.item_code is null then
     raise exception 'Товар % не найден или снят с продажи', p_item_code;
+  end if;
+
+  if p_item_code = 'title_custom' then
+    raise exception 'Персональный титул покупается только через отправку на модерацию';
   end if;
 
   if v_item.item_kind = 'shield' then
@@ -589,7 +765,8 @@ CREATE OR REPLACE FUNCTION public.equip_item(p_student_id bigint, p_slot text, p
  LANGUAGE plpgsql
 AS $function$
 declare
-  v_slot text;
+  v_slot         text;
+  v_custom_title text;
 begin
   if p_item_code is null then
     delete from student_equipment where student_id = p_student_id and slot = p_slot;
@@ -608,6 +785,23 @@ begin
   if not exists (select 1 from student_items
                    where student_id = p_student_id and item_code = p_item_code) then
     raise exception 'Сначала нужно купить этот предмет';
+  end if;
+
+  if p_item_code = 'title_custom' then
+    select title_text into v_custom_title
+      from student_custom_titles
+      where student_id = p_student_id and status = 'approved';
+    if v_custom_title is null then
+      raise exception 'Персональный титул ещё не одобрен';
+    end if;
+
+    insert into student_equipment (student_id, slot, item_code, variant)
+      values (p_student_id, p_slot, p_item_code, v_custom_title)
+      on conflict (student_id, slot)
+      do update set item_code = excluded.item_code,
+                    variant = excluded.variant,
+                    updated_at = now();
+    return;
   end if;
 
   insert into student_equipment (student_id, slot, item_code)
