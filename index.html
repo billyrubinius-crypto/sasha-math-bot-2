@@ -136,6 +136,7 @@
         .shop-body { flex: 1; min-width: 0; }
         .shop-name { font-weight: 600; font-size: 14px; }
         .shop-desc { font-size: 11px; color: var(--tg-hint); margin-top: 2px; }
+        .shop-leaving { color: #ff9800; font-weight: 600; }
         .shop-action { flex-shrink: 0; text-align: right; }
         .shop-buy-btn {
             background: #ff9800; color: white; border: none; border-radius: 10px;
@@ -1078,12 +1079,33 @@
         // buy_item (щит делегируется в buy_streak_shield внутри RPC, здесь один путь).
         // Динамика строится через DOM (textContent), а не innerHTML-строками — payload и названия
         // товаров не могут исполниться как разметка.
+
+        // Склонение «день/дня/дней» для плашки «уйдёт через N дней» (S4)
+        function pluralDays(n) {
+            const abs = Math.abs(n);
+            const mod10 = abs % 10, mod100 = abs % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'день';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'дня';
+            return 'дней';
+        }
+
+        // Сезон = 2 недели (SPEC_STAGE1.md раздел 3). Оценочный отсчёт от start_date по МСК —
+        // информационная плашка, не гарантия: реальное закрытие сезона — ручное нажатие кнопки
+        // учителем (close_season, G8), может случиться позже расчётных 14 дней. Клампим нулём,
+        // чтобы просроченный, но ещё не закрытый сезон не показывал отрицательные дни.
+        function daysLeftInSeason(startDate) {
+            const [sy, sm, sd] = startDate.split('-').map(Number);
+            const [ty, tm, td] = getTodayMSK().split('-').map(Number);
+            const elapsed = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(sy, sm - 1, sd)) / 86400000);
+            return Math.max(0, 14 - elapsed);
+        }
+
         async function loadShop() {
             const content = document.getElementById('shop-content');
             const balanceEl = document.getElementById('shop-balance');
             content.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
             try {
-                const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes] = await Promise.all([
+                const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes, seasonRes] = await Promise.all([
                     db.from('shop_items')
                         .select('item_code,name,item_kind,slot,price,availability,rotation_bundle,condition_achievement,render_payload')
                         .eq('active', true).order('sort_order'),
@@ -1091,7 +1113,10 @@
                     db.from('student_items').select('item_code,quantity').eq('student_id', currentUser.id),
                     db.from('student_achievements').select('achievement_code').eq('student_id', currentUser.id),
                     db.from('students').select('huikons').eq('telegram_id', currentUser.id).single(),
-                    db.from('student_equipment').select('slot,item_code').eq('student_id', currentUser.id)
+                    db.from('student_equipment').select('slot,item_code').eq('student_id', currentUser.id),
+                    // Только для плашки «уйдёт через N дней» (S4) — не создаёт сезон, ensure_season_rotation
+                    // и getCurrentSeasonId (лидерборд) уже отвечают за ленивое создание.
+                    db.from('seasons').select('start_date').is('end_date', null).order('id', { ascending: false }).limit(1).maybeSingle()
                 ]);
                 if (itemsRes.error) throw itemsRes.error;
 
@@ -1102,6 +1127,7 @@
                 const balance = stRes.data ? stRes.data.huikons : 0;
                 // slot → item_code надетого предмета (для кнопок Надеть/Снять на купленном)
                 const equippedBySlot = new Map((eqRes.data || []).map(r => [r.slot, r.item_code]));
+                const daysLeft = seasonRes.data ? daysLeftInSeason(seasonRes.data.start_date) : null;
                 balanceEl.innerText = `Баланс: ${balance} ${pluralBubliks(balance)} 🥯`;
 
                 const rotation = items.filter(i => i.availability === 'rotation' && i.rotation_bundle === currentBundle);
@@ -1111,7 +1137,11 @@
                 if (rotation.length) {
                     content.appendChild(shopSectionTitle('✨ Витрина сезона',
                         'Сезонные товары уходят с витрины в конце сезона — потом их не купить'));
-                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot)));
+                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot, daysLeft)));
+                } else {
+                    // Пул ротации исчерпан (все бандлы уже были на витрине в прошлых сезонах) —
+                    // явное сообщение вместо молчаливого исчезновения секции (риск из карточки S4).
+                    content.appendChild(shopSectionTitle('✨ Витрина сезона', 'Сезонных товаров сейчас нет — загляните в следующем сезоне'));
                 }
                 content.appendChild(shopSectionTitle('🥯 Всегда в магазине', ''));
                 always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot)));
@@ -1168,7 +1198,7 @@
             return btn;
         }
 
-        function renderShopItem(item, owned, earned, balance, equippedBySlot) {
+        function renderShopItem(item, owned, earned, balance, equippedBySlot, daysLeft) {
             const row = document.createElement('div');
             row.className = 'shop-item';
             row.appendChild(shopPreview(item));
@@ -1183,6 +1213,12 @@
             desc.className = 'shop-desc';
             desc.textContent = `${item.price} ${pluralBubliks(item.price)} 🥯`;
             body.appendChild(desc);
+            if (item.availability === 'rotation' && daysLeft != null) {
+                const leaving = document.createElement('div');
+                leaving.className = 'shop-desc shop-leaving';
+                leaving.textContent = daysLeft > 0 ? `Уйдёт с витрины через ${daysLeft} ${pluralDays(daysLeft)}` : 'Уходит с витрины со дня на день';
+                body.appendChild(leaving);
+            }
             row.appendChild(body);
 
             const action = document.createElement('div');
