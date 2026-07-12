@@ -94,6 +94,19 @@
         .hist-positive { color: #28a745; }
         .hist-negative { color: #dc3545; }
 
+        /* Достижения (G5) */
+        .achievements-section { margin-top: 20px; }
+        .achievements-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .ach-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        .ach-tile {
+            background: var(--tg-secondary); border-radius: 14px; padding: 12px 6px;
+            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .ach-tile.locked { opacity: 0.4; filter: grayscale(1); }
+        .ach-icon { font-size: 28px; line-height: 1; }
+        .ach-name { font-size: 11px; font-weight: 600; margin-top: 6px; line-height: 1.2; }
+        @media (max-width: 380px) { .ach-grid { grid-template-columns: repeat(3, 1fr); } }
+
         /* Домашка */
         .dz-section { background: var(--tg-secondary); border-radius: 20px; padding: 25px; margin-top: 10px; }
         .dz-title { font-size: 20px; font-weight: bold; margin-bottom: 20px; text-align: center; }
@@ -222,6 +235,11 @@
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
             <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
+        </div>
+
+        <div class="achievements-section" id="achievements-section" style="display:none;">
+            <div class="achievements-title">🏆 Достижения</div>
+            <div class="ach-grid" id="ach-grid"></div>
         </div>
 
         <div class="mock-chart-section" id="mock-chart-section">
@@ -541,6 +559,7 @@
                 loadAssignmentsSummary();
                 loadMockExamChart();
                 loadSeasonHistory();
+                loadAchievements();
 
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
         }
@@ -787,6 +806,50 @@
             } catch (e) {
                 section.style.display = 'none';
                 log('❌ Ошибка истории сезонов: ' + e.message);
+            }
+        }
+
+        // Альбом достижений (G5). Фиксированный набор из 8 достижений «Дисциплины»: полученные —
+        // цветными, ещё не полученные — серым силуэтом (locked). Порядок и метаданные — константа
+        // ниже; коды совпадают с achievement_code, которые выдаёт teacher.html (grantAchievement).
+        const ACHIEVEMENTS_META = [
+            { code: 'first_step',    icon: '🌱', name: 'Первый шаг' },
+            { code: 'streak_7',      icon: '🔥', name: 'Неделя огня' },
+            { code: 'streak_30',     icon: '📅', name: 'Месяц без пропусков' },
+            { code: 'streak_100',    icon: '💯', name: 'Сотня' },
+            { code: 'streak_200',    icon: '⚡', name: '200 дней' },
+            { code: 'streak_365',    icon: '👑', name: 'Год дисциплины' },
+            { code: 'perfect_month', icon: '✨', name: 'Идеальный месяц' },
+            { code: 'rebirth',       icon: '🕊', name: 'Возрождение' }
+        ];
+
+        async function loadAchievements() {
+            const section = document.getElementById('achievements-section');
+            const grid = document.getElementById('ach-grid');
+            try {
+                const { data, error } = await db
+                    .from('student_achievements')
+                    .select('achievement_code')
+                    .eq('student_id', currentUser.id);
+                if (error) throw error;
+
+                const earned = new Set((data || []).map(r => r.achievement_code));
+                grid.innerHTML = '';
+                ACHIEVEMENTS_META.forEach(a => {
+                    const has = earned.has(a.code);
+                    const tile = document.createElement('div');
+                    tile.className = `ach-tile ${has ? '' : 'locked'}`;
+                    tile.innerHTML = `
+                        <div class="ach-icon">${has ? a.icon : '🔒'}</div>
+                        <div class="ach-name">${esc(a.name)}</div>
+                    `;
+                    grid.appendChild(tile);
+                });
+                section.style.display = '';
+
+            } catch (e) {
+                section.style.display = 'none';
+                log('❌ Ошибка достижений: ' + e.message);
             }
         }
 
