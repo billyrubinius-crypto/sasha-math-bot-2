@@ -196,6 +196,51 @@ create index if not exists idx_streak_shield_uses_student
   on public.streak_shield_uses (student_id);
 alter table public.streak_shield_uses disable row level security;  -- как и все таблицы проекта (T10)
 
+-- shop_items — каталог магазина «Бубличная» (миграция 008, задача S1). Полные решения —
+-- в шапке миграции 008: buy_item как единая точка покупки (щит — делегированием в
+-- buy_streak_shield), ротация через бандлы, автоэкипировка косметики.
+create table public.shop_items (
+  item_code             text         primary key,
+  name                  text         not null,
+  item_kind             text         not null check (item_kind in ('cosmetic','shield','service')),
+  slot                  text         check (slot in ('name_color','crown','status_emoji','title','frame','background')),
+  price                 integer      not null check (price > 0),
+  availability          text         not null check (availability in ('always','rotation')),
+  rotation_bundle       integer,
+  condition_achievement text,
+  render_payload        text,
+  sort_order            integer      not null default 100,
+  active                boolean      not null default true,
+  created_at            timestamptz  not null default now(),
+  check ((availability = 'rotation') = (rotation_bundle is not null))
+);
+alter table public.shop_items disable row level security;
+
+-- season_bundles — какой ротационный набор на витрине какого сезона (миграция 008).
+-- unique(bundle): использованный набор не возвращается («потом — никогда» для легендарок).
+create table public.season_bundles (
+  season_id  bigint       primary key references public.seasons (id),
+  bundle     integer      not null unique,
+  created_at timestamptz  not null default now()
+);
+alter table public.season_bundles disable row level security;
+
+-- student_equipment — что надето по слотам; variant — выбранный эмодзи статуса (миграция 008).
+-- slot без check: S7 добавит showcase_1..3 без миграции.
+create table public.student_equipment (
+  id          uuid         primary key default gen_random_uuid(),
+  student_id  bigint       not null references public.students (telegram_id),
+  slot        text         not null,
+  item_code   text         not null references public.shop_items (item_code),
+  variant     text,
+  updated_at  timestamptz  not null default now(),
+  created_at  timestamptz  not null default now(),
+  unique (student_id, slot)
+);
+create index if not exists idx_student_equipment_student
+  on public.student_equipment (student_id);
+alter table public.student_equipment disable row level security;
+
 -- --- Индексы (кроме автоматических для PK/UNIQUE и idx_students_telegram_id выше) -----
 
 create index if not exists idx_assignments_activation
@@ -405,6 +450,155 @@ begin
     where student_id = p_student_id and item_code = 'streak_shield';
 
   return true;
+end;
+$function$;
+
+-- ensure_season_rotation / buy_item / equip_item — RPC магазина (миграция 008, задача S1).
+-- Тела и мотивация решений — в миграции 008 (ленивое назначение бандла открытому сезону;
+-- единая покупка с делегированием щита, явной проверкой баланса, gate по достижению и
+-- автоэкипировкой; бесплатное переодевание купленного). Сид каталога — тоже в миграции 008.
+CREATE OR REPLACE FUNCTION public.ensure_season_rotation()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_season bigint;
+  v_bundle integer;
+begin
+  select id into v_season from seasons where end_date is null order by id desc limit 1;
+  if v_season is null then
+    return null;
+  end if;
+
+  select bundle into v_bundle from season_bundles where season_id = v_season;
+  if v_bundle is not null then
+    return v_bundle;
+  end if;
+
+  select min(rotation_bundle) into v_bundle
+    from shop_items
+    where rotation_bundle is not null
+      and active
+      and rotation_bundle not in (select bundle from season_bundles);
+  if v_bundle is null then
+    return null;
+  end if;
+
+  insert into season_bundles (season_id, bundle)
+    values (v_season, v_bundle)
+    on conflict (season_id) do nothing;
+
+  select bundle into v_bundle from season_bundles where season_id = v_season;
+  return v_bundle;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.buy_item(p_student_id bigint, p_item_code text, p_variant text DEFAULT null)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_item     shop_items%rowtype;
+  v_bundle   integer;
+  v_balance  integer;
+  v_new_balance integer;
+begin
+  select * into v_item from shop_items where item_code = p_item_code and active;
+  if v_item.item_code is null then
+    raise exception 'Товар % не найден или снят с продажи', p_item_code;
+  end if;
+
+  if v_item.item_kind = 'shield' then
+    return buy_streak_shield(p_student_id);
+  end if;
+
+  if v_item.availability = 'rotation' then
+    v_bundle := ensure_season_rotation();
+    if v_bundle is null or v_bundle <> v_item.rotation_bundle then
+      raise exception 'Товар «%» сейчас не на витрине', v_item.name;
+    end if;
+  end if;
+
+  if v_item.condition_achievement is not null then
+    if not exists (select 1 from student_achievements
+                     where student_id = p_student_id
+                       and achievement_code = v_item.condition_achievement) then
+      raise exception 'Для покупки «%» нужно достижение', v_item.name;
+    end if;
+  end if;
+
+  if v_item.item_kind = 'service' then
+    if p_variant is null or position(p_variant in coalesce(v_item.render_payload, '')) = 0 then
+      raise exception 'Недопустимый вариант для «%»', v_item.name;
+    end if;
+  end if;
+
+  if v_item.item_kind = 'cosmetic' then
+    if exists (select 1 from student_items
+                 where student_id = p_student_id and item_code = p_item_code) then
+      raise exception 'Уже куплено';
+    end if;
+  end if;
+
+  select huikons into v_balance from students where telegram_id = p_student_id for update;
+  if v_balance is null then
+    raise exception 'Ученик % не найден', p_student_id;
+  end if;
+  if v_balance < v_item.price then
+    raise exception 'Недостаточно бубликов: нужно %, есть %', v_item.price, v_balance;
+  end if;
+
+  select new_balance into v_new_balance
+    from add_huikons(p_student_id, -v_item.price, 'buy_' || p_item_code);
+
+  if v_item.item_kind = 'cosmetic' then
+    insert into student_items (student_id, item_code, quantity)
+      values (p_student_id, p_item_code, 1);
+    insert into student_equipment (student_id, slot, item_code)
+      values (p_student_id, v_item.slot, p_item_code)
+      on conflict (student_id, slot)
+      do update set item_code = excluded.item_code, variant = null, updated_at = now();
+  elsif v_item.item_kind = 'service' then
+    insert into student_equipment (student_id, slot, item_code, variant)
+      values (p_student_id, v_item.slot, p_item_code, p_variant)
+      on conflict (student_id, slot)
+      do update set item_code = excluded.item_code, variant = excluded.variant, updated_at = now();
+  end if;
+
+  return json_build_object('item_code', p_item_code, 'balance', v_new_balance);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.equip_item(p_student_id bigint, p_slot text, p_item_code text DEFAULT null)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_slot text;
+begin
+  if p_item_code is null then
+    delete from student_equipment where student_id = p_student_id and slot = p_slot;
+    return;
+  end if;
+
+  if p_slot = 'status_emoji' then
+    raise exception 'Эмодзи-статус меняется только покупкой смены';
+  end if;
+
+  select slot into v_slot from shop_items where item_code = p_item_code and active;
+  if v_slot is null or v_slot <> p_slot then
+    raise exception 'Товар % не подходит слоту %', p_item_code, p_slot;
+  end if;
+
+  if not exists (select 1 from student_items
+                   where student_id = p_student_id and item_code = p_item_code) then
+    raise exception 'Сначала нужно купить этот предмет';
+  end if;
+
+  insert into student_equipment (student_id, slot, item_code)
+    values (p_student_id, p_slot, p_item_code)
+    on conflict (student_id, slot)
+    do update set item_code = excluded.item_code, variant = null, updated_at = now();
 end;
 $function$;
 
