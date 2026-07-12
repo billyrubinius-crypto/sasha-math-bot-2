@@ -327,7 +327,7 @@
             </div>
             
             <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 13px;">
-                Бублики начисляются сразу за загрузку и ещё раз — после проверки учителем.<br>
+                Бублики начисляются после проверки учителем.<br>
                 Размер награды зависит от типа задания.
             </div>
         </div>
@@ -1029,16 +1029,14 @@
             const assignment = activeAssignments.find(a => a.id === assignmentId);
             if (!assignment) return;
 
-            let rewardPoints = 5; // Базовая награда
             const nowInstant = new Date();
             let deadlineMSK = null;
 
-            // Определяем награду и дедлайн в зависимости от типа
+            // Определяем дедлайн в зависимости от типа (награда за загрузку убрана — G11,
+            // бублики теперь начисляются только за принятую работу учителем, см. G4/G6)
             if (assignment.type === 'individual') {
-                rewardPoints = 15; // Индивидуальное сложнее
-                deadlineMSK = null; // Без дедлайна (или можно поставить через месяц)
+                deadlineMSK = null; // Без дедлайна
             } else if (assignment.type === 'weekly') {
-                rewardPoints = 30; // Еженедельное самое ценное
                 const [ty, tm, td] = getTodayMSK().split('-').map(Number);
                 const currentDay = new Date(Date.UTC(ty, tm - 1, td)).getUTCDay();
                 let daysUntilMonday = (1 - currentDay + 7) % 7;
@@ -1047,7 +1045,6 @@
                 deadlineMSK = moscowDateTimeToInstant(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), 0, 0);
             } else {
                 // Ежедневное
-                rewardPoints = 5;
                 let dateStr = assignment.scheduled_date;
                 if (!dateStr) {
                      status.innerText = "⚠️ Ошибка даты задания"; return;
@@ -1091,19 +1088,12 @@
                 
                 if (dbError) throw dbError;
 
-                // 3. Начисляем баллы за загрузку — но только за первую сдачу, не за пересдачу возвращённой работы
-                //    (бублики за неё уже были начислены при первой загрузке и не отзывались при возврате)
+                // Награда за загрузку убрана (G11) — бублики теперь только за принятую работу,
+                // учитель как quality gate (SPEC_STAGE1.md, раздел 7). isResubmission оставлен
+                // только для текста статуса — отличаем пересдачу от первой сдачи.
                 const isResubmission = assignment.status === 'checked';
-                if (!isResubmission) {
-                    const { error: rpcError } = await db.rpc('add_huikons', {
-                        p_student_id: currentUser.id,
-                        p_amount: rewardPoints,
-                        p_reason: `dz_upload_${assignment.type}` // Сохраняем тип для истории
-                    });
-                    if (rpcError) throw rpcError;
-                }
 
-                status.innerText = isResubmission ? '✅ Работа пересдана на проверку!' : `✅ ДЗ загружено! (+${rewardPoints} ${pluralBubliks(rewardPoints)} 🥯)`;
+                status.innerText = isResubmission ? '✅ Работа пересдана на проверку!' : '✅ ДЗ загружено, ждёт проверки';
                 status.style.color = "#4caf50";
                 
                 // Сброс формы
