@@ -226,7 +226,6 @@ create table public.season_bundles (
 alter table public.season_bundles disable row level security;
 
 -- student_equipment — что надето по слотам; variant — выбранный эмодзи статуса (миграция 008).
--- slot без check: S7 добавит showcase_1..3 без миграции.
 create table public.student_equipment (
   id          uuid         primary key default gen_random_uuid(),
   student_id  bigint       not null references public.students (telegram_id),
@@ -240,6 +239,22 @@ create table public.student_equipment (
 create index if not exists idx_student_equipment_student
   on public.student_equipment (student_id);
 alter table public.student_equipment disable row level security;
+
+-- student_showcase — витрина профиля: 3 слота, предмет ИЛИ достижение (миграция 009, S7).
+-- Отдельная таблица, не расширение student_equipment: item_code там жёстко ссылается на
+-- shop_items (FK), а витрина должна показывать ещё и student_achievements.achievement_code —
+-- другое пространство кодов, одна FK-колонка не может ссылаться на две таблицы разом.
+create table public.student_showcase (
+  id          uuid         primary key default gen_random_uuid(),
+  student_id  bigint       not null references public.students (telegram_id),
+  position    smallint     not null check (position between 1 and 3),
+  kind        text         not null check (kind in ('item', 'achievement')),
+  ref_code    text         not null,
+  updated_at  timestamptz  not null default now(),
+  created_at  timestamptz  not null default now(),
+  unique (student_id, position)
+);
+alter table public.student_showcase disable row level security;
 
 -- --- Индексы (кроме автоматических для PK/UNIQUE и idx_students_telegram_id выше) -----
 
@@ -599,6 +614,38 @@ begin
     values (p_student_id, p_slot, p_item_code)
     on conflict (student_id, slot)
     do update set item_code = excluded.item_code, variant = null, updated_at = now();
+end;
+$function$;
+
+-- set_showcase — поставить/снять предмет витрины профиля (миграция 009, S7). p_ref_code=null
+-- снимает слот; иначе проверяет владение (student_items) или получение (student_achievements)
+-- в зависимости от p_kind перед апсертом. Мотивация отдельной таблицы — в шапке миграции 009.
+CREATE OR REPLACE FUNCTION public.set_showcase(p_student_id bigint, p_position smallint, p_kind text, p_ref_code text)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+begin
+  if p_ref_code is null then
+    delete from student_showcase where student_id = p_student_id and position = p_position;
+    return;
+  end if;
+
+  if p_kind = 'item' then
+    if not exists (select 1 from student_items where student_id = p_student_id and item_code = p_ref_code) then
+      raise exception 'Предмет % не куплен', p_ref_code;
+    end if;
+  elsif p_kind = 'achievement' then
+    if not exists (select 1 from student_achievements where student_id = p_student_id and achievement_code = p_ref_code) then
+      raise exception 'Достижение % не получено', p_ref_code;
+    end if;
+  else
+    raise exception 'Неизвестный тип витрины: %', p_kind;
+  end if;
+
+  insert into student_showcase (student_id, position, kind, ref_code)
+    values (p_student_id, p_position, p_kind, p_ref_code)
+    on conflict (student_id, position)
+    do update set kind = excluded.kind, ref_code = excluded.ref_code, updated_at = now();
 end;
 $function$;
 

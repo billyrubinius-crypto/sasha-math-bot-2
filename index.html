@@ -130,6 +130,31 @@
         .coll-name { font-size: 10px; color: var(--tg-hint); margin-top: 4px; line-height: 1.2; }
         @media (max-width: 380px) { .coll-grid { grid-template-columns: repeat(3, 1fr); } }
 
+        /* Витрина профиля (S7) */
+        .showcase-section { margin-top: 20px; margin-bottom: 20px; }
+        .showcase-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .showcase-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .showcase-tile {
+            background: var(--tg-secondary); border-radius: 14px; padding: 12px 6px;
+            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; min-height: 78px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .showcase-tile.empty { opacity: 0.5; border: 1.5px dashed var(--tg-hint); box-shadow: none; background: transparent; }
+        .showcase-icon { font-size: 26px; line-height: 1; }
+        .showcase-name { font-size: 10px; font-weight: 600; margin-top: 6px; line-height: 1.2; }
+        .showcase-picker {
+            margin-top: 10px; background: var(--tg-secondary); border-radius: 14px; padding: 12px;
+            max-height: 240px; overflow-y: auto;
+        }
+        .showcase-picker-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+        .showcase-chip {
+            display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+            background: var(--tg-bg); border: none; border-radius: 10px; padding: 8px 10px;
+            margin-bottom: 6px; font-size: 13px; cursor: pointer; color: var(--tg-text);
+        }
+        .showcase-chip-clear { color: #f44336; font-weight: 600; }
+        .showcase-picker-empty { font-size: 12px; color: var(--tg-hint); text-align: center; padding: 10px; }
+
         /* Магазин «Бубличная» (S2) */
         .shop-balance { text-align: center; font-size: 15px; font-weight: 700; margin-bottom: 18px; }
         .shop-section-title { font-size: 16px; font-weight: bold; margin: 18px 0 4px; }
@@ -337,6 +362,12 @@
             <div class="group-badge" id="group-badge" style="display:none;"></div>
         </div>
         <div class="profile-title" id="profile-title" style="display:none;"></div>
+
+        <div class="showcase-section" id="showcase-section" style="display:none;">
+            <div class="showcase-title">🌟 Витрина</div>
+            <div class="showcase-grid" id="showcase-grid"></div>
+            <div class="showcase-picker" id="showcase-picker" style="display:none;"></div>
+        </div>
 
         <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
         <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
@@ -744,6 +775,7 @@
                 loadAchievements();
                 loadShields();
                 loadCollections();
+                loadShowcase();
 
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
         }
@@ -1124,6 +1156,148 @@
                 p_student_id: currentUser.id, p_amount: 50, p_reason: `achievement_${code}`
             });
             if (rpcError) throw rpcError;
+        }
+
+        // Витрина профиля (S7, GAME_DESIGN.md §13): 3 слота, каждый — предмет ИЗ КУПЛЕННОГО
+        // или достижение ИЗ ПОЛУЧЕННОГО (student_showcase, миграция 009 — отдельная таблица,
+        // не student_equipment: там item_code жёстко ссылается на shop_items, а сюда нужны ещё
+        // и achievement_code из другого пространства кодов). Известное ограничение (осознанно,
+        // SPEC_STAGE2 раздел 5): чужие профили не открываются, витрину видит только владелец.
+        let showcaseOpenPosition = null;
+
+        async function loadShowcase() {
+            const section = document.getElementById('showcase-section');
+            const grid = document.getElementById('showcase-grid');
+            document.getElementById('showcase-picker').style.display = 'none';
+            showcaseOpenPosition = null;
+            try {
+                const { data: slots, error } = await db.from('student_showcase')
+                    .select('position,kind,ref_code').eq('student_id', currentUser.id);
+                if (error) throw error;
+                const bySlot = new Map((slots || []).map(s => [s.position, s]));
+
+                const itemCodes = (slots || []).filter(s => s.kind === 'item').map(s => s.ref_code);
+                let itemsByCode = {};
+                if (itemCodes.length) {
+                    const { data: items } = await db.from('shop_items')
+                        .select('item_code,name,slot,item_kind,render_payload').in('item_code', itemCodes);
+                    (items || []).forEach(i => { itemsByCode[i.item_code] = i; });
+                }
+
+                grid.innerHTML = '';
+                for (let pos = 1; pos <= 3; pos++) {
+                    const slot = bySlot.get(pos);
+                    const tile = document.createElement('div');
+                    tile.onclick = () => openShowcasePicker(pos);
+
+                    if (!slot) {
+                        tile.className = 'showcase-tile empty';
+                        tile.innerHTML = '<div class="showcase-icon">+</div>';
+                    } else if (slot.kind === 'achievement') {
+                        const meta = ACHIEVEMENTS_META.find(a => a.code === slot.ref_code);
+                        tile.className = 'showcase-tile';
+                        const icon = document.createElement('div');
+                        icon.className = 'showcase-icon';
+                        icon.textContent = meta ? meta.icon : '🏆';
+                        const name = document.createElement('div');
+                        name.className = 'showcase-name';
+                        name.textContent = meta ? meta.name : slot.ref_code;
+                        tile.appendChild(icon);
+                        tile.appendChild(name);
+                    } else {
+                        const item = itemsByCode[slot.ref_code];
+                        tile.className = 'showcase-tile';
+                        if (item) {
+                            tile.appendChild(shopPreview(item));
+                            const name = document.createElement('div');
+                            name.className = 'showcase-name';
+                            name.textContent = item.name;
+                            tile.appendChild(name);
+                        }
+                    }
+                    grid.appendChild(tile);
+                }
+                section.style.display = '';
+
+            } catch (e) {
+                section.style.display = 'none';
+                log('❌ Ошибка витрины: ' + e.message);
+            }
+        }
+
+        // Пикер под сеткой: купленные предметы + полученные достижения как список кнопок,
+        // плюс «Убрать», если слот уже занят. Один открытый пикер за раз (повторный клик по
+        // тому же слоту закрывает панель).
+        async function openShowcasePicker(position) {
+            const panel = document.getElementById('showcase-picker');
+            if (showcaseOpenPosition === position) {
+                panel.style.display = 'none';
+                showcaseOpenPosition = null;
+                return;
+            }
+            showcaseOpenPosition = position;
+            panel.style.display = '';
+            panel.innerHTML = '<div class="showcase-picker-empty">Загрузка...</div>';
+
+            // student_items.item_code без FK на shop_items (таблица старше магазина, G3 до S1) —
+            // PostgREST embed здесь не сработает, имена подтягиваем отдельным запросом и мапом.
+            const [{ data: owned }, { data: earned }] = await Promise.all([
+                db.from('student_items').select('item_code').eq('student_id', currentUser.id),
+                db.from('student_achievements').select('achievement_code').eq('student_id', currentUser.id)
+            ]);
+            let ownedNames = {};
+            if (owned && owned.length) {
+                const { data: catalogRows } = await db.from('shop_items').select('item_code,name').in('item_code', owned.map(o => o.item_code));
+                (catalogRows || []).forEach(r => { ownedNames[r.item_code] = r.name; });
+            }
+
+            panel.innerHTML = '';
+            const title = document.createElement('div');
+            title.className = 'showcase-picker-title';
+            title.textContent = `Слот ${position}: выбери предмет или достижение`;
+            panel.appendChild(title);
+
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'showcase-chip showcase-chip-clear';
+            clearBtn.textContent = '✕ Убрать из витрины';
+            clearBtn.onclick = () => setShowcase(position, null, null);
+            panel.appendChild(clearBtn);
+
+            if ((!owned || !owned.length) && (!earned || !earned.length)) {
+                const empty = document.createElement('div');
+                empty.className = 'showcase-picker-empty';
+                empty.textContent = 'Пока нечего выставить — купи что-нибудь в магазине или получи достижение';
+                panel.appendChild(empty);
+                return;
+            }
+
+            (owned || []).forEach(o => {
+                const chip = document.createElement('button');
+                chip.className = 'showcase-chip';
+                chip.textContent = `🥯 ${ownedNames[o.item_code] || o.item_code}`;
+                chip.onclick = () => setShowcase(position, 'item', o.item_code);
+                panel.appendChild(chip);
+            });
+            (earned || []).forEach(a => {
+                const meta = ACHIEVEMENTS_META.find(m => m.code === a.achievement_code);
+                const chip = document.createElement('button');
+                chip.className = 'showcase-chip';
+                chip.textContent = `${meta ? meta.icon : '🏆'} ${meta ? meta.name : a.achievement_code}`;
+                chip.onclick = () => setShowcase(position, 'achievement', a.achievement_code);
+                panel.appendChild(chip);
+            });
+        }
+
+        async function setShowcase(position, kind, refCode) {
+            try {
+                const { error } = await db.rpc('set_showcase', {
+                    p_student_id: currentUser.id, p_position: position, p_kind: kind, p_ref_code: refCode
+                });
+                if (error) throw error;
+                await loadShowcase();
+            } catch (e) {
+                alert('Не удалось: ' + (e.message || e));
+            }
         }
 
         // Щит стрика (G9): счётчик в запасе + кнопка покупки. Лимит 2 щита, цена 40 бубликов —
