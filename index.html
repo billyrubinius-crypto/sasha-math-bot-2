@@ -119,6 +119,17 @@
         .ach-name { font-size: 11px; font-weight: 600; margin-top: 6px; line-height: 1.2; }
         @media (max-width: 380px) { .ach-grid { grid-template-columns: repeat(3, 1fr); } }
 
+        /* Альбом коллекций (S6) */
+        .collections-section { margin-top: 20px; }
+        .collections-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .collection-block { margin-bottom: 16px; }
+        .collection-season-title { font-size: 13px; font-weight: 700; color: var(--tg-hint); margin-bottom: 8px; }
+        .coll-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .coll-tile { text-align: center; }
+        .coll-tile.locked { opacity: 0.4; filter: grayscale(1); }
+        .coll-name { font-size: 10px; color: var(--tg-hint); margin-top: 4px; line-height: 1.2; }
+        @media (max-width: 380px) { .coll-grid { grid-template-columns: repeat(3, 1fr); } }
+
         /* Магазин «Бубличная» (S2) */
         .shop-balance { text-align: center; font-size: 15px; font-weight: 700; margin-bottom: 18px; }
         .shop-section-title { font-size: 16px; font-weight: bold; margin: 18px 0 4px; }
@@ -350,6 +361,11 @@
         <div class="achievements-section" id="achievements-section" style="display:none;">
             <div class="achievements-title">🏆 Достижения</div>
             <div class="ach-grid" id="ach-grid"></div>
+        </div>
+
+        <div class="collections-section" id="collections-section" style="display:none;">
+            <div class="collections-title">📦 Коллекции</div>
+            <div id="collections-list"></div>
         </div>
 
         <div class="mock-chart-section" id="mock-chart-section">
@@ -727,6 +743,7 @@
                 loadSeasonHistory();
                 loadAchievements();
                 loadShields();
+                loadCollections();
 
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
         }
@@ -1018,6 +1035,95 @@
                 section.style.display = 'none';
                 log('❌ Ошибка достижений: ' + e.message);
             }
+        }
+
+        // Альбом коллекций (S6, GAME_DESIGN.md §10.5). «Коллекция сезона N» = набор ротационных
+        // товаров бандла, который был назначен сезону N (season_bundles, S1/S4) — тот же источник
+        // данных, что и витрина ротации (S4), не отдельный список (риск из карточки S6).
+        // Показываются ВСЕ сезоны, у которых есть бандл — и закрытые, и текущий открытый: не
+        // купленные предметы текущего сезона тоже стоит видеть силуэтами, это подталкивает купить.
+        //
+        // Проверка «коллекция закрыта» — здесь, при загрузке альбома, а не в buyShopItem (S2):
+        // не дублирует группировку «бандл → сезон» во втором месте и не трогает файл S2. Цена —
+        // бонус приходит не в момент покупки последнего предмета, а при следующем открытии
+        // профиля; это осознанный компромисс простоты, не баг.
+        async function loadCollections() {
+            const section = document.getElementById('collections-section');
+            const wrap = document.getElementById('collections-list');
+            try {
+                const { data: bundles, error } = await db
+                    .from('season_bundles')
+                    .select('season_id, bundle')
+                    .order('season_id', { ascending: false });
+                if (error) throw error;
+                if (!bundles || !bundles.length) { section.style.display = 'none'; return; }
+
+                const [{ data: rotationItems }, { data: owned }] = await Promise.all([
+                    db.from('shop_items').select('item_code,name,rotation_bundle,slot,item_kind,render_payload').eq('availability', 'rotation'),
+                    db.from('student_items').select('item_code').eq('student_id', currentUser.id)
+                ]);
+                const ownedSet = new Set((owned || []).map(r => r.item_code));
+                const itemsByBundle = {};
+                (rotationItems || []).forEach(i => { (itemsByBundle[i.rotation_bundle] = itemsByBundle[i.rotation_bundle] || []).push(i); });
+
+                wrap.innerHTML = '';
+                for (const b of bundles) {
+                    const items = itemsByBundle[b.bundle] || [];
+                    if (!items.length) continue; // бандл без товаров — не показываем (риск карточки)
+
+                    const block = document.createElement('div');
+                    block.className = 'collection-block';
+                    const title = document.createElement('div');
+                    title.className = 'collection-season-title';
+                    title.textContent = `Сезон №${b.season_id}`;
+                    block.appendChild(title);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'coll-grid';
+                    items.forEach(item => {
+                        const has = ownedSet.has(item.item_code);
+                        const tile = document.createElement('div');
+                        tile.className = `coll-tile ${has ? '' : 'locked'}`;
+                        tile.appendChild(shopPreview(item));
+                        const name = document.createElement('div');
+                        name.className = 'coll-name';
+                        name.textContent = item.name;
+                        tile.appendChild(name);
+                        grid.appendChild(tile);
+                    });
+                    block.appendChild(grid);
+                    wrap.appendChild(block);
+
+                    if (items.every(i => ownedSet.has(i.item_code))) {
+                        await grantCollectionBonus(b.season_id);
+                    }
+                }
+                section.style.display = '';
+
+            } catch (e) {
+                section.style.display = 'none';
+                log('❌ Ошибка коллекций: ' + e.message);
+            }
+        }
+
+        // Идемпотентная выдача бонуса за закрытую коллекцию сезона — тот же паттерн, что
+        // grantAchievement в teacher.html (G5): награда только если строка реально вставилась,
+        // конфликт unique(student_id, achievement_code) = уже выдано, no-op.
+        async function grantCollectionBonus(seasonId) {
+            const code = `collection_season_${seasonId}`;
+            const { data, error } = await db.from('student_achievements')
+                .insert({ student_id: currentUser.id, achievement_code: code })
+                .select();
+            if (error) {
+                if (error.code === '23505') return;
+                throw error;
+            }
+            if (!data || !data.length) return;
+
+            const { error: rpcError } = await db.rpc('add_huikons', {
+                p_student_id: currentUser.id, p_amount: 50, p_reason: `achievement_${code}`
+            });
+            if (rpcError) throw rpcError;
         }
 
         // Щит стрика (G9): счётчик в запасе + кнопка покупки. Лимит 2 щита, цена 40 бубликов —
