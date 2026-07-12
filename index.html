@@ -6,6 +6,7 @@
     <title>Sasha Math Bot</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="shared.js"></script>
     <style>
         :root {
             --tg-bg: var(--tg-theme-bg-color, #fff);
@@ -403,14 +404,7 @@
 
     <script>
         // --- КОНФИГУРАЦИЯ ---
-        // Bot 2.0 dev-окружение — НЕ прод. См. bot2/BOT2_CONTEXT.md в приватном репозитории.
-        const SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b';
-        
-        // Cloudinary Config
-        const CLOUDINARY_CLOUD_NAME = 'ddrn3vxm0';
-        const CLOUDINARY_UPLOAD_PRESET = 'sasha-math-dz';
-
+        // SUPABASE_URL/KEY и CLOUDINARY_* вынесены в shared.js (F4) — здесь только index-специфичное.
         // Бот для родителей — username нужен для ссылки-приглашения
         const PARENT_BOT_USERNAME = 'sashamathparents_bot';
         
@@ -421,37 +415,11 @@
 
         function log(msg) { console.log(msg); }
 
-        // Экранирует пользовательский текст перед вставкой через innerHTML (имена, названия заданий,
-        // комментарии учителя и т.п. — всё, что вводит человек, а не сам код)
-        function esc(str) {
-            const div = document.createElement('div');
-            div.textContent = str ?? '';
-            return div.innerHTML;
-        }
-
-        // Склонение слова «бублик» по числу (1 бублик / 2 бублика / 5 бубликов) — Bot 2.0, G1
-        function pluralBubliks(n) {
-            const abs = Math.abs(n);
-            const mod10 = abs % 10, mod100 = abs % 100;
-            if (mod10 === 1 && mod100 !== 11) return 'бублик';
-            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'бублика';
-            return 'бубликов';
-        }
-
-        // Текущая дата в Москве (YYYY-MM-DD), не зависит от часового пояса устройства ученика
-        function getTodayMSK() {
-            return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
-        }
+        // esc(), getTodayMSK(), normalizeUrl(), pluralBubliks() — в shared.js (F4).
 
         // Момент времени, соответствующий указанным часам/минутам по московскому времени (МСК = UTC+3 круглый год)
         function moscowDateTimeToInstant(y, m, d, hh, mm) {
             return new Date(Date.UTC(y, m - 1, d, hh, mm) - 3 * 60 * 60 * 1000);
-        }
-
-        // Ссылка без http(s):// браузер считает относительным путём текущей страницы — достраиваем схему
-        function normalizeUrl(url) {
-            if (!url) return '';
-            return /^https?:\/\//i.test(url) ? url : 'https://' + url;
         }
 
         document.addEventListener('DOMContentLoaded', async () => {

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Sasha Math - Teacher Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="shared.js"></script>
     <style>
         :root { 
             --primary: #2481cc; 
@@ -417,14 +418,8 @@
     </div>
 
     <script>
-        // Bot 2.0 dev-окружение — НЕ прод. См. bot2/BOT2_CONTEXT.md в приватном репозитории.
-        const SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b';
+        // SUPABASE_URL/KEY и CLOUDINARY_* вынесены в shared.js (F4). Здесь только teacher-специфичное.
         const PASS = 'sasha2024';
-
-        // Cloudinary Config — тот же аккаунт, что и в index.html, для загрузки PDF с заданиями
-        const CLOUDINARY_CLOUD_NAME = 'ddrn3vxm0';
-        const CLOUDINARY_UPLOAD_PRESET = 'sasha-math-dz';
 
         // Загружает PDF в Cloudinary и подставляет получившуюся ссылку в указанное поле
         async function handlePdfUpload(event, targetInputId) {
@@ -465,33 +460,7 @@
         let db, currentSubmissionId = null, selectedPenalty = -20, studentsList = [];
         let currentCheckView = 'pending';
 
-        // Текущая дата в Москве (YYYY-MM-DD), не зависит от часового пояса устройства учителя
-        function getTodayMSK() {
-            return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
-        }
-
-        // Ссылка без http(s):// браузер считает относительным путём текущей страницы — достраиваем схему
-        function normalizeUrl(url) {
-            if (!url) return '';
-            return /^https?:\/\//i.test(url) ? url : 'https://' + url;
-        }
-
-        // Экранирует пользовательский текст перед вставкой через innerHTML (имена, названия заданий,
-        // комментарии, названия групп и т.п. — всё, что вводит человек, а не сам код)
-        function esc(str) {
-            const div = document.createElement('div');
-            div.textContent = str ?? '';
-            return div.innerHTML;
-        }
-
-        // Склонение слова «бублик» по числу (1 бублик / 2 бублика / 5 бубликов) — Bot 2.0, G1
-        function pluralBubliks(n) {
-            const abs = Math.abs(n);
-            const mod10 = abs % 10, mod100 = abs % 100;
-            if (mod10 === 1 && mod100 !== 11) return 'бублик';
-            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'бублика';
-            return 'бубликов';
-        }
+        // getTodayMSK(), normalizeUrl(), esc(), pluralBubliks() — в shared.js (F4).
 
         // Переменные для навигации по фото внутри модального окна
         let reviewPhotos = [];
