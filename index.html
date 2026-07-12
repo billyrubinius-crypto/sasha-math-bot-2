@@ -1281,9 +1281,12 @@
                         action.appendChild(btn);
                     }
                 } else if (item.condition_achievement && !earned.has(item.condition_achievement)) {
+                    // Условный товар (S5): замок с названием нужного достижения, не голое «Условие» —
+                    // проверка владения/условия здесь только косметическая, реальный gate — в buy_item (S1).
+                    const meta = ACHIEVEMENTS_META.find(a => a.code === item.condition_achievement);
                     const s = document.createElement('span');
                     s.className = 'shop-state locked';
-                    s.textContent = '🔒 Условие';
+                    s.textContent = `🔒 Нужно: ${meta ? meta.name : item.condition_achievement}`;
                     action.appendChild(s);
                 } else {
                     action.appendChild(shopBuyButton(item, balance));
