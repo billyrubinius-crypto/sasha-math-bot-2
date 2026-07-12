@@ -258,6 +258,61 @@
         }
         .nav-btn.active { color: var(--tg-link); }
         .nav-icon { font-size: 22px; margin-bottom: 3px; }
+
+        /* Косметика: экипировка (S3) */
+        /* Цвет ника — переопределяет цвет текста; «золотой» — градиентная заливка текста */
+        .nick-gold {
+            background: linear-gradient(135deg, #f9d423 0%, #e6a817 50%, #f9d423 100%);
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent; color: transparent; font-weight: 800;
+        }
+        .nick-crown, .nick-status { margin: 0 3px; -webkit-text-fill-color: initial; }
+
+        /* Титул — строка под ником */
+        .profile-title { font-size: 13px; font-weight: 600; color: var(--tg-hint); margin-top: 2px; text-align: left; }
+
+        /* Рамки аватара (слот frame). База — кольцо вокруг круглого аватара. */
+        .frame { box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px currentColor; }
+        .frame-notebook { color: #1e88e5; box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px #1e88e5; }
+        .frame-winter   { color: #4fc3f7; box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px #4fc3f7; }
+        .frame-fire100  { color: #ff7043; box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 5px #ff7043, 0 0 12px 2px rgba(255,112,67,0.7); }
+        .frame-legend-1, .frame-legend-2, .frame-legend-3, .frame-legend-4 {
+            box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 5px #e6a817, 0 0 10px 1px rgba(230,168,23,0.6);
+        }
+        .frame-pulsar { animation: framePulse 1.6s ease-in-out infinite; }
+        @keyframes framePulse {
+            0%,100% { box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px #7e57c2, 0 0 4px 0 rgba(126,87,194,0.5); }
+            50%     { box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 5px #b388ff, 0 0 14px 3px rgba(179,136,255,0.9); }
+        }
+        .frame-orbit {
+            background: conic-gradient(#00bcd4, #3f51b5, #00bcd4); padding: 3px;
+            animation: frameSpin 3.5s linear infinite;
+        }
+        @keyframes frameSpin { to { transform: rotate(360deg); } }
+        .frame-orbit .avatar-img, .frame-orbit .avatar-placeholder { animation: frameSpin 3.5s linear infinite reverse; }
+
+        /* Фоны профиля (слот background) — накладываются на экран профиля */
+        #screen-profile.bg-grid { background-image: linear-gradient(rgba(128,128,128,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(128,128,128,0.09) 1px, transparent 1px); background-size: 22px 22px; }
+        #screen-profile.bg-space { background-image: radial-gradient(circle at 20% 20%, rgba(63,81,181,0.18), transparent 45%), radial-gradient(circle at 80% 70%, rgba(156,39,176,0.15), transparent 40%); }
+        #screen-profile.bg-aurora { background-image: linear-gradient(160deg, rgba(38,166,154,0.14), transparent 40%), linear-gradient(20deg, rgba(126,87,194,0.14), transparent 45%); }
+        #screen-profile.bg-draft { background-image: repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(128,128,128,0.06) 20px, rgba(128,128,128,0.06) 21px); }
+
+        /* Лидерборд: аватар со рамкой + строка ника с косметикой (S3) */
+        .lb-avatar {
+            width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; margin-right: 10px;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+            font-size: 13px; font-weight: bold; color: var(--tg-link); background: rgba(36,129,204,0.12);
+        }
+        .lb-name-wrap { flex: 1; min-width: 0; }
+        .lb-name-line { display: flex; align-items: center; gap: 2px; }
+        .lb-title { font-size: 11px; color: var(--tg-hint); margin-top: 1px; }
+
+        /* Экипировка в магазине (кнопки Надеть/Снять на купленном) */
+        .shop-equip-btn {
+            background: transparent; color: var(--tg-link); border: 1px solid var(--tg-link);
+            border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
+        .shop-equipped { font-size: 12px; font-weight: 700; color: #43a047; display: block; margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -269,6 +324,7 @@
             <h2 class="user-name" id="user-name">Загрузка...</h2>
             <div class="group-badge" id="group-badge" style="display:none;"></div>
         </div>
+        <div class="profile-title" id="profile-title" style="display:none;"></div>
 
         <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
         <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
@@ -543,6 +599,79 @@
             }
         }
 
+        // --- КОСМЕТИКА / ЭКИПИРОВКА (S3) ---
+        // Разрешённые классы payload — применяем только известные из каталога, чтобы строка из
+        // БД не превратилась в произвольный CSS-класс.
+        const FRAME_CLASSES = new Set(['frame-notebook','frame-winter','frame-fire100','frame-legend-1','frame-legend-2','frame-legend-3','frame-legend-4','frame-pulsar','frame-orbit']);
+        const BG_CLASSES = new Set(['bg-grid','bg-space','bg-aurora','bg-draft']);
+
+        // student_equipment + встроенный shop_items (render_payload/name) одним embed-запросом.
+        function equipmentQuery(idsOrOne, isList) {
+            const q = db.from('student_equipment')
+                .select('student_id, slot, item_code, variant, shop_items(render_payload, name)');
+            return isList ? q.in('student_id', idsOrOne) : q.eq('student_id', idsOrOne);
+        }
+
+        // Массив строк экипировки → карта slot → {item_code, variant, payload, name}
+        function buildEquipMap(rows) {
+            const map = {};
+            (rows || []).forEach(r => {
+                const si = r.shop_items || {};
+                map[r.slot] = { item_code: r.item_code, variant: r.variant, payload: si.render_payload, name: si.name };
+            });
+            return map;
+        }
+
+        // Отображаемый текст титула: «Ященко» из «Титул «Ященко»» (fallback — имя как есть)
+        function titleText(name) {
+            if (!name) return '';
+            const m = name.match(/«([^»]+)»/);
+            return m ? m[1] : name;
+        }
+
+        // Применить цвет ника к элементу: 'gold' — градиент, валидный hex — цвет, иначе дефолт
+        function applyNickColor(el, payload) {
+            el.classList.remove('nick-gold');
+            el.style.color = '';
+            if (payload === 'gold') el.classList.add('nick-gold');
+            else if (/^#[0-9a-fA-F]{6}$/.test(payload || '')) el.style.color = payload;
+        }
+
+        // Собрать «ник с косметикой» в контейнер: [эмодзи-статус] [имя в цвете] [корона]
+        function renderNick(container, baseName, eq, meSuffix) {
+            container.innerHTML = '';
+            if (eq.status_emoji && eq.status_emoji.variant) {
+                const s = document.createElement('span'); s.className = 'nick-status';
+                s.textContent = eq.status_emoji.variant; container.appendChild(s);
+            }
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = baseName + (meSuffix || '');
+            if (eq.name_color) applyNickColor(nameSpan, eq.name_color.payload);
+            container.appendChild(nameSpan);
+            if (eq.crown) {
+                const c = document.createElement('span'); c.className = 'nick-crown';
+                c.textContent = '👑'; container.appendChild(c);
+            }
+        }
+
+        // Применить рамку аватара к контейнеру (сброс + известный класс)
+        function applyAvatarFrame(container, eq) {
+            FRAME_CLASSES.forEach(c => container.classList.remove(c));
+            container.classList.remove('frame');
+            if (eq.frame && FRAME_CLASSES.has(eq.frame.payload)) container.classList.add(eq.frame.payload);
+        }
+
+        function applyProfileCosmetics(eq) {
+            renderNick(document.getElementById('user-name'), currentUser.first_name || '', eq, '');
+            const titleEl = document.getElementById('profile-title');
+            if (eq.title) { titleEl.textContent = titleText(eq.title.name); titleEl.style.display = 'block'; }
+            else { titleEl.style.display = 'none'; titleEl.textContent = ''; }
+            applyAvatarFrame(document.getElementById('user-avatar-container'), eq);
+            const scr = document.getElementById('screen-profile');
+            BG_CLASSES.forEach(c => scr.classList.remove(c));
+            if (eq.background && BG_CLASSES.has(eq.background.payload)) scr.classList.add(eq.background.payload);
+        }
+
         // --- ПРОФИЛЬ И ИСТОРИЯ ---
         async function loadProfile(isRetryAfterInsert) {
             try {
@@ -585,6 +714,10 @@
                     streakEl.style.display = 'none';
                 }
                 renderStreakProgress(data.current_streak);
+
+                // Косметика (S3): применяем экипировку к нику/аватару/фону/титулу
+                const { data: eqRows } = await equipmentQuery(currentUser.id, false);
+                applyProfileCosmetics(buildEquipMap(eqRows));
 
                 currentUser.stats = data;
                 loadBalanceHistory();
@@ -950,14 +1083,15 @@
             const balanceEl = document.getElementById('shop-balance');
             content.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
             try {
-                const [itemsRes, bundleRes, ownedRes, achRes, stRes] = await Promise.all([
+                const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes] = await Promise.all([
                     db.from('shop_items')
                         .select('item_code,name,item_kind,slot,price,availability,rotation_bundle,condition_achievement,render_payload')
                         .eq('active', true).order('sort_order'),
                     db.rpc('ensure_season_rotation'),
                     db.from('student_items').select('item_code,quantity').eq('student_id', currentUser.id),
                     db.from('student_achievements').select('achievement_code').eq('student_id', currentUser.id),
-                    db.from('students').select('huikons').eq('telegram_id', currentUser.id).single()
+                    db.from('students').select('huikons').eq('telegram_id', currentUser.id).single(),
+                    db.from('student_equipment').select('slot,item_code').eq('student_id', currentUser.id)
                 ]);
                 if (itemsRes.error) throw itemsRes.error;
 
@@ -966,6 +1100,8 @@
                 const owned = new Map((ownedRes.data || []).map(r => [r.item_code, r.quantity]));
                 const earned = new Set((achRes.data || []).map(r => r.achievement_code));
                 const balance = stRes.data ? stRes.data.huikons : 0;
+                // slot → item_code надетого предмета (для кнопок Надеть/Снять на купленном)
+                const equippedBySlot = new Map((eqRes.data || []).map(r => [r.slot, r.item_code]));
                 balanceEl.innerText = `Баланс: ${balance} ${pluralBubliks(balance)} 🥯`;
 
                 const rotation = items.filter(i => i.availability === 'rotation' && i.rotation_bundle === currentBundle);
@@ -975,10 +1111,10 @@
                 if (rotation.length) {
                     content.appendChild(shopSectionTitle('✨ Витрина сезона',
                         'Сезонные товары уходят с витрины в конце сезона — потом их не купить'));
-                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance)));
+                    rotation.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot)));
                 }
                 content.appendChild(shopSectionTitle('🥯 Всегда в магазине', ''));
-                always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance)));
+                always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot)));
 
             } catch (e) {
                 content.innerHTML = '<div style="text-align:center; padding:30px; color:#f44336;">Ошибка загрузки магазина</div>';
@@ -1032,7 +1168,7 @@
             return btn;
         }
 
-        function renderShopItem(item, owned, earned, balance) {
+        function renderShopItem(item, owned, earned, balance, equippedBySlot) {
             const row = document.createElement('div');
             row.className = 'shop-item';
             row.appendChild(shopPreview(item));
@@ -1083,10 +1219,31 @@
             } else {
                 // Косметика
                 if (owned.has(item.item_code)) {
-                    const s = document.createElement('span');
-                    s.className = 'shop-state owned';
-                    s.textContent = '✓ Куплено';
-                    action.appendChild(s);
+                    // Куплено: показываем «Надето»/«Снять» или «Надеть» (переключение бесплатно, S3)
+                    const isEquipped = equippedBySlot && equippedBySlot.get(item.slot) === item.item_code;
+                    if (isEquipped) {
+                        const s = document.createElement('span');
+                        s.className = 'shop-equipped';
+                        s.textContent = '✓ Надето';
+                        action.appendChild(s);
+                        const btn = document.createElement('button');
+                        btn.className = 'shop-equip-btn';
+                        btn.textContent = 'Снять';
+                        btn.onclick = () => equipShopItem(item.slot, null, btn);
+                        action.appendChild(btn);
+                    } else {
+                        const s = document.createElement('span');
+                        s.className = 'shop-state owned';
+                        s.textContent = '✓ Куплено';
+                        s.style.display = 'block';
+                        s.style.marginBottom = '4px';
+                        action.appendChild(s);
+                        const btn = document.createElement('button');
+                        btn.className = 'shop-equip-btn';
+                        btn.textContent = 'Надеть';
+                        btn.onclick = () => equipShopItem(item.slot, item.item_code, btn);
+                        action.appendChild(btn);
+                    }
                 } else if (item.condition_achievement && !earned.has(item.condition_achievement)) {
                     const s = document.createElement('span');
                     s.className = 'shop-state locked';
@@ -1114,6 +1271,23 @@
                 loadBalanceHistory();
             } catch (e) {
                 alert('Не удалось купить: ' + (e.message || e));
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // Надеть/снять купленный предмет (S3). itemCode=null → снять слот. Переключение бесплатно,
+        // проверка владения — внутри RPC equip_item (S1). После — перерисовка витрины; профиль
+        // подхватит новую экипировку при следующем открытии вкладки.
+        async function equipShopItem(slot, itemCode, btn) {
+            if (btn) btn.disabled = true;
+            try {
+                const { error } = await db.rpc('equip_item', {
+                    p_student_id: currentUser.id, p_slot: slot, p_item_code: itemCode
+                });
+                if (error) throw error;
+                await loadShop();
+            } catch (e) {
+                alert('Не удалось: ' + (e.message || e));
                 if (btn) btn.disabled = false;
             }
         }
@@ -1439,28 +1613,60 @@
                 document.getElementById('lb-season-label').innerText = seasonId ? `Сезон №${seasonId}` : '';
 
                 if (error) throw error;
+
+                // Экипировка всех из топ-10 ОДНИМ запросом (не N+1) → карта по ученику
+                const ids = data.map(s => s.telegram_id);
+                const eqByStudent = {};
+                if (ids.length) {
+                    const { data: eqAll } = await equipmentQuery(ids, true);
+                    (eqAll || []).forEach(r => { (eqByStudent[r.student_id] = eqByStudent[r.student_id] || []).push(r); });
+                }
+
                 list.innerHTML = '';
-                
                 data.forEach((student, index) => {
                     const isMe = student.telegram_id === currentUser.id;
+                    const eq = buildEquipMap(eqByStudent[student.telegram_id] || []);
                     const li = document.createElement('li');
                     li.className = `lb-item ${isMe ? 'lb-me' : ''}`;
-                    
+
                     let rankDisplay = `#${index + 1}`;
                     if (index === 0) rankDisplay = '🥇';
                     if (index === 1) rankDisplay = '🥈';
                     if (index === 2) rankDisplay = '🥉';
 
-                    li.innerHTML = `
-                        <div class="lb-rank">${rankDisplay}</div>
-                        <div class="lb-name">${esc(student.name)} ${isMe ? '(Вы)' : ''}</div>
-                        <div class="lb-score">${student.rating} ⭐</div>
-                    `;
+                    const rank = document.createElement('div');
+                    rank.className = 'lb-rank'; rank.textContent = rankDisplay;
+
+                    const avatar = document.createElement('div');
+                    avatar.className = 'lb-avatar';
+                    avatar.textContent = student.name ? student.name[0].toUpperCase() : '?';
+                    applyAvatarFrame(avatar, eq);
+
+                    const wrap = document.createElement('div');
+                    wrap.className = 'lb-name-wrap';
+                    const line = document.createElement('div');
+                    line.className = 'lb-name-line';
+                    renderNick(line, student.name || '', eq, isMe ? ' (Вы)' : '');
+                    wrap.appendChild(line);
+                    if (eq.title) {
+                        const t = document.createElement('div');
+                        t.className = 'lb-title'; t.textContent = titleText(eq.title.name);
+                        wrap.appendChild(t);
+                    }
+
+                    const score = document.createElement('div');
+                    score.className = 'lb-score'; score.textContent = `${student.rating} ⭐`;
+
+                    li.appendChild(rank);
+                    li.appendChild(avatar);
+                    li.appendChild(wrap);
+                    li.appendChild(score);
                     list.appendChild(li);
                 });
 
             } catch (e) {
                 list.innerHTML = '<li style="text-align:center; color:#f44336; padding:30px;">Ошибка</li>';
+                log('❌ Лидерборд: ' + (e.message || e));
             }
         }
 
