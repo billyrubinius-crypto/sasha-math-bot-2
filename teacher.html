@@ -389,6 +389,7 @@
             <h3 id="rev-student" style="margin-top:0"></h3>
             <div id="rev-type" class="badge" style="margin-bottom:10px; display:inline-block;"></div>
             <div id="rev-comment-teacher" style="font-size:13px; color:#666; margin-bottom:10px; font-style:italic;"></div>
+            <div id="rev-deadline-info" style="display:none; font-size:12px; color:#666; margin-bottom:10px; padding:8px; background:#f5f5f5; border-radius:6px;"></div>
             <a id="rev-link" href="#" target="_blank" class="card-link">🔗 Открыть исходник задачи</a>
             
             <!-- Контейнер фото с навигацией -->
@@ -1052,26 +1053,72 @@
         function openReview(sub) {
             currentSubmissionId = sub.id;
             document.getElementById('rev-student').innerText = sub.students?.name || 'Unknown';
-            
+
             const typeLabels = { daily: 'Ежедневное', weekly: 'Еженедельное', individual: 'Индивидуальное' };
             const badge = document.getElementById('rev-type');
             badge.innerText = typeLabels[sub.type];
             badge.className = `badge badge-${sub.type}`;
-            
+
             document.getElementById('rev-comment-teacher').innerText = sub.teacher_comment || 'Нет комментария от учителя';
             document.getElementById('rev-link').href = sub.content_url ? normalizeUrl(sub.content_url) : '#';
             document.getElementById('rev-link').style.display = sub.content_url ? 'inline-block' : 'none';
             document.getElementById('rev-feedback').value = sub.teacher_feedback || '';
-            
+
             try {
                 reviewPhotos = JSON.parse(sub.photo_url);
                 if (!Array.isArray(reviewPhotos)) reviewPhotos = [reviewPhotos];
             } catch { reviewPhotos = [sub.photo_url]; }
-            
+
             reviewPhotoIndex = 0;
             updateReviewPhotoDisplay();
-            
+
             document.getElementById('review-modal').classList.add('active');
+            renderReviewDeadlineInfo(sub);
+        }
+
+        // Исходный срок, срок исправления и просрочка — только для daily (SPEC §6, W05).
+        // «Просрочено» определяет сервер (is_first_submission_on_time — та же RPC, что считает
+        // A в recalc_student_week), а не новое клиентское право; срок исправления — уже
+        // готовое серверное поле revision_deadline_at, сравнение с now() — только для показа.
+        async function renderReviewDeadlineInfo(sub) {
+            const el = document.getElementById('rev-deadline-info');
+            if (sub.type !== 'daily' || !sub.scheduled_date) { el.style.display = 'none'; return; }
+
+            const lines = [`📅 Исходный срок: ${sub.scheduled_date} 23:59 МСК`];
+            let overdue = false;
+
+            if (sub.revision_deadline_at) {
+                const dl = new Date(sub.revision_deadline_at);
+                const windowClosed = dl <= new Date();
+                lines.push(`✏️ Срок исправления: ${dl.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК${windowClosed ? ' — истёк' : ''}`);
+
+                // Пересдача засчитывается в A, только если сама попала в это окно — то же
+                // условие, что в recalc_student_week (014): сравнение уже существующих
+                // timestamp полей, не новое клиентское право.
+                if ((sub.revision_count || 0) > 0 && sub.submitted_at && new Date(sub.submitted_at) > dl) {
+                    overdue = true;
+                }
+            }
+
+            el.innerText = lines.join('\n');
+            el.style.display = 'block';
+
+            try {
+                // Авторитетная проверка «сама первая сдача была вовремя» — та же RPC, что
+                // считает A в recalc_student_week, не переизобретаем сравнение дат в JS.
+                const { data: onTime, error } = await db.rpc('is_first_submission_on_time', {
+                    p_first_submitted_at: sub.first_submitted_at,
+                    p_submitted_at: sub.submitted_at,
+                    p_scheduled_date: sub.scheduled_date
+                });
+                if (error) throw error;
+                if (onTime === false) overdue = true;
+            } catch (e) { /* информационный блок необязателен для самой проверки — не блокируем модалку */ }
+
+            if (overdue) {
+                lines.push('⏰ Просрочено — эта сдача не засчитается в выполненные дни недели');
+                el.innerText = lines.join('\n');
+            }
         }
 
         function closeReview() {
@@ -1129,8 +1176,20 @@
 
         async function submitReview(status) {
             if (!currentSubmissionId) return;
+
+            // Двойной клик/повтор не должен начислить награду дважды (W05): SELECT alreadyApproved
+            // читается ДО update, поэтому без синхронной защиты два почти одновременных вызова
+            // могли бы оба увидеть alreadyApproved=false и оба выдать streak/сезонные очки.
+            // Проверка и установка disabled должны быть СИНХРОННЫМИ (до первого await): иначе
+            // второй вызов проскочит проверку раньше, чем первый успеет выставить disabled.
+            const approveBtn = document.querySelector('#review-modal .btn-success');
+            const rejectBtn = document.querySelector('#review-modal .btn-danger');
+            if (approveBtn.disabled || rejectBtn.disabled) return; // запрос уже выполняется
+            approveBtn.disabled = true;
+            rejectBtn.disabled = true;
+
             const feedback = document.getElementById('rev-feedback').value.trim();
-            
+
             try {
                 // Состояние читаем до обновления: повторное «Принять» уже принятой работы (открытой из Архива) не должно начислять бонус ещё раз
                 const { data: sub } = await db.from('assignments').select('student_id, type, status, approval_status, scheduled_date').eq('id', currentSubmissionId).single();
@@ -1143,6 +1202,22 @@
                     checked_at: new Date().toISOString()
                 }).eq('id', currentSubmissionId);
 
+                // Недельный результат пересчитывается сразу (W04/W05), но награда за неделю НЕ
+                // выдаётся на клиенте — reward_amount заполнит только finalize_student_week (W09).
+                // Старый processStreak()/awardApprovalBonus ниже — экономика W05 не меняет.
+                if (sub.type === 'daily' && sub.scheduled_date) {
+                    try {
+                        const { data: weekStart, error: wsErr } = await db.rpc('week_start_of', { p_date: sub.scheduled_date });
+                        if (wsErr) throw wsErr;
+                        if (weekStart) {
+                            const { error: recalcErr } = await db.rpc('recalc_student_week', {
+                                p_student_id: sub.student_id, p_week_start: weekStart
+                            });
+                            if (recalcErr) throw recalcErr;
+                        }
+                    } catch (e) { console.error('Не удалось пересчитать неделю: ' + e.message); }
+                }
+
                 if (status === 'approved' && !alreadyApproved) {
                     if (sub.type === 'daily') {
                         await processStreak(sub.student_id, sub.scheduled_date);
@@ -1153,11 +1228,12 @@
                     // Идемпотентно — на второй и далее принятой работе grantAchievement вернёт no-op.
                     await grantAchievement(sub.student_id, 'first_step');
                 }
-                
+
                 alert(status === 'approved' ? 'Работа принята!' : 'Работа возвращена!');
                 closeReview();
                 loadSubmissions();
             } catch(e) { alert('Ошибка: ' + e.message); }
+            finally { approveBtn.disabled = false; rejectBtn.disabled = false; }
         }
 
         // Стрик считается пересчётом цепочки подряд идущих scheduled_date с принятыми ежедневками,
