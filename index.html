@@ -471,6 +471,7 @@
                 <!-- Карточка с деталями выбранного задания -->
                 <div id="assignment-details" style="display:none; background:var(--tg-bg); border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid rgba(128,128,128,0.2);">
                     <div style="font-weight:bold; margin-bottom:8px; font-size:15px;" id="detail-title"></div>
+                    <div id="detail-count" style="display:none; font-size:13px; color:var(--tg-hint); margin-bottom:8px;"></div>
                     <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:14px; display:inline-block; word-break:break-all;">🔗 Открыть условие задачи</a>
                     <div id="detail-feedback" style="display:none; margin-top:10px; padding:10px; background:rgba(220,53,69,0.1); border-radius:8px; font-size:13px; color:#721c24;"></div>
                 </div>
@@ -850,17 +851,20 @@
         async function loadAssignmentsSummary() {
             const el = document.getElementById('assignments-summary');
             try {
+                // Тот же набор, что в dropdown: не сданные + возвращённые на переделку —
+                // чтобы возвращённая ежедневка отражалась одинаково во всех экранах (W03).
                 const { data, error } = await db
                     .from('assignments')
-                    .select('type, scheduled_date')
+                    .select('type, scheduled_date, status, approval_status, revision_deadline_at')
                     .eq('student_id', currentUser.id)
-                    .eq('status', 'assigned')
-                    .eq('activation_status', 'active');
+                    .eq('activation_status', 'active')
+                    .or('status.eq.assigned,and(status.eq.checked,approval_status.eq.rejected)');
 
                 if (error) throw error;
 
                 const todayMSK = getTodayMSK();
-                const relevant = (data || []).filter(a => a.type !== 'daily' || a.scheduled_date === todayMSK);
+                const nowInstant = new Date();
+                const relevant = (data || []).filter(a => isAssignmentAvailable(a, nowInstant, todayMSK));
 
                 if (relevant.length === 0) {
                     el.innerHTML = `<div class="summary-empty">🕊️ Нет активных заданий</div>`;
@@ -1760,6 +1764,27 @@
             }
         }
 
+        // Склонение «задача» по числу — только в этом файле (как pluralShields/pluralDays; см. shared.js).
+        function pluralTasks(n) {
+            const mod10 = n % 10, mod100 = n % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'задача';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'задачи';
+            return 'задач';
+        }
+
+        // Доступно ли задание для отправки прямо сейчас (W03). Возвращённая ежедневка
+        // (checked+rejected) остаётся доступной, пока действует серверное окно исправления
+        // revision_deadline_at (W04) — её НЕ отсекает scheduled_date !== today. Назначенная
+        // ежедневка доступна только в свой день по МСК. weekly/individual — как раньше.
+        // Признак берётся из серверных полей, новое право в JS не вычисляется (SPEC §6).
+        function isAssignmentAvailable(a, nowInstant, todayMSK) {
+            if (a.type !== 'daily') return true;
+            if (a.status === 'checked' && a.approval_status === 'rejected') {
+                return a.revision_deadline_at != null && new Date(a.revision_deadline_at) > nowInstant;
+            }
+            return a.scheduled_date === todayMSK;
+        }
+
         // --- ЗАГРУЗКА АКТИВНЫХ ЗАДАНИЙ (ИСПРАВЛЕНО) ---
         async function loadActiveAssignments() {
             const select = document.getElementById('assignment-select');
@@ -1778,9 +1803,11 @@
 
                 if (error) throw error;
 
-                // Ежедневное задание доступно только в свой день (по МСК) — просроченные больше не показываем
+                // Доступность считается единым признаком: ежедневка своего дня + возвращённая
+                // ежедневка с действующим окном исправления (W04), просроченные скрыты (W03).
                 const todayMSK = getTodayMSK();
-                activeAssignments = (data || []).filter(a => a.type !== 'daily' || a.scheduled_date === todayMSK);
+                const nowInstant = new Date();
+                activeAssignments = (data || []).filter(a => isAssignmentAvailable(a, nowInstant, todayMSK));
 
                 if (activeAssignments.length === 0) {
                     select.innerHTML = '<option value="">Нет активных заданий 🕊️</option>';
@@ -1820,6 +1847,17 @@
             const assignment = activeAssignments.find(a => a.id === assignmentId);
             if (assignment) {
                 document.getElementById('detail-title').innerText = assignment.title || 'Без названия';
+
+                // Число задач показываем только для новых заданий; legacy (task_count = null)
+                // не рендерим как «0 задач» (W03/P01A).
+                const countEl = document.getElementById('detail-count');
+                if (assignment.task_count != null) {
+                    countEl.innerText = `📝 ${assignment.task_count} ${pluralTasks(assignment.task_count)}`;
+                    countEl.style.display = 'block';
+                } else {
+                    countEl.style.display = 'none';
+                }
+
                 const linkEl = document.getElementById('detail-link');
                 if (assignment.content_url) {
                     linkEl.href = normalizeUrl(assignment.content_url);
@@ -1896,6 +1934,16 @@
             if (!assignment) return;
 
             const nowInstant = new Date();
+            const todayMSK = getTodayMSK();
+
+            // Единый признак доступности с dropdown: просроченная ежедневка или возвращённая
+            // ежедневка с истёкшим/отсутствующим окном исправления к отправке не принимается (W03).
+            if (!isAssignmentAvailable(assignment, nowInstant, todayMSK)) {
+                status.innerText = "⏰ Время вышло — работа больше не принимается";
+                status.style.color = "#f44336";
+                return;
+            }
+
             let deadlineMSK = null;
 
             // Определяем дедлайн в зависимости от типа (награда за загрузку убрана — G11,
@@ -1903,14 +1951,18 @@
             if (assignment.type === 'individual') {
                 deadlineMSK = null; // Без дедлайна
             } else if (assignment.type === 'weekly') {
-                const [ty, tm, td] = getTodayMSK().split('-').map(Number);
+                const [ty, tm, td] = todayMSK.split('-').map(Number);
                 const currentDay = new Date(Date.UTC(ty, tm - 1, td)).getUTCDay();
                 let daysUntilMonday = (1 - currentDay + 7) % 7;
                 if (daysUntilMonday === 0) daysUntilMonday = 7;
                 const monday = new Date(Date.UTC(ty, tm - 1, td + daysUntilMonday));
                 deadlineMSK = moscowDateTimeToInstant(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), 0, 0);
+            } else if (assignment.status === 'checked' && assignment.approval_status === 'rejected') {
+                // Возвращённая ежедневка: дедлайн — серверное окно исправления (W04),
+                // а не 23:59 её исходного дня (isAssignmentAvailable выше уже проверил, что окно живо).
+                deadlineMSK = assignment.revision_deadline_at ? new Date(assignment.revision_deadline_at) : null;
             } else {
-                // Ежедневное
+                // Первая сдача ежедневки — 23:59 МСК её дня
                 let dateStr = assignment.scheduled_date;
                 if (!dateStr) {
                      status.innerText = "⚠️ Ошибка даты задания"; return;
@@ -2028,10 +2080,14 @@
                         </div>`;
                     }
 
+                    // Число задач — только для новых заданий; legacy null не показываем (W03/P01A)
+                    const countHtml = hw.task_count != null
+                        ? ` <span class="hw-pages">📝 ${hw.task_count} ${pluralTasks(hw.task_count)}</span>` : '';
+
                     li.innerHTML = `
                         <div class="hw-header">
                             <div>
-                                <div class="hw-variant">${esc(hw.title || 'ДЗ')} <span class="hw-pages">📄 x${pagesCount}</span></div>
+                                <div class="hw-variant">${esc(hw.title || 'ДЗ')} <span class="hw-pages">📄 x${pagesCount}</span>${countHtml}</div>
                                 <div class="hw-date">${date}</div>
                             </div>
                             <span class="hw-badge ${badgeClass}">${statusText}</span>
