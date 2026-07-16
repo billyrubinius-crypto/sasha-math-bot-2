@@ -1232,8 +1232,19 @@
                     ${dots}
                     ${labels}
                 </svg>
-                <div id="exam-info-box" class="exam-info-box">Нажми на точку, чтобы увидеть детали</div>
+                <div id="exam-info-box" class="exam-info-box">${esc(lastResultSummary(points))}</div>
             `;
+        }
+
+        // Последний результат и его изменение к предыдущему пробнику (P02B) — простая разница
+        // двух чисел, не прогноз: карточка запрещает медицинские/гарантирующие формулировки.
+        function lastResultSummary(points) {
+            const last = Number(points[points.length - 1].score) || 0;
+            if (points.length < 2) return `Последний результат: ${last}. Нажми на точку, чтобы увидеть детали`;
+            const prev = Number(points[points.length - 2].score) || 0;
+            const delta = last - prev;
+            const sign = delta > 0 ? '+' : '';
+            return `Последний результат: ${last} (${sign}${delta} к предыдущему). Нажми на точку, чтобы увидеть детали`;
         }
 
         // exam_date — чистая дата (YYYY-MM-DD, без времени), парсим вручную, чтобы не словить сдвиг на день из-за часового пояса браузера

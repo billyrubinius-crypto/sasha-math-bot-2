@@ -192,6 +192,22 @@ def format_exam_date(exam: dict) -> str:
     return format_sync_date(exam.get('created_at'))
 
 
+def format_score_delta(exams: list) -> str | None:
+    """Изменение последнего результата к предыдущему пробнику (P02B) — простая разница двух
+    чисел, не прогноз (карточка запрещает медицинские/гарантирующие формулировки). None, если
+    пробник один или встретился нечисловой legacy score."""
+    if len(exams) < 2:
+        return None
+    try:
+        last = int(exams[-1]['score'])
+        prev = int(exams[-2]['score'])
+    except (ValueError, TypeError):
+        return None
+    delta = last - prev
+    sign = '+' if delta > 0 else ''
+    return f"Изменение к предыдущему: {sign}{delta}"
+
+
 def format_progress_message(student_name: str, progress_rows: list, exams: list) -> str:
     progress_by_type = {row['type']: row for row in progress_rows}
     lines = [f"📊 Результаты ученика <b>{student_name}</b>:\n"]
@@ -204,6 +220,9 @@ def format_progress_message(student_name: str, progress_rows: list, exams: list)
         for i, exam in enumerate(exams, 1):
             date_str = format_exam_date(exam)
             lines.append(f"№{i} «{exam['exam_name']}» — {exam['score']} баллов ({date_str})")
+        delta_text = format_score_delta(exams)
+        if delta_text:
+            lines.append(delta_text)
     else:
         lines.append("\n🧮 Пробников пока нет.")
 

@@ -322,6 +322,23 @@
             </div>
 
             <div class="week-planner">
+                <h3 style="margin-top:0">🧮 Пробник недели</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Запись результата идёт только через эту форму — бублики и очки сезона начисляет сервер, здесь их не считаем.</p>
+                <div style="position:relative;">
+                    <input type="text" id="mock-username-input" placeholder="Введите username ученика" autocomplete="off"
+                        style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;"
+                        oninput="onMockUsernameInput()"
+                        onblur="setTimeout(() => { document.getElementById('mock-username-suggestions').style.display = 'none'; }, 150)">
+                    <div id="mock-username-suggestions" class="username-suggestions"></div>
+                </div>
+                <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Неделя (понедельник):</label>
+                <input type="date" id="mock-week" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+                <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Результат (0–100):</label>
+                <input type="number" id="mock-score" min="0" max="100" step="1" placeholder="Балл пробника" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+                <button class="btn-primary" id="btn-submit-mock" onclick="submitMockExam()">Сохранить результат</button>
+            </div>
+
+            <div class="week-planner">
                 <h3 style="margin-top:0">🏁 Сезон</h3>
                 <p style="font-size:13px; color:#666; margin-bottom:15px;">Закрытие сезона: итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон. Делается вручную раз в 2 недели.</p>
                 <button class="btn-danger" id="btn-close-season" onclick="closeSeason()" style="width:100%;">🏁 Закрыть сезон</button>
@@ -549,6 +566,12 @@
             const todayWeekday = new Date(Date.UTC(ny, nm - 1, nd)).getUTCDay();
             const daysUntilNextMonday = (1 + 7 - todayWeekday) % 7 || 7;
             document.getElementById('activation-date').value = addDaysToDate(todayMSKStr, daysUntilNextMonday);
+
+            // Понедельник ТЕКУЩЕЙ недели для формы пробника (P02B) — daysUntilNextMonday
+            // above уже даёт следующий понедельник; текущий = на 7 дней раньше, если сегодня
+            // не сам понедельник (daysUntilNextMonday=7 → сегодня понедельник → 0 назад).
+            document.getElementById('mock-week').value =
+                addDaysToDate(todayMSKStr, daysUntilNextMonday === 7 ? 0 : daysUntilNextMonday - 7);
 
             // === ЗУМ И ПЕРЕТАСКИВАНИЕ ДЛЯ LIGHTBOX ===
             const lbImg = document.getElementById('lb-img');
@@ -1721,6 +1744,108 @@
                 document.getElementById('indiv-url').value = '';
                 document.getElementById('indiv-count').value = '';
                 document.getElementById('indiv-comment').value = '';
+            } catch(e) { alert('Ошибка: ' + e.message); }
+            finally { btn.disabled = false; }
+        }
+
+        // --- ПОИСК УЧЕНИКА ПО USERNAME (пробник недели, P02B) ---
+        // Отдельная копия поиска по username (не переиспользует indiv-*): это Bot 2.0-специфичное
+        // правило («не делать сопутствующий рефакторинг существующего кода без карточки») —
+        // выносить общий хелпер значило бы менять уже работающий indiv-поиск вне карточки.
+        let selectedMockStudentId = null;
+        let mockSearchTimeout = null;
+
+        function onMockUsernameInput() {
+            selectedMockStudentId = null;
+            const query = document.getElementById('mock-username-input').value.trim();
+            const box = document.getElementById('mock-username-suggestions');
+            clearTimeout(mockSearchTimeout);
+
+            if (!query) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+            mockSearchTimeout = setTimeout(async () => {
+                const { data } = await db.from('students')
+                    .select('telegram_id, name, telegram_username')
+                    .ilike('telegram_username', `%${query}%`)
+                    .not('telegram_username', 'is', null)
+                    .limit(8);
+
+                if (!data || data.length === 0) {
+                    box.innerHTML = '<div class="username-suggestion-item" style="color:#999; cursor:default;">Не найдено</div>';
+                    box.style.display = 'block';
+                    return;
+                }
+
+                box.innerHTML = '';
+                data.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = 'username-suggestion-item';
+                    item.innerHTML = `<b>@${esc(s.telegram_username)}</b> — ${esc(s.name || '')}`;
+                    item.onclick = () => selectMockStudent(s.telegram_id, s.telegram_username);
+                    box.appendChild(item);
+                });
+                box.style.display = 'block';
+            }, 250);
+        }
+
+        function selectMockStudent(telegramId, username) {
+            selectedMockStudentId = telegramId;
+            document.getElementById('mock-username-input').value = username;
+            document.getElementById('mock-username-suggestions').style.display = 'none';
+        }
+
+        // Запись результата пробника — только через RPC record_weekly_mock_exam (P02A):
+        // бублики/очки сезона считает сервер, клиент их не начисляет (P02B, "не начисляют валюты").
+        async function submitMockExam() {
+            const btn = document.getElementById('btn-submit-mock');
+            if (btn.disabled) return;
+
+            if (!selectedMockStudentId) return alert('Выберите ученика из подсказок!');
+
+            const weekStart = document.getElementById('mock-week').value;
+            if (!weekStart) return alert('Выберите неделю!');
+            if (!isMonday(weekStart)) return alert('Неделя начинается только с понедельника — выберите понедельник.');
+
+            const scoreRaw = document.getElementById('mock-score').value;
+            const score = Number(scoreRaw);
+            if (scoreRaw.trim() === '' || !Number.isInteger(score) || score < 0 || score > 100) {
+                return alert('Результат должен быть целым числом от 0 до 100.');
+            }
+
+            // Синхронная защита от двойного клика ДО любого await (урок W05/W06).
+            btn.disabled = true;
+            try {
+                // Уже есть результат на эту неделю — подтверждение перед заменой ("может
+                // исправить его с подтверждением", P02B). Отсутствие строки или совпадающий
+                // score подтверждения не требуют.
+                const { data: existing, error: existingError } = await db.from('weekly_mock_exams')
+                    .select('score')
+                    .eq('student_id', selectedMockStudentId)
+                    .eq('week_start', weekStart)
+                    .maybeSingle();
+                if (existingError) throw existingError;
+
+                if (existing && existing.score !== score) {
+                    if (!confirm(`На неделю ${weekStart} уже записан результат ${existing.score}. Заменить на ${score}?`)) {
+                        return;
+                    }
+                }
+
+                const { data, error } = await db.rpc('record_weekly_mock_exam', {
+                    p_student_id: selectedMockStudentId,
+                    p_week_start: weekStart,
+                    p_score: score
+                });
+                if (error) throw error;
+
+                let msg = `Результат ${score} за неделю ${weekStart} сохранён.`;
+                if (data.base_awarded) msg += '\n+20 🥯 за пробник';
+                if (data.record_awarded) msg += '\n+30 🥯 личный рекорд!';
+                alert(msg);
+
+                document.getElementById('mock-username-input').value = '';
+                selectedMockStudentId = null;
+                document.getElementById('mock-score').value = '';
             } catch(e) { alert('Ошибка: ' + e.message); }
             finally { btn.disabled = false; }
         }
