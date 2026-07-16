@@ -1908,3 +1908,43 @@ create trigger trg_students_weekly_plans_group_change
   for each row
   when (old.group_name is distinct from new.group_name)
   execute function public.trg_students_sync_weekly_plans();
+
+-- get_student_task_totals — серверный lifetime/range счётчик задач и дней занятий поверх
+-- lifecycle-полей W01/W04 (миграция 013, P01A). Read-only производная от assignments: без
+-- отдельного изменяемого counter. Принятая работа = status='checked' и
+-- approval_status='approved'; solved_tasks суммирует только task_count > 0 (сложение null
+-- бессмысленно), active_days считает ВСЕ принятые работы с известной датой отправки, включая
+-- legacy с task_count IS NULL (решение пользователя 2026-07-16: день был реально активным
+-- независимо от того, известно ли число задач) — такие строки одновременно увеличивают
+-- unknown_approved_assignments. p_from/p_to = null → lifetime; иначе диапазон дат МСК
+-- включительно, каждая граница независима. Полная мотивация — в шапке миграции 013.
+CREATE OR REPLACE FUNCTION public.get_student_task_totals(
+  p_student_id bigint,
+  p_from       date DEFAULT null,
+  p_to         date DEFAULT null
+)
+ RETURNS TABLE(
+   solved_tasks                 bigint,
+   active_days                  bigint,
+   unknown_approved_assignments bigint
+ )
+ LANGUAGE sql
+ STABLE
+AS $function$
+  with accepted as (
+    select
+      a.task_count,
+      (coalesce(a.first_submitted_at, a.submitted_at) at time zone 'Europe/Moscow')::date as date_msk
+    from public.assignments a
+    where a.student_id = p_student_id
+      and a.status = 'checked'
+      and a.approval_status = 'approved'
+      and (p_from is null or (coalesce(a.first_submitted_at, a.submitted_at) at time zone 'Europe/Moscow')::date >= p_from)
+      and (p_to   is null or (coalesce(a.first_submitted_at, a.submitted_at) at time zone 'Europe/Moscow')::date <= p_to)
+  )
+  select
+    coalesce(sum(task_count) filter (where task_count > 0), 0)::bigint as solved_tasks,
+    count(distinct date_msk)::bigint                                   as active_days,
+    count(*) filter (where task_count is null)::bigint                 as unknown_approved_assignments
+  from accepted;
+$function$;
