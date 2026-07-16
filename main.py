@@ -49,13 +49,16 @@ def fetch_active_assignments() -> list:
     """Строки assignments, которые уже активны либо ждут клиентской активации — общее сырьё для обеих
     рассылок, только чтение. 'scheduled' включены намеренно: активация происходит на стороне Mini App
     при заходе ученика (checkAndActivateAssignments()), а не сама по себе — is_effectively_active()
-    ниже досчитывает то же правило, не дожидаясь, пока ученик откроет приложение."""
+    ниже досчитывает то же правило, не дожидаясь, пока ученик откроет приложение.
+    week_label и revision_deadline_at добавлены в W08: нужны, чтобы отличить возвращённую daily с
+    открытым окном исправления (SPEC §11) и weekly текущей недели от прочих строк, без второго запроса."""
     resp = requests.get(
         f'{SUPABASE_URL}/rest/v1/assignments',
         headers=SUPABASE_HEADERS,
         params={
             'activation_status': 'in.(active,scheduled)',
-            'select': 'student_id,type,scheduled_date,status,approval_status,activation_status'
+            'select': 'student_id,type,scheduled_date,week_label,status,approval_status,'
+                      'activation_status,revision_deadline_at'
         }
     )
     resp.raise_for_status()
@@ -120,24 +123,123 @@ async def send_morning_digest():
         await send_safely(student_id, text)
 
 
-async def send_evening_reminder():
-    """19:00 МСК — напоминание о несданном: не сдано вообще, либо возвращено учителем на пересдачу."""
-    today = today_msk_str()
-    rows = [
-        r for r in fetch_active_assignments()
-        if is_effectively_active(r, today)
-        and (r['status'] == 'assigned' or (r['status'] == 'checked' and r['approval_status'] == 'rejected'))
-    ]
-    counts = group_counts_by_student(rows, today)
+def week_start_of(d) -> str:
+    """Понедельник недели, содержащей дату d — тот же приём, что week_start_of в БД (W04) и
+    week_start_of в parent_bot.py (W07): свой read-only Python-хелпер на файл, без общей утилиты."""
+    return (d - timedelta(days=d.isoweekday() - 1)).isoformat()
 
-    for student_id, student_counts in counts.items():
-        if sum(student_counts.values()) == 0:
+
+def has_open_revision_window(row: dict, now: datetime) -> bool:
+    """revision_deadline_at пишет только сервер (триггер W04) — здесь только сравнение с текущим
+    временем для показа, новое право не изобретается (тот же принцип, что в index.html/teacher.html)."""
+    dl = row.get('revision_deadline_at')
+    if not dl:
+        return False
+    try:
+        deadline = datetime.fromisoformat(dl.replace('Z', '+00:00'))
+    except (ValueError, AttributeError):
+        return False
+    return deadline > now
+
+
+def classify_evening_row(row: dict, today: str, current_week_label: str, now: datetime) -> str | None:
+    """Одна строка assignments -> ровно одна категория ('new'/'revision') или None (не напоминать).
+    Однозначная классификация одной строкой гарантирует отсутствие дубля в одном запуске (W08).
+
+    daily: сегодняшняя несданная -> 'new'; возвращённая с ещё живым окном исправления
+    (revision_deadline_at > now), в т.ч. прошлой даты, -> 'revision'; pending review ('submitted')
+    и просроченное исправление ни в одну категорию не попадают — не напоминаются (SPEC §11).
+    weekly: только текущей недели (week_label == понедельник этой недели); возвращённая weekly
+    напоминается как 'new' — у weekly нет окна исправления (W04: только у daily).
+    individual: как раньше, без даты и различения категорий."""
+    rtype, status, approval = row['type'], row['status'], row.get('approval_status')
+
+    if rtype == 'daily':
+        if status == 'assigned':
+            return 'new' if row.get('scheduled_date') == today else None
+        if status == 'checked' and approval == 'rejected':
+            return 'revision' if has_open_revision_window(row, now) else None
+        return None
+
+    if rtype == 'weekly' and row.get('week_label') != current_week_label:
+        return None
+
+    if status == 'assigned' or (status == 'checked' and approval == 'rejected'):
+        return 'new'
+    return None
+
+
+def group_evening_by_student(rows: list, today: str, current_week_label: str, now: datetime) -> dict:
+    """{student_id: {'new': {'daily':n,'weekly':n,'individual':n}, 'revision_daily': n}}"""
+    counts = {}
+    for row in rows:
+        category = classify_evening_row(row, today, current_week_label, now)
+        if category is None:
             continue
-        footer = 'Открой приложение, чтобы сдать 🚀'
-        if student_counts['daily'] > 0:
-            footer = '⏰ Ежедневное нужно сдать сегодня до 23:59 МСК!\n' + footer
-        text = format_counts_message('🌙 Не забудь про домашку! Ещё не сдано:', student_counts, footer)
-        await send_safely(student_id, text)
+        student = counts.setdefault(
+            row['student_id'], {'new': {'daily': 0, 'weekly': 0, 'individual': 0}, 'revision_daily': 0}
+        )
+        if category == 'revision':
+            student['revision_daily'] += 1
+        else:
+            student['new'][row['type']] += 1
+    return counts
+
+
+def plural_ru(n: int, one: str, few: str, many: str) -> str:
+    """1 работа / 2 работы / 5 работ — тот же mod10/mod100 приём, что pluralShields/pluralTasks
+    в JS-файлах проекта, здесь для main.py."""
+    mod10, mod100 = n % 10, n % 100
+    if mod10 == 1 and mod100 != 11:
+        return one
+    if 2 <= mod10 <= 4 and not (10 <= mod100 <= 20):
+        return few
+    return many
+
+
+def format_evening_message(new_counts: dict, revision_daily: int) -> str:
+    """Новое задание и исправление показаны раздельно (карточка W08: 'явно различать')."""
+    lines = ['<b>🌙 Не забудь про домашку!</b>', '']
+
+    if any(new_counts.values()):
+        lines.append('Ещё не сдано:')
+        for key, label in TYPE_LABELS.items():
+            n = new_counts.get(key, 0)
+            if n:
+                lines.append(f"{label}: {n}")
+        lines.append('')
+
+    if revision_daily:
+        word = plural_ru(revision_daily, 'работу', 'работы', 'работ')
+        lines.append(f"✏️ Учитель вернул на исправление: {revision_daily} {word} — ещё есть время сдать заново")
+        lines.append('')
+
+    footer = []
+    if new_counts.get('daily', 0) > 0:
+        footer.append('⏰ Ежедневное нужно сдать сегодня до 23:59 МСК!')
+    if revision_daily:
+        footer.append('✏️ Не забудь уложиться в срок исправления.')
+    footer.append('Открой приложение, чтобы сдать 🚀')
+    lines.extend(footer)
+
+    return '\n'.join(lines)
+
+
+async def send_evening_reminder():
+    """19:00 МСК — напоминание о несданном (SPEC §11, W08): сегодняшняя daily + возвращённая daily
+    с открытым окном исправления (даже прошлой даты) + weekly текущей недели + individual как раньше.
+    pending review ('submitted') и просроченное исправление не напоминаются."""
+    now = datetime.now(MSK)
+    today = today_msk_str()
+    current_week_label = week_start_of(now.date())
+
+    rows = [r for r in fetch_active_assignments() if is_effectively_active(r, today)]
+    counts = group_evening_by_student(rows, today, current_week_label, now)
+
+    for student_id, c in counts.items():
+        if sum(c['new'].values()) == 0 and c['revision_daily'] == 0:
+            continue
+        await send_safely(student_id, format_evening_message(c['new'], c['revision_daily']))
 
 
 def fetch_last_sent(key: str):
