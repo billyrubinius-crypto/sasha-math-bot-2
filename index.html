@@ -401,7 +401,7 @@
                 <span id="shield-count">🛡 0 щитов</span>
                 <span class="shield-hint">Спасает стрик при пропуске одного дня</span>
             </div>
-            <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 40 🥯</button>
+            <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 90 🥯</button>
         </div>
 
         <div class="assignments-summary" id="assignments-summary">
@@ -1352,10 +1352,11 @@
             }
         }
 
-        // Щит стрика (G9): счётчик в запасе + кнопка покупки. Лимит 2 щита, цена 40 бубликов —
+        // Щит (G9): счётчик в запасе + кнопка покупки. Лимит 7 щитов, цена 90 бубликов —
         // проверка и списание атомарны в RPC buy_streak_shield (teacher-логика та же таблица
         // student_items). Кнопка блокируется при лимите; сама покупка защищена RPC от гонки.
-        const SHIELD_MAX = 2, SHIELD_PRICE = 40;
+        // Цена/лимит подняты миграцией 012 (W04) — значения ниже обязаны совпадать с RPC.
+        const SHIELD_MAX = 7, SHIELD_PRICE = 90;
 
         function pluralShields(n) {
             const mod10 = n % 10, mod100 = n % 100;
@@ -1380,7 +1381,9 @@
                 const qty = data ? data.quantity : 0;
                 countEl.innerText = `🛡 ${qty} ${pluralShields(qty)}`;
                 btn.disabled = qty >= SHIELD_MAX;
-                btn.innerText = qty >= SHIELD_MAX ? 'Лимит 2 щита' : `Купить — ${SHIELD_PRICE} 🥯`;
+                btn.innerText = qty >= SHIELD_MAX
+                    ? `Лимит ${SHIELD_MAX} ${pluralShields(SHIELD_MAX)}`
+                    : `Купить — ${SHIELD_PRICE} 🥯`;
                 widget.style.display = '';
 
             } catch (e) {
@@ -1605,16 +1608,16 @@
                 body.appendChild(chips);
             } else if (item.item_kind === 'shield') {
                 const qty = owned.get('streak_shield') || 0;
-                if (qty >= 2) {
+                if (qty >= SHIELD_MAX) {
                     const s = document.createElement('span');
                     s.className = 'shop-state owned';
-                    s.textContent = '🛡 2/2';
+                    s.textContent = `🛡 ${qty}/${SHIELD_MAX}`;
                     action.appendChild(s);
                 } else {
                     const label = document.createElement('div');
                     label.className = 'shop-desc';
                     label.style.marginBottom = '4px';
-                    label.textContent = `в запасе: ${qty}/2`;
+                    label.textContent = `в запасе: ${qty}/${SHIELD_MAX}`;
                     action.appendChild(label);
                     action.appendChild(shopBuyButton(item, balance));
                 }

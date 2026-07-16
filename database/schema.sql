@@ -179,7 +179,7 @@ create table public.student_achievements (
 );
 
 -- student_items — инвентарь; первый item_code — 'streak_shield' (щит стрика).
--- Лимит «не больше 2 щитов» — в RPC покупки (G9), не в схеме.
+-- Лимит запаса (7 с миграции 012, было 2) — в RPC покупки, не в схеме.
 create table public.student_items (
   id          uuid         primary key default gen_random_uuid(),
   student_id  bigint       not null references public.students (telegram_id),
@@ -366,6 +366,68 @@ create index if not exists idx_assignments_plan_item
   on public.assignments (plan_item_id)
   where plan_item_id is not null;
 
+-- --- Недельный результат и щиты недели (миграция 012, W04) ---------------------
+-- Серверный источник истины недельного итога. Награды здесь НЕ начисляются: finalize считает
+-- и сохраняет reward_amount, выплату через add_huikons включает cutover W09. Расписание
+-- (pg_cron) тоже включает W09 — 012 только создаёт finalize_due_student_weeks().
+-- Полные решения и мотивация — в шапке миграции 012.
+
+-- student_week_results — снимок недельного расчёта: N/A/S/E, статус и итог (SPEC §7.1).
+-- Источником реальной работы остаются assignments; строка пересчитывается recalc_student_week
+-- до финализации, после — заморожена.
+create table public.student_week_results (
+  id                    uuid         primary key default gen_random_uuid(),
+  student_id            bigint       not null references public.students (telegram_id),
+  week_start            date         not null check (extract(isodow from week_start) = 1),
+  available_daily_count integer      not null default 0 check (available_daily_count >= 0),  -- N
+  approved_daily_count  integer      not null default 0 check (approved_daily_count >= 0),   -- A
+  requested_shields     integer      not null default 0 check (requested_shields >= 0),
+  shields_used          integer      not null default 0 check (shields_used >= 0),           -- S
+  effective_daily_count integer      not null default 0 check (effective_daily_count >= 0),  -- E
+  status                text         not null default 'open'
+                                     check (status in ('open', 'pending_review', 'awaiting_student', 'finalized', 'neutral')),
+  successful            boolean,     -- null у нейтральной недели: она не успешная и не слабая
+  reward_amount         integer      check (reward_amount is null or reward_amount >= 0),
+  neutral_reason        text,
+  finalized_at          timestamptz,
+  created_at            timestamptz  not null default now(),
+  updated_at            timestamptz  not null default now(),
+  unique (student_id, week_start)
+);
+
+create index if not exists idx_student_week_results_open
+  on public.student_week_results (week_start)
+  where status not in ('finalized', 'neutral');
+
+alter table public.student_week_results disable row level security;
+
+-- weekly_shield_uses — резерв щита на КОНКРЕТНУЮ ежедневку (SPEC §7.2). Отдельная таблица от
+-- streak_shield_uses (007): та закрывает разрывы старого processStreak(), эта резервирует щит
+-- под недельный результат. on delete cascade — потому что sync_student_week_assignments (011)
+-- удаляет неначатые плановые строки, а резерв ставится именно на неначатую ежедневку.
+create table public.weekly_shield_uses (
+  id            uuid         primary key default gen_random_uuid(),
+  student_id    bigint       not null references public.students (telegram_id),
+  week_start    date         not null check (extract(isodow from week_start) = 1),
+  assignment_id uuid         not null references public.assignments (id) on delete cascade,
+  status        text         not null check (status in ('requested', 'consumed', 'cancelled')),
+  requested_at  timestamptz  not null default now(),
+  consumed_at   timestamptz,
+  cancelled_at  timestamptz,
+  created_at    timestamptz  not null default now(),
+  updated_at    timestamptz  not null default now()
+);
+
+-- Активный резерв уникален для assignment; списанный — тоже (нельзя списать дважды).
+create unique index if not exists uq_weekly_shield_requested
+  on public.weekly_shield_uses (assignment_id) where status = 'requested';
+create unique index if not exists uq_weekly_shield_consumed
+  on public.weekly_shield_uses (assignment_id) where status = 'consumed';
+create index if not exists idx_weekly_shield_student_week
+  on public.weekly_shield_uses (student_id, week_start);
+
+alter table public.weekly_shield_uses disable row level security;
+
 -- --- Индексы (кроме автоматических для PK/UNIQUE и idx_students_telegram_id выше) -----
 
 create index if not exists idx_assignments_activation
@@ -492,16 +554,18 @@ begin
 end;
 $function$;
 
--- buy_streak_shield — атомарная покупка щита стрика (миграция 007, задача G9): лимит 2,
--- цена 40 через add_huikons (reason='buy_streak_shield'), инкремент инвентаря. Мотивация
--- атомарности и блокировок — в шапке миграции 007.
+-- buy_streak_shield — атомарная покупка щита (миграция 007, задача G9): лимит и цена через
+-- add_huikons (reason='buy_streak_shield'), инкремент инвентаря. Мотивация атомарности и
+-- блокировок — в шапке миграции 007. Цена 40→90 и лимит 2→7 подняты миграцией 012 (W04,
+-- SPEC_STAGE2_5 §7.2 / ECONOMY_V2 §6) по отдельному решению пользователя: щит — часть
+-- недельной модели, а не общий пересчёт магазина. Существующие щиты сохранены как есть.
 CREATE OR REPLACE FUNCTION public.buy_streak_shield(p_student_id bigint)
  RETURNS json
  LANGUAGE plpgsql
 AS $function$
 declare
-  v_price  integer := 40;
-  v_max    integer := 2;
+  v_price  integer := 90;
+  v_max    integer := 7;
   v_qty    integer;
   v_balance integer;
   v_new_balance integer;
@@ -1353,7 +1417,461 @@ begin
 end;
 $function$;
 
+-- --- Недельный расчёт: утилиты и RPC (миграция 012, W04) -----------------------
+-- Полные решения и мотивация — в шапке миграции 012. Ключевые:
+--   * поздняя ПЕРВАЯ сдача не засчитывается в A (решение пользователя 2026-07-16, SPEC §6.1);
+--   * submitted_at/checked_at нормализуются серверным now() в триггере — клиентские часы не
+--     определяют право на 24-часовое окно (SPEC §6.2);
+--   * backfill legacy не делается: там, где нужна первая отправка, читается
+--     coalesce(first_submitted_at, submitted_at);
+--   * награда не начисляется: reward_amount сохраняется, add_huikons зовёт W09.
+
+-- Понедельник учебной недели, содержащей дату (SPEC §3).
+CREATE OR REPLACE FUNCTION public.week_start_of(p_date date)
+ RETURNS date
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select p_date - (extract(isodow from p_date)::int - 1);
+$function$;
+
+-- Момент следующего понедельника 00:00 МСК — правая граница учебной недели (SPEC §3).
+CREATE OR REPLACE FUNCTION public.next_monday_msk(p_date date)
+ RETURNS timestamptz
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select ((public.week_start_of(p_date) + 7)::timestamp) at time zone 'Europe/Moscow';
+$function$;
+
+-- Недельная награда по эффективному результату E (SPEC §7.3, ECONOMY_V2 §4).
+CREATE OR REPLACE FUNCTION public.weekly_reward_amount(p_effective integer)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select case
+    when p_effective >= 7 then 110
+    when p_effective = 6  then 80
+    when p_effective = 5  then 55
+    when p_effective = 4  then 30
+    else 0
+  end;
+$function$;
+
+-- Была ли ПЕРВАЯ отправка своевременной (в свой scheduled_date по МСК).
+CREATE OR REPLACE FUNCTION public.is_first_submission_on_time(
+  p_first_submitted_at timestamptz,
+  p_submitted_at       timestamptz,
+  p_scheduled_date     date
+)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  select coalesce(p_first_submitted_at, p_submitted_at) is not null
+     and p_scheduled_date is not null
+     and (coalesce(p_first_submitted_at, p_submitted_at) at time zone 'Europe/Moscow')::date
+         <= p_scheduled_date;
+$function$;
+
+-- Доступный запас щитов = инвентарь минус активные резервы всех нефинализированных недель:
+-- одну единицу нельзя обещать двум неделям (SPEC §7.2).
+CREATE OR REPLACE FUNCTION public.available_shield_quantity(p_student_id bigint)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE
+AS $function$
+  select coalesce((select quantity from public.student_items
+                    where student_id = p_student_id and item_code = 'streak_shield'), 0)
+       - (select count(*) from public.weekly_shield_uses
+           where student_id = p_student_id and status = 'requested')::int;
+$function$;
+
+-- request_weekly_shield / cancel_weekly_shield — ручной выбор щитов до финализации.
+-- Ничего не списывают: списание только при финализации. Тела — в миграции 012.
+CREATE OR REPLACE FUNCTION public.request_weekly_shield(p_student_id bigint, p_assignment_id uuid)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_asn        public.assignments%rowtype;
+  v_week_start date;
+  v_status     text;
+  v_available  integer;
+begin
+  perform 1 from public.student_items
+    where student_id = p_student_id and item_code = 'streak_shield' for update;
+
+  select * into v_asn from public.assignments where id = p_assignment_id;
+  if not found or v_asn.student_id is distinct from p_student_id then
+    raise exception 'Задание не найдено у этого ученика';
+  end if;
+  if v_asn.type <> 'daily' then
+    raise exception 'Щит применяется только к ежедневкам';
+  end if;
+  if v_asn.scheduled_date is null then
+    raise exception 'У задания нет даты — щит применить нельзя';
+  end if;
+  if v_asn.status = 'checked' and v_asn.approval_status = 'approved' then
+    raise exception 'Работа уже принята — щит не нужен';
+  end if;
+
+  v_week_start := public.week_start_of(v_asn.scheduled_date);
+
+  select status into v_status from public.student_week_results
+    where student_id = p_student_id and week_start = v_week_start for update;
+  if v_status in ('finalized', 'neutral') then
+    raise exception 'Неделя уже закрыта — выбор щитов изменить нельзя';
+  end if;
+
+  if exists (select 1 from public.weekly_shield_uses
+               where assignment_id = p_assignment_id and status = 'requested') then
+    return json_build_object('status', 'requested', 'available', public.available_shield_quantity(p_student_id));
+  end if;
+  if exists (select 1 from public.weekly_shield_uses
+               where assignment_id = p_assignment_id and status = 'consumed') then
+    raise exception 'На это задание щит уже списан';
+  end if;
+
+  v_available := public.available_shield_quantity(p_student_id);
+  if v_available < 1 then
+    raise exception 'Нет свободных щитов: все либо не куплены, либо уже обещаны другой неделе';
+  end if;
+
+  insert into public.weekly_shield_uses (student_id, week_start, assignment_id, status)
+    values (p_student_id, v_week_start, p_assignment_id, 'requested');
+
+  perform public.recalc_student_week(p_student_id, v_week_start);
+
+  return json_build_object('status', 'requested', 'available', public.available_shield_quantity(p_student_id));
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.cancel_weekly_shield(p_student_id bigint, p_assignment_id uuid)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_week_start date;
+  v_status     text;
+begin
+  select week_start into v_week_start from public.weekly_shield_uses
+    where assignment_id = p_assignment_id and student_id = p_student_id and status = 'requested'
+    for update;
+  if not found then
+    return json_build_object('status', 'cancelled', 'available', public.available_shield_quantity(p_student_id));
+  end if;
+
+  select status into v_status from public.student_week_results
+    where student_id = p_student_id and week_start = v_week_start for update;
+  if v_status in ('finalized', 'neutral') then
+    raise exception 'Неделя уже закрыта — выбор щитов изменить нельзя';
+  end if;
+
+  update public.weekly_shield_uses
+     set status = 'cancelled', cancelled_at = now(), updated_at = now()
+   where assignment_id = p_assignment_id and status = 'requested';
+
+  perform public.recalc_student_week(p_student_id, v_week_start);
+
+  return json_build_object('status', 'cancelled', 'available', public.available_shield_quantity(p_student_id));
+end;
+$function$;
+
+-- recalc_student_week — снимок недели по фактическим assignments. N/A считаются по
+-- scheduled_date (а не week_label), поэтому legacy-строки попадают в свою реальную неделю.
+CREATE OR REPLACE FUNCTION public.recalc_student_week(p_student_id bigint, p_week_start date)
+ RETURNS public.student_week_results
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_row       public.student_week_results%rowtype;
+  v_n         integer;
+  v_a         integer;
+  v_requested integer;
+  v_consumed  integer;
+  v_shields   integer;
+  v_e         integer;
+  v_pending   boolean;
+  v_awaiting  boolean;
+  v_status    text;
+begin
+  if p_week_start is null or extract(isodow from p_week_start) <> 1 then
+    raise exception 'week_start % — не понедельник', p_week_start;
+  end if;
+
+  select * into v_row from public.student_week_results
+    where student_id = p_student_id and week_start = p_week_start for update;
+
+  if found and v_row.status in ('finalized', 'neutral') then
+    return v_row;
+  end if;
+
+  select
+    count(*),
+    count(*) filter (
+      where a.status = 'checked' and a.approval_status = 'approved'
+        and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)),
+    bool_or(a.status = 'submitted'
+            and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)),
+    bool_or(a.status = 'checked' and a.approval_status = 'rejected'
+            and a.revision_deadline_at is not null and a.revision_deadline_at > now())
+  into v_n, v_a, v_pending, v_awaiting
+  from public.assignments a
+  where a.student_id = p_student_id
+    and a.type = 'daily'
+    and a.scheduled_date between p_week_start and p_week_start + 6;
+
+  v_n := coalesce(v_n, 0);
+  v_a := coalesce(v_a, 0);
+  v_pending := coalesce(v_pending, false);
+  v_awaiting := coalesce(v_awaiting, false);
+
+  select count(*) filter (where status = 'requested'), count(*) filter (where status = 'consumed')
+    into v_requested, v_consumed
+    from public.weekly_shield_uses
+   where student_id = p_student_id and week_start = p_week_start;
+
+  v_requested := coalesce(v_requested, 0);
+  v_consumed := coalesce(v_consumed, 0);
+  v_shields := v_requested + v_consumed;
+  v_e := least(v_n, v_a + v_shields, 7);
+
+  if v_pending then
+    v_status := 'pending_review';
+  elsif v_awaiting then
+    v_status := 'awaiting_student';
+  else
+    v_status := 'open';
+  end if;
+
+  insert into public.student_week_results as r
+    (student_id, week_start, available_daily_count, approved_daily_count,
+     requested_shields, shields_used, effective_daily_count, status)
+  values
+    (p_student_id, p_week_start, v_n, v_a, v_requested, v_consumed, v_e, v_status)
+  on conflict (student_id, week_start) do update
+    set available_daily_count = excluded.available_daily_count,
+        approved_daily_count  = excluded.approved_daily_count,
+        requested_shields     = excluded.requested_shields,
+        shields_used          = excluded.shields_used,
+        effective_daily_count = excluded.effective_daily_count,
+        status                = excluded.status,
+        updated_at            = now()
+  returning * into v_row;
+
+  return v_row;
+end;
+$function$;
+
+-- finalize_student_week — идемпотентная финализация одной недели (SPEC §6.3, §7.2, §7.3):
+-- пересчёт → проверка окон → списание выбранных щитов → фиксация итога. Награду не платит.
+CREATE OR REPLACE FUNCTION public.finalize_student_week(p_student_id bigint, p_week_start date)
+ RETURNS public.student_week_results
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_row      public.student_week_results%rowtype;
+  v_qty      integer;
+  v_consume  integer;
+  v_e        integer;
+begin
+  perform 1 from public.student_items
+    where student_id = p_student_id and item_code = 'streak_shield' for update;
+
+  v_row := public.recalc_student_week(p_student_id, p_week_start);
+
+  if v_row.status in ('finalized', 'neutral') then
+    return v_row;
+  end if;
+
+  if now() < public.next_monday_msk(p_week_start)
+     or v_row.status in ('pending_review', 'awaiting_student') then
+    return v_row;
+  end if;
+
+  if v_row.available_daily_count < 4 then
+    update public.weekly_shield_uses
+       set status = 'cancelled', cancelled_at = now(), updated_at = now()
+     where student_id = p_student_id and week_start = p_week_start and status = 'requested';
+
+    update public.student_week_results
+       set status = 'neutral',
+           successful = null,
+           requested_shields = 0,
+           shields_used = 0,
+           effective_daily_count = least(available_daily_count, approved_daily_count, 7),
+           reward_amount = 0,
+           neutral_reason = case
+             when available_daily_count = 0 then 'нет назначенных ежедневок'
+             else 'меньше четырёх доступных ежедневок' end,
+           finalized_at = now(),
+           updated_at = now()
+     where student_id = p_student_id and week_start = p_week_start
+    returning * into v_row;
+
+    return v_row;
+  end if;
+
+  select coalesce(quantity, 0) into v_qty from public.student_items
+    where student_id = p_student_id and item_code = 'streak_shield';
+  v_qty := coalesce(v_qty, 0);
+  v_consume := least(v_row.requested_shields, v_qty);
+
+  if v_consume > 0 then
+    update public.weekly_shield_uses
+       set status = 'consumed', consumed_at = now(), updated_at = now()
+     where id in (
+       select id from public.weekly_shield_uses
+        where student_id = p_student_id and week_start = p_week_start and status = 'requested'
+        order by requested_at
+        limit v_consume
+     );
+
+    update public.weekly_shield_uses
+       set status = 'cancelled', cancelled_at = now(), updated_at = now()
+     where student_id = p_student_id and week_start = p_week_start and status = 'requested';
+
+    update public.student_items
+       set quantity = quantity - v_consume, updated_at = now()
+     where student_id = p_student_id and item_code = 'streak_shield';
+  else
+    update public.weekly_shield_uses
+       set status = 'cancelled', cancelled_at = now(), updated_at = now()
+     where student_id = p_student_id and week_start = p_week_start and status = 'requested';
+  end if;
+
+  v_e := least(v_row.available_daily_count, v_row.approved_daily_count + v_consume, 7);
+
+  update public.student_week_results
+     set requested_shields     = 0,
+         shields_used          = v_consume,
+         effective_daily_count = v_e,
+         status                = 'finalized',
+         successful            = (v_e >= 4),
+         reward_amount         = public.weekly_reward_amount(v_e),
+         finalized_at          = now(),
+         updated_at            = now()
+   where student_id = p_student_id and week_start = p_week_start
+  returning * into v_row;
+
+  return v_row;
+end;
+$function$;
+
+-- finalize_due_student_weeks — пакетная финализация недель с закрытыми окнами. Расписание
+-- (Supabase Cron) включает W09 одновременно с cutover_at; W04 проверяет её вручную.
+CREATE OR REPLACE FUNCTION public.finalize_due_student_weeks()
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_count integer := 0;
+  v_row   public.student_week_results%rowtype;
+  r       record;
+begin
+  for r in
+    select student_id, week_start
+      from public.student_week_results
+     where status not in ('finalized', 'neutral')
+       and now() >= public.next_monday_msk(week_start)
+     order by week_start, student_id
+  loop
+    v_row := public.finalize_student_week(r.student_id, r.week_start);
+    if v_row.status in ('finalized', 'neutral') then
+      v_count := v_count + 1;
+    end if;
+  end loop;
+
+  return v_count;
+end;
+$function$;
+
 -- --- Триггеры ------------------------------------------------------------------
+
+-- trg_assignments_revision_lifecycle — серверная семантика полей исправлений (миграция 012):
+-- фиксирует first_submitted_at, наращивает revision_count при РЕАЛЬНОМ возврате и считает
+-- revision_deadline_at (понедельник 00:00 МСК; +24ч при позднем возврате вовремя отправленной
+-- работы). Триггером, а не RPC: в assignments пишут существующие клиенты, а W04 не меняет UI.
+CREATE OR REPLACE FUNCTION public.trg_assignments_revision_lifecycle()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_attempt_on_time boolean;
+  v_next_monday     timestamptz;
+begin
+  if new.status = 'submitted' and new.submitted_at is distinct from old.submitted_at then
+    new.submitted_at := now();
+    if new.first_submitted_at is null then
+      new.first_submitted_at := now();
+    end if;
+  end if;
+
+  if new.status = 'checked' and new.checked_at is distinct from old.checked_at then
+    new.checked_at := now();
+  end if;
+
+  if new.status = 'checked'
+     and new.approval_status = 'rejected'
+     and old.status = 'submitted' then
+
+    new.revision_count := coalesce(old.revision_count, 0) + 1;
+
+    if new.type = 'daily' then
+      if coalesce(old.revision_count, 0) = 0 then
+        v_attempt_on_time := public.is_first_submission_on_time(
+          old.first_submitted_at, old.submitted_at, new.scheduled_date);
+      else
+        v_attempt_on_time := old.revision_deadline_at is not null
+                         and old.submitted_at is not null
+                         and old.submitted_at <= old.revision_deadline_at;
+      end if;
+
+      if v_attempt_on_time then
+        v_next_monday := public.next_monday_msk(new.scheduled_date);
+        if now() < v_next_monday then
+          new.revision_deadline_at := v_next_monday;
+        else
+          new.revision_deadline_at := now() + interval '24 hours';
+        end if;
+      else
+        new.revision_deadline_at := null;
+      end if;
+    end if;
+  end if;
+
+  return new;
+end;
+$function$;
+
+create trigger trg_assignments_revision_lifecycle
+  before update on public.assignments
+  for each row
+  execute function public.trg_assignments_revision_lifecycle();
+
+-- trg_assignments_release_shield — принятая работа освобождает свой резерв щита (SPEC §7.2):
+-- щит не тратится на день, который в итоге зачли по-настоящему.
+CREATE OR REPLACE FUNCTION public.trg_assignments_release_shield()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+begin
+  if new.status = 'checked' and new.approval_status = 'approved'
+     and (old.status is distinct from 'checked' or old.approval_status is distinct from 'approved') then
+    update public.weekly_shield_uses
+       set status = 'cancelled', cancelled_at = now(), updated_at = now()
+     where assignment_id = new.id and status = 'requested';
+  end if;
+  return null;
+end;
+$function$;
+
+create trigger trg_assignments_release_shield
+  after update on public.assignments
+  for each row
+  execute function public.trg_assignments_release_shield();
 
 -- trg_students_sync_weekly_plans — новый ученик и смена группы (миграция 011;
 -- SPEC §5.3–5.4): синхронизирует текущую и опубликованные будущие недели.
