@@ -1,9 +1,10 @@
 import asyncio
+import html
 import io
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
 from dotenv import load_dotenv
@@ -97,6 +98,215 @@ async def get_mock_exams(student_id: int):
     return resp.json()
 
 
+# --- Текущая неделя (W07): дополняет lifetime-статистику отдельным блоком поверх контракта
+# W04 (SPEC_STAGE2_5.md §10). Только чтение assignments/weekly_shield_uses — recalc_student_week
+# не вызывается, потому что это RPC с записью (insert/update student_week_results), а карточка
+# требует "только чтение Supabase, без начислений и обновлений". N/A/S/E и статус дня поэтому
+# считаются здесь напрямую по тем же полям и по той же логике, что recalc_student_week (012,
+# исправлено 014) — без кэша: работает и когда student_week_results для этой недели ещё нет
+# (ученик не открывал Mini App, учитель ещё не проверял ничего на этой неделе).
+MSK_OFFSET = timedelta(hours=3)  # МСК = UTC+3 круглый год (тот же принцип, что в index.html/teacher.html)
+
+WEEK_DAY_NAMES_RU = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
+
+
+def now_msk() -> datetime:
+    return datetime.now(timezone.utc) + MSK_OFFSET
+
+
+def parse_ts(ts: str | None) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+    except (ValueError, AttributeError):
+        return None
+
+
+def msk_date_of(ts: str | None) -> date | None:
+    dt = parse_ts(ts)
+    if dt is None:
+        return None
+    return (dt.astimezone(timezone.utc) + MSK_OFFSET).date()
+
+
+def week_start_of(d: date) -> date:
+    return d - timedelta(days=d.isoweekday() - 1)
+
+
+def is_on_time(a: dict) -> bool:
+    """Первая отправка строго в свой scheduled_date по МСК — та же строгая проверка, что
+    is_first_submission_on_time в БД после корректирующей миграции 014 (было <=, стало =)."""
+    ts = a.get('first_submitted_at') or a.get('submitted_at')
+    d = msk_date_of(ts)
+    scheduled = a.get('scheduled_date')
+    return d is not None and scheduled is not None and d.isoformat() == scheduled
+
+
+def counts_toward_a(a: dict) -> bool:
+    """Тот же составной критерий, что recalc_student_week использует и для A, и для pending
+    (014): вовремя отправлена, и если была пересдача — текущая попытка попала в действовавшее
+    окно исправления."""
+    if not is_on_time(a):
+        return False
+    if not (a.get('revision_count') or 0):
+        return True
+    deadline = parse_ts(a.get('revision_deadline_at'))
+    submitted = parse_ts(a.get('submitted_at'))
+    return deadline is not None and submitted is not None and submitted <= deadline
+
+
+def daily_day_status(a: dict | None, shielded: bool, today: date, now: datetime) -> str:
+    """Статус дня — производная уже существующих полей, тот же принцип, что isAssignmentAvailable
+    в index.html (W03) и просрочка в teacher.html (W05): щит показывается отдельно от реальной
+    сдачи (SPEC §10), новое право не изобретается."""
+    if shielded:
+        return 'shielded'
+    if not a:
+        return 'none'
+    status, approval = a.get('status'), a.get('approval_status')
+    if status == 'checked' and approval == 'approved':
+        return 'approved'
+    if status == 'checked' and approval == 'rejected':
+        deadline = parse_ts(a.get('revision_deadline_at'))
+        return 'revision' if (deadline and deadline > now) else 'missed'
+    if status == 'submitted':
+        return 'submitted'
+    if status == 'assigned':
+        scheduled = a.get('scheduled_date')
+        return 'missed' if (scheduled and scheduled < today.isoformat()) else 'assigned'
+    return 'none'
+
+
+def classify_week(n: int, e: int, pending: bool, awaiting: bool) -> str:
+    """Термины SPEC §3: успешная (N>=4 и E>=4), слабая (N>=4 и E<=3), нейтральная (N<4).
+    Pending/awaiting — отдельное состояние поверх классификации, т.к. итог ещё не окончательный."""
+    if pending or awaiting:
+        return 'pending'
+    if n < 4:
+        return 'neutral'
+    return 'successful' if e >= 4 else 'weak'
+
+
+async def get_week_daily(student_id: int, week_start: date, week_end: date) -> list[dict]:
+    resp = await http_client.get(
+        f'{SUPABASE_URL}/rest/v1/assignments',
+        headers=SUPABASE_HEADERS,
+        params={
+            'student_id': f'eq.{student_id}', 'type': 'eq.daily',
+            'scheduled_date': [f'gte.{week_start.isoformat()}', f'lte.{week_end.isoformat()}'],
+            'select': 'id,title,scheduled_date,status,approval_status,revision_deadline_at,'
+                      'first_submitted_at,submitted_at,revision_count',
+            'order': 'scheduled_date.asc'
+        }
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def get_week_shields(student_id: int, week_start: date) -> list[dict]:
+    resp = await http_client.get(
+        f'{SUPABASE_URL}/rest/v1/weekly_shield_uses',
+        headers=SUPABASE_HEADERS,
+        params={
+            'student_id': f'eq.{student_id}', 'week_start': f'eq.{week_start.isoformat()}',
+            'status': 'in.(requested,consumed)', 'select': 'assignment_id,status'
+        }
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def get_week_weekly_item(student_id: int, week_start: date) -> dict | None:
+    resp = await http_client.get(
+        f'{SUPABASE_URL}/rest/v1/assignments',
+        headers=SUPABASE_HEADERS,
+        params={
+            'student_id': f'eq.{student_id}', 'type': 'eq.weekly',
+            'week_label': f'eq.{week_start.isoformat()}',
+            'select': 'title,status,approval_status'
+        }
+    )
+    resp.raise_for_status()
+    rows = resp.json()
+    return rows[0] if rows else None
+
+
+WEEKLY_ITEM_LABELS = {
+    'none': 'не назначено', 'assigned': 'назначено', 'submitted': 'отправлено',
+    'approved': 'принято', 'rejected': 'возвращено'
+}
+
+
+def weekly_item_status(row: dict | None) -> str:
+    if not row:
+        return 'none'
+    status = row.get('status')
+    if status == 'assigned':
+        return 'assigned'
+    if status == 'submitted':
+        return 'submitted'
+    if status == 'checked':
+        return 'approved' if row.get('approval_status') == 'approved' else 'rejected'
+    return 'none'
+
+
+def format_week_block(daily_rows: list[dict], shield_rows: list[dict], weekly_row: dict | None,
+                       week_start: date, week_end: date) -> str:
+    now = now_msk()
+    today = now.date()
+    shielded_ids = {s['assignment_id'] for s in shield_rows}
+
+    n = len(daily_rows)
+    a = sum(1 for r in daily_rows if r.get('status') == 'checked'
+            and r.get('approval_status') == 'approved' and counts_toward_a(r))
+    pending = any(r.get('status') == 'submitted' and counts_toward_a(r) for r in daily_rows)
+    awaiting = any(
+        r.get('status') == 'checked' and r.get('approval_status') == 'rejected'
+        and (dl := parse_ts(r.get('revision_deadline_at'))) is not None and dl > now
+        for r in daily_rows
+    )
+    s = len(shield_rows)
+    e = min(n, a + s, 7)
+    status = classify_week(n, e, pending, awaiting)
+
+    lines = [f"\n🗓️ <b>Текущая неделя</b> ({week_start.strftime('%d.%m')}–{week_end.strftime('%d.%m')}):"]
+    lines.append(f"Ежедневные: {a} из {n} принято" + (f", 🛡 щитов: {s}" if s else "")
+                 + f" → эффективно {e}")
+
+    weekly_status = weekly_item_status(weekly_row)
+    weekly_label = WEEKLY_ITEM_LABELS[weekly_status]
+    if weekly_row and weekly_row.get('title'):
+        lines.append(f"🔥 Еженедельное: {weekly_label} — «{html.escape(weekly_row['title'])}»")
+    else:
+        lines.append(f"🔥 Еженедельное: {weekly_label}")
+
+    revisions = [
+        r for r in daily_rows
+        if daily_day_status(r, r['id'] in shielded_ids, today, now) == 'revision'
+    ]
+    if revisions:
+        lines.append("✏️ Открытые исправления:")
+        for r in revisions:
+            dl = parse_ts(r['revision_deadline_at'])
+            dl_text = (dl + MSK_OFFSET).strftime('%d.%m %H:%M') if dl else '—'
+            title = html.escape(r.get('title') or 'Без названия')
+            lines.append(f"  • «{title}» — до {dl_text} МСК")
+
+    # Pending/awaiting — нейтральная формулировка без обвинения ученика (карточка W07).
+    status_text = {
+        'pending': "⏳ Итог недели пока уточняется: есть работа на проверке у учителя или "
+                   "открытое окно для исправления.",
+        'successful': "✅ Неделя засчитывается как успешная.",
+        'weak': "Выполнено меньше половины назначенного на неделю — неделя слабая, без награды.",
+        'neutral': "➖ На этой неделе назначено меньше 4 ежедневных заданий — неделя нейтральная, "
+                   "не засчитывается ни в плюс, ни в минус.",
+    }[status]
+    lines.append(status_text)
+
+    return "\n".join(lines)
+
+
 def format_sync_date(created_at: str) -> str:
     """Дата синхронизации Apps Script (created_at) — используется как запасной вариант, если exam_date ещё не заполнена."""
     try:
@@ -175,7 +385,23 @@ async def send_student_progress(message: types.Message, student_id: int, student
         await message.answer(NETWORK_ERROR_TEXT)
         return
 
-    await message.answer(format_progress_message(student_name, progress, exams), parse_mode="HTML")
+    text = format_progress_message(student_name, progress, exams)
+
+    # Блок текущей недели (W07) — необязательное дополнение: сбой её загрузки не должен
+    # ломать старый /progress (карточка требует "старый /progress работает").
+    try:
+        week_start = week_start_of(now_msk().date())
+        week_end = week_start + timedelta(days=6)
+        daily_rows, shield_rows, weekly_row = await asyncio.gather(
+            get_week_daily(student_id, week_start, week_end),
+            get_week_shields(student_id, week_start),
+            get_week_weekly_item(student_id, week_start)
+        )
+        text += "\n" + format_week_block(daily_rows, shield_rows, weekly_row, week_start, week_end)
+    except httpx.HTTPError as e:
+        logging.warning(f"Не удалось загрузить недельный блок {student_id}: {e}")
+
+    await message.answer(text, parse_mode="HTML")
 
     chart = render_mock_chart(exams)
     if chart:
