@@ -522,23 +522,25 @@ AS $function$
   group by a.type;
 $function$;
 
--- close_season — закрытие сезона одной транзакцией (миграция 006, задача G8):
--- архив итогов в season_results (места по rank(), равные очки = одно место),
--- награды топ-3 с ненулевыми очками (100/60/30, GAME_DESIGN.md §5) через add_huikons
--- (reason='season_place_N'), обнуление rating, end_date у закрытого сезона, открытие
--- следующего. Сезон, открытый сегодня, закрыть нельзя (защита от двойного клика).
--- Полная мотивация решений — в шапке миграции 006.
+-- close_season — закрытие сезона одной транзакцией (миграция 006, переписана W09/017):
+-- архив итогов в season_results с ДЕТЕРМИНИРОВАННЫМ tie-break (rating desc → меньше штрафов
+-- в сезоне → раньше набрал очки по season_points_log → telegram_id), места тотальны
+-- (row_number, без деления одного места). Призы топ-3 с ненулевыми очками (100/60/30) по
+-- одному ученику на место — фиксированный фонд ≤ 190. Обнуление rating, закрытие сезона,
+-- открытие следующего. Сезон, открытый сегодня, закрыть нельзя (защита от двойного клика).
+-- Мотивация tie-break и предел леджера пробников — в шапке миграции 017.
 CREATE OR REPLACE FUNCTION public.close_season()
  RETURNS json
  LANGUAGE plpgsql
 AS $function$
 declare
-  v_season_id bigint;
-  v_start_date date;
-  v_today date := (now() at time zone 'Europe/Moscow')::date;
-  v_archived integer;
-  v_awarded integer := 0;
-  v_reward integer;
+  v_season_id    bigint;
+  v_start_date   date;
+  v_start_ts     timestamptz;
+  v_today        date := (now() at time zone 'Europe/Moscow')::date;
+  v_archived     integer;
+  v_awarded      integer := 0;
+  v_reward       integer;
   r record;
 begin
   select id, start_date into v_season_id, v_start_date
@@ -556,19 +558,36 @@ begin
     raise exception 'Сезон №% открыт сегодня — закрывать можно не раньше следующего дня', v_season_id;
   end if;
 
+  v_start_ts := (v_start_date::timestamp) at time zone 'Europe/Moscow';
+
   -- Блокируем учеников до снимка очков (гонка с add_season_points, см. миграцию 006).
   perform 1 from students for update;
 
   insert into season_results (season_id, student_id, points, place)
   select v_season_id, s.telegram_id, s.rating,
-         rank() over (order by s.rating desc)
-    from students s;
+         row_number() over (
+           order by s.rating desc,
+                    coalesce(pen.cnt, 0) asc,
+                    pts.last_scored asc nulls last,
+                    s.telegram_id asc)
+    from students s
+    left join (
+      select student_id, count(*) as cnt
+        from balance_history
+       where reason like 'penalty:%' and created_at >= v_start_ts
+       group by student_id) pen on pen.student_id = s.telegram_id
+    left join (
+      select student_id, max(created_at) as last_scored
+        from season_points_log
+       where season_id = v_season_id and amount > 0
+       group by student_id) pts on pts.student_id = s.telegram_id;
   get diagnostics v_archived = row_count;
 
   for r in
     select student_id, place
       from season_results
       where season_id = v_season_id and place <= 3 and points > 0
+      order by place
   loop
     v_reward := case r.place when 1 then 100 when 2 then 60 else 30 end;
     perform add_huikons(r.student_id, v_reward, 'season_place_' || r.place);
@@ -1710,7 +1729,9 @@ end;
 $function$;
 
 -- finalize_student_week — идемпотентная финализация одной недели (SPEC §6.3, §7.2, §7.3):
--- пересчёт → проверка окон → списание выбранных щитов → фиксация итога. Награду не платит.
+-- пересчёт → проверка окон → списание выбранных щитов → фиксация итога. W09/017 добавил
+-- ВЫПЛАТУ недельной награды (add_huikons, страховка ledger'ом weekly_reward_log) и недельные
+-- достижения — только когда weekly_economy_active(week_start) (после cutover). До cutover — no-op.
 CREATE OR REPLACE FUNCTION public.finalize_student_week(p_student_id bigint, p_week_start date)
  RETURNS public.student_week_results
  LANGUAGE plpgsql
@@ -1720,6 +1741,7 @@ declare
   v_qty      integer;
   v_consume  integer;
   v_e        integer;
+  v_paid     integer;
 begin
   perform 1 from public.student_items
     where student_id = p_student_id and item_code = 'streak_shield' for update;
@@ -1799,6 +1821,21 @@ begin
          updated_at            = now()
    where student_id = p_student_id and week_start = p_week_start
   returning * into v_row;
+
+  -- W09/017: выплата и недельные достижения — только при активной недельной экономике.
+  if public.weekly_economy_active(p_week_start) then
+    if v_row.reward_amount > 0 then
+      insert into public.weekly_reward_log (student_id, week_start, reward_amount)
+        values (p_student_id, p_week_start, v_row.reward_amount)
+        on conflict (student_id, week_start) do nothing;
+      get diagnostics v_paid = row_count;
+      if v_paid = 1 then
+        perform public.add_huikons(p_student_id, v_row.reward_amount, 'weekly_reward');
+      end if;
+    end if;
+
+    perform public.grant_weekly_achievements(p_student_id, p_week_start);
+  end if;
 
   return v_row;
 end;
@@ -2343,3 +2380,236 @@ begin
   );
 end;
 $function$;
+
+-- =============================================================================
+-- W09 / миграция 017 — экономический cutover на недельную модель. Полная мотивация,
+-- решения пользователя и предел леджера пробников — в шапке 017_weekly_economy_cutover.sql.
+-- =============================================================================
+
+-- economy_config — singleton-флаг cutover. cutover_at=NULL → недельная экономика спит.
+create table if not exists public.economy_config (
+  id         boolean      primary key default true check (id),
+  cutover_at timestamptz,
+  updated_at timestamptz  not null default now()
+);
+insert into public.economy_config (id, cutover_at) values (true, null)
+  on conflict (id) do nothing;
+alter table public.economy_config disable row level security;
+
+-- Активна ли недельная выплата/достижения для недели (граница — понедельник cutover).
+create or replace function public.weekly_economy_active(p_week_start date)
+ returns boolean
+ language sql
+ stable
+as $function$
+  select v.cutover_at is not null
+     and p_week_start >= public.week_start_of((v.cutover_at at time zone 'Europe/Moscow')::date)
+  from (select cutover_at from public.economy_config where id) v;
+$function$;
+
+-- season_points_log — событийный журнал очков сезона (для детерминированного tie-break).
+create table if not exists public.season_points_log (
+  id         uuid         primary key default gen_random_uuid(),
+  season_id  bigint       references public.seasons (id),
+  student_id bigint       not null references public.students (telegram_id),
+  amount     integer      not null,
+  reason     text         not null,
+  event_key  text,
+  created_at timestamptz  not null default now()
+);
+create unique index if not exists uq_season_points_event
+  on public.season_points_log (event_key) where event_key is not null;
+create index if not exists idx_season_points_student
+  on public.season_points_log (season_id, student_id);
+alter table public.season_points_log disable row level security;
+
+-- award_season_points — начисление очков сезона + запись в ledger, идемпотентно по event_key.
+create or replace function public.award_season_points(
+  p_student_id bigint, p_amount integer, p_reason text, p_event_key text default null)
+ returns integer
+ language plpgsql
+as $function$
+declare
+  v_season   bigint;
+  v_inserted integer;
+  v_rating   integer;
+begin
+  select id into v_season from public.seasons where end_date is null order by id desc limit 1;
+
+  insert into public.season_points_log (season_id, student_id, amount, reason, event_key)
+    values (v_season, p_student_id, p_amount, p_reason, p_event_key)
+    on conflict (event_key) where event_key is not null do nothing;
+  get diagnostics v_inserted = row_count;
+
+  if v_inserted = 0 and p_event_key is not null then
+    select rating into v_rating from public.students where telegram_id = p_student_id;
+    return v_rating;
+  end if;
+
+  return public.add_season_points(p_student_id, p_amount);
+end;
+$function$;
+
+-- grant_achievement_server — идемпотентная выдача достижения на сервере (без окна между
+-- вставкой и начислением: одна транзакция). Награда — только при реальной вставке.
+create or replace function public.grant_achievement_server(
+  p_student_id bigint, p_code text, p_reward integer)
+ returns boolean
+ language plpgsql
+as $function$
+declare
+  v_inserted integer;
+begin
+  insert into public.student_achievements (student_id, achievement_code)
+    values (p_student_id, p_code)
+    on conflict (student_id, achievement_code) do nothing;
+  get diagnostics v_inserted = row_count;
+
+  if v_inserted = 1 and p_reward > 0 then
+    perform public.add_huikons(p_student_id, p_reward, 'achievement_' || p_code);
+  end if;
+
+  return v_inserted = 1;
+end;
+$function$;
+
+-- record_approved_assignment — идемпотентный per-approval поток (W10 будет звать из teacher.html):
+-- season points 10/40/30 (event_key на assignment), first_step, clean_10.
+create or replace function public.record_approved_assignment(p_assignment_id uuid)
+ returns json
+ language plpgsql
+as $function$
+declare
+  v_asn       public.assignments%rowtype;
+  v_pts       integer;
+  v_reason    text;
+  v_run       integer := 0;
+  v_clean_10  boolean := false;
+  r           record;
+begin
+  select * into v_asn from public.assignments where id = p_assignment_id;
+  if not found then
+    raise exception 'Задание % не найдено', p_assignment_id;
+  end if;
+  if not (v_asn.status = 'checked' and v_asn.approval_status = 'approved') then
+    raise exception 'Задание % не принято — начислять нечего', p_assignment_id;
+  end if;
+
+  v_pts := case v_asn.type when 'daily' then 10 when 'weekly' then 40 when 'individual' then 30 else 0 end;
+  if v_pts > 0 then
+    v_reason := 'approve_' || v_asn.type;
+    perform public.award_season_points(
+      v_asn.student_id, v_pts, v_reason, 'season_approve_' || v_asn.id::text);
+  end if;
+
+  perform public.grant_achievement_server(v_asn.student_id, 'first_step', 10);
+
+  for r in
+    select coalesce(revision_count, 0) = 0 as clean
+      from public.assignments
+     where student_id = v_asn.student_id
+       and status = 'checked' and approval_status = 'approved'
+     order by checked_at, id
+  loop
+    if r.clean then
+      v_run := v_run + 1;
+      if v_run >= 10 then v_clean_10 := true; end if;
+    else
+      v_run := 0;
+    end if;
+  end loop;
+  if v_clean_10 then
+    perform public.grant_achievement_server(v_asn.student_id, 'clean_10', 25);
+  end if;
+
+  return json_build_object('student_id', v_asn.student_id, 'type', v_asn.type, 'season_points', v_pts);
+end;
+$function$;
+
+-- grant_weekly_achievements — недельные достижения по финализированным (не нейтральным)
+-- неделям ученика. Нейтральные пропускаются, слабая обрывает серии; щиты допускают только
+-- rhythm_*. Условие проверяется «когда-либо выполнялось», выдача идемпотентна.
+create or replace function public.grant_weekly_achievements(p_student_id bigint, p_week_start date)
+ returns void
+ language plpgsql
+as $function$
+declare
+  r                  record;
+  v_total_succ       integer := 0;
+  v_run_succ         integer := 0;
+  v_max_run_succ     integer := 0;
+  v_run_succ_ns      integer := 0;
+  v_max_run_succ_ns  integer := 0;
+  v_run_77ns         integer := 0;
+  v_max_run_77ns     integer := 0;
+  v_any_good         boolean := false;
+  v_any_perfect_week boolean := false;
+  v_rebirth          boolean := false;
+  v_prev_weak        boolean := false;
+  v_is_succ          boolean;
+  v_is_77            boolean;
+begin
+  for r in
+    select approved_daily_count, shields_used, successful
+      from public.student_week_results
+     where student_id = p_student_id and status = 'finalized'
+     order by week_start
+  loop
+    v_is_succ := coalesce(r.successful, false);
+    v_is_77   := (r.approved_daily_count = 7 and r.shields_used = 0);
+
+    if v_is_succ then
+      v_total_succ := v_total_succ + 1;
+      v_any_good := true;
+
+      v_run_succ := v_run_succ + 1;
+      if v_run_succ > v_max_run_succ then v_max_run_succ := v_run_succ; end if;
+
+      if r.shields_used = 0 then
+        v_run_succ_ns := v_run_succ_ns + 1;
+      else
+        v_run_succ_ns := 0;
+      end if;
+      if v_run_succ_ns > v_max_run_succ_ns then v_max_run_succ_ns := v_run_succ_ns; end if;
+
+      if v_prev_weak and r.approved_daily_count >= 5 and r.shields_used = 0 then
+        v_rebirth := true;
+      end if;
+    else
+      v_run_succ := 0;
+      v_run_succ_ns := 0;
+    end if;
+
+    if v_is_77 then
+      v_any_perfect_week := true;
+      v_run_77ns := v_run_77ns + 1;
+      if v_run_77ns > v_max_run_77ns then v_max_run_77ns := v_run_77ns; end if;
+    else
+      v_run_77ns := 0;
+    end if;
+
+    v_prev_weak := not v_is_succ;
+  end loop;
+
+  if v_any_good              then perform public.grant_achievement_server(p_student_id, 'first_good_week', 10); end if;
+  if v_any_perfect_week      then perform public.grant_achievement_server(p_student_id, 'perfect_week', 15); end if;
+  if v_max_run_succ >= 4     then perform public.grant_achievement_server(p_student_id, 'rhythm_4', 25); end if;
+  if v_max_run_succ >= 12    then perform public.grant_achievement_server(p_student_id, 'rhythm_12', 50); end if;
+  if v_max_run_succ >= 24    then perform public.grant_achievement_server(p_student_id, 'rhythm_24', 100); end if;
+  if v_total_succ >= 36      then perform public.grant_achievement_server(p_student_id, 'good_weeks_36', 150); end if;
+  if v_max_run_succ_ns >= 8  then perform public.grant_achievement_server(p_student_id, 'no_shields_8', 40); end if;
+  if v_max_run_77ns >= 4     then perform public.grant_achievement_server(p_student_id, 'perfect_month_weekly', 50); end if;
+  if v_rebirth               then perform public.grant_achievement_server(p_student_id, 'rebirth_week', 30); end if;
+end;
+$function$;
+
+-- weekly_reward_log — ledger недельной награды (страховка от двойной выплаты).
+create table if not exists public.weekly_reward_log (
+  id            uuid         primary key default gen_random_uuid(),
+  student_id    bigint       not null references public.students (telegram_id),
+  week_start    date         not null,
+  reward_amount integer      not null,
+  paid_at       timestamptz  not null default now(),
+  unique (student_id, week_start)
+);
+alter table public.weekly_reward_log disable row level security;
