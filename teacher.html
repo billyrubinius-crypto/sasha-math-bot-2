@@ -316,6 +316,7 @@
                     <input type="url" id="indiv-url" placeholder="Ссылка на задачу" style="padding:10px; border:1px solid #ddd; border-radius:6px;">
                     <label class="pdf-upload-btn">📎<input type="file" accept="application/pdf" onchange="handlePdfUpload(event, 'indiv-url')"></label>
                 </div>
+                <input type="number" id="indiv-count" min="1" max="200" step="1" placeholder="Сколько задач в задании (1–200)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
                 <textarea id="indiv-comment" placeholder="Комментарий ученику" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; min-height:60px;"></textarea>
                 <button class="btn-primary" id="btn-assign-indiv" onclick="assignIndividual()" style="margin-top:10px;">Назначить индивидуально</button>
             </div>
@@ -1617,6 +1618,12 @@
 
             if (!selectedIndivStudentId || !title) return alert('Выберите ученика из подсказок и укажите название!');
 
+            // Тот же parseTaskCount/диапазон 1–200, что и у недельных заданий (W02) — один
+            // источник количества задач, не второй способ подсчёта (P01B).
+            let taskCount;
+            try { taskCount = parseTaskCount(document.getElementById('indiv-count').value, 'Индивидуальное задание'); }
+            catch(e) { return alert(e.message); }
+
             // Блокируем кнопку на время сохранения — двойной клик назначил бы задание дважды
             const btn = document.getElementById('btn-assign-indiv');
             btn.disabled = true;
@@ -1628,13 +1635,15 @@
                     content_url: url,
                     teacher_comment: comment,
                     activation_status: 'active',
-                    status: 'assigned'
+                    status: 'assigned',
+                    task_count: taskCount
                 }]);
                 alert('Индивидуальное задание назначено!');
                 document.getElementById('indiv-username-input').value = '';
                 selectedIndivStudentId = null;
                 document.getElementById('indiv-title').value = '';
                 document.getElementById('indiv-url').value = '';
+                document.getElementById('indiv-count').value = '';
                 document.getElementById('indiv-comment').value = '';
             } catch(e) { alert('Ошибка: ' + e.message); }
             finally { btn.disabled = false; }
@@ -2087,7 +2096,7 @@
                         <span class="student-name">${esc(a.students?.name || 'Unknown')}</span>
                         <span class="badge badge-individual">Индивидуальное</span>
                     </div>
-                    <div class="card-meta">${esc(a.title || 'Без названия')} • ${new Date(a.created_at).toLocaleString('ru')}</div>
+                    <div class="card-meta">${esc(a.title || 'Без названия')}${a.task_count != null ? ` • ${a.task_count} ${pluralTasks(a.task_count)}` : ''} • ${new Date(a.created_at).toLocaleString('ru')}</div>
                     ${a.content_url ? `<a href="${normalizeUrl(a.content_url)}" target="_blank" class="card-link">🔗 Исходник</a>` : ''}
                     ${view === 'active' ? `<button class="btn-danger" style="margin-top:8px; padding:8px;" onclick="deleteIndividualAssignment('${a.id}')">🗑️ Удалить</button>` : ''}
                 </div>
