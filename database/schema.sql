@@ -1472,7 +1472,7 @@ AS $function$
   select coalesce(p_first_submitted_at, p_submitted_at) is not null
      and p_scheduled_date is not null
      and (coalesce(p_first_submitted_at, p_submitted_at) at time zone 'Europe/Moscow')::date
-         <= p_scheduled_date;
+         = p_scheduled_date;
 $function$;
 
 -- Доступный запас щитов = инвентарь минус активные резервы всех нефинализированных недель:
@@ -1581,6 +1581,7 @@ $function$;
 
 -- recalc_student_week — снимок недели по фактическим assignments. N/A считаются по
 -- scheduled_date (а не week_label), поэтому legacy-строки попадают в свою реальную неделю.
+-- Миграция 014 дополнительно исключает раннюю первую сдачу и пересдачу после deadline.
 CREATE OR REPLACE FUNCTION public.recalc_student_week(p_student_id bigint, p_week_start date)
  RETURNS public.student_week_results
  LANGUAGE plpgsql
@@ -1598,7 +1599,7 @@ declare
   v_status    text;
 begin
   if p_week_start is null or extract(isodow from p_week_start) <> 1 then
-    raise exception 'week_start % — не понедельник', p_week_start;
+    raise exception 'week_start % is not Monday', p_week_start;
   end if;
 
   select * into v_row from public.student_week_results
@@ -1612,9 +1613,17 @@ begin
     count(*),
     count(*) filter (
       where a.status = 'checked' and a.approval_status = 'approved'
-        and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)),
+        and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)
+        and (coalesce(a.revision_count, 0) = 0
+             or (a.revision_deadline_at is not null
+                 and a.submitted_at is not null
+                 and a.submitted_at <= a.revision_deadline_at))),
     bool_or(a.status = 'submitted'
-            and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)),
+            and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)
+            and (coalesce(a.revision_count, 0) = 0
+                 or (a.revision_deadline_at is not null
+                     and a.submitted_at is not null
+                     and a.submitted_at <= a.revision_deadline_at))),
     bool_or(a.status = 'checked' and a.approval_status = 'rejected'
             and a.revision_deadline_at is not null and a.revision_deadline_at > now())
   into v_n, v_a, v_pending, v_awaiting
@@ -1760,8 +1769,9 @@ begin
 end;
 $function$;
 
--- finalize_due_student_weeks — пакетная финализация недель с закрытыми окнами. Расписание
--- (Supabase Cron) включает W09 одновременно с cutover_at; W04 проверяет её вручную.
+-- finalize_due_student_weeks — пакетная финализация недель с закрытыми окнами. Миграция 014
+-- добавила поиск материализованных plan_item daily без заранее созданного результата, чтобы
+-- финализация не зависела от открытия Mini App. Расписание включает W09 с cutover_at.
 CREATE OR REPLACE FUNCTION public.finalize_due_student_weeks()
  RETURNS integer
  LANGUAGE plpgsql
@@ -1772,10 +1782,31 @@ declare
   r       record;
 begin
   for r in
+    with due_candidates as (
+      select swr.student_id, swr.week_start
+        from public.student_week_results swr
+       where swr.status not in ('finalized', 'neutral')
+         and now() >= public.next_monday_msk(swr.week_start)
+
+      union
+
+      select a.student_id, public.week_start_of(a.scheduled_date) as week_start
+        from public.assignments a
+       where a.type = 'daily'
+         and a.plan_item_id is not null
+         and a.scheduled_date is not null
+         and now() >= public.next_monday_msk(a.scheduled_date)
+         and not exists (
+           select 1
+             from public.student_week_results closed
+            where closed.student_id = a.student_id
+              and closed.week_start = public.week_start_of(a.scheduled_date)
+              and closed.status in ('finalized', 'neutral')
+         )
+       group by a.student_id, public.week_start_of(a.scheduled_date)
+    )
     select student_id, week_start
-      from public.student_week_results
-     where status not in ('finalized', 'neutral')
-       and now() >= public.next_monday_msk(week_start)
+      from due_candidates
      order by week_start, student_id
   loop
     v_row := public.finalize_student_week(r.student_id, r.week_start);
