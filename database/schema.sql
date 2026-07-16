@@ -428,6 +428,40 @@ create index if not exists idx_weekly_shield_student_week
 
 alter table public.weekly_shield_uses disable row level security;
 
+-- --- Еженедельные пробники Stage 2.5 (миграция 016, P02A) ----------------------
+-- Канонический результат недельного пробника (score integer 0-100) отдельно от legacy
+-- mock_exam_results (score text не трогается). Награда идемпотентна: бублики pay-once через
+-- явный ledger, season points — детерминированная компенсирующая дельта. Запись только через
+-- RPC record_weekly_mock_exam (см. функции ниже). Полная мотивация — в шапке миграции 016.
+create table public.weekly_mock_exams (
+  id                     uuid         primary key default gen_random_uuid(),
+  student_id             bigint       not null references public.students (telegram_id),
+  week_start             date         not null check (extract(isodow from week_start) = 1),
+  score                  integer      not null check (score between 0 and 100),
+  season_points_awarded  integer      not null default 0,  -- сколько season points уже дал этот результат (для дельты при edit)
+  created_at             timestamptz  not null default now(),
+  updated_at             timestamptz  not null default now(),
+  unique (student_id, week_start)
+);
+create index if not exists idx_weekly_mock_exams_student
+  on public.weekly_mock_exams (student_id, week_start);
+alter table public.weekly_mock_exams disable row level security;
+
+-- Явный ledger бубличных наград пробника: уникальность (student_id, week_start, reward_kind)
+-- гарантирует одну базу и один рекорд на неделю (SPEC §9).
+create table public.mock_exam_reward_log (
+  id           uuid         primary key default gen_random_uuid(),
+  student_id   bigint       not null references public.students (telegram_id),
+  week_start   date         not null,
+  reward_kind  text         not null check (reward_kind in ('base', 'record')),
+  bubliks      integer      not null check (bubliks > 0),
+  awarded_at   timestamptz  not null default now(),
+  unique (student_id, week_start, reward_kind)
+);
+create index if not exists idx_mock_exam_reward_log_month
+  on public.mock_exam_reward_log (student_id, reward_kind, awarded_at);
+alter table public.mock_exam_reward_log disable row level security;
+
 -- --- Индексы (кроме автоматических для PK/UNIQUE и idx_students_telegram_id выше) -----
 
 create index if not exists idx_assignments_activation
@@ -2185,4 +2219,127 @@ select jsonb_build_object(
 from params p
 cross join classified c
 cross join days_payload dp;
+$function$;
+
+-- record_weekly_mock_exam — атомарная запись/редактирование результата недельного пробника
+-- (миграция 016, P02A; SPEC §9, ECONOMY_V2 §§11,14). Единственная точка записи пробника.
+-- База +20 и рекорд +30 бубликов — pay-once через mock_exam_reward_log; season points
+-- 50 + рост (cap 20) — детерминированная компенсирующая дельта в weekly_mock_exams.
+-- season_points_awarded. Зеркалит display-строку в mock_exam_results для существующих
+-- графиков/списков. Блокировка students(for update) сериализует конкурентные вызовы.
+-- Полная мотивация и границы — в шапке миграции 016.
+CREATE OR REPLACE FUNCTION public.record_weekly_mock_exam(
+  p_student_id bigint,
+  p_week_start date,
+  p_score      integer
+)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_prev_score   integer;
+  v_prev_max     integer;
+  v_growth       integer;
+  v_season_target integer;
+  v_season_prev  integer;
+  v_season_delta integer;
+  v_is_record    boolean;
+  v_record_this_month boolean;
+  v_base_awarded boolean := false;
+  v_record_awarded boolean := false;
+  v_now          timestamptz := now();
+  v_month_start  date := date_trunc('month', (v_now at time zone 'Europe/Moscow'))::date;
+  v_exam_name    text;
+begin
+  if p_week_start is null or extract(isodow from p_week_start) <> 1 then
+    raise exception 'week_start % — не понедельник', p_week_start;
+  end if;
+  if p_score is null or p_score < 0 or p_score > 100 then
+    raise exception 'score должен быть целым от 0 до 100';
+  end if;
+
+  perform 1 from public.students where telegram_id = p_student_id for update;
+  if not found then
+    raise exception 'Ученик % не найден', p_student_id;
+  end if;
+
+  select score into v_prev_score
+    from public.weekly_mock_exams
+    where student_id = p_student_id and week_start < p_week_start
+    order by week_start desc
+    limit 1;
+
+  select max(score) into v_prev_max
+    from public.weekly_mock_exams
+    where student_id = p_student_id and week_start < p_week_start;
+
+  v_growth := least(greatest(p_score - coalesce(v_prev_score, p_score), 0), 20);
+  v_season_target := 50 + v_growth;
+
+  select season_points_awarded into v_season_prev
+    from public.weekly_mock_exams
+    where student_id = p_student_id and week_start = p_week_start
+    for update;
+
+  if not found then
+    insert into public.weekly_mock_exams (student_id, week_start, score, season_points_awarded)
+      values (p_student_id, p_week_start, p_score, v_season_target);
+    v_season_prev := 0;
+  else
+    update public.weekly_mock_exams
+      set score = p_score,
+          season_points_awarded = v_season_target,
+          updated_at = v_now
+      where student_id = p_student_id and week_start = p_week_start;
+  end if;
+
+  v_season_delta := v_season_target - v_season_prev;
+  if v_season_delta <> 0 then
+    perform public.add_season_points(p_student_id, v_season_delta);
+  end if;
+
+  v_exam_name := 'Недельный пробник ' || to_char(p_week_start, 'DD.MM.YYYY');
+  insert into public.mock_exam_results (student_id, exam_name, score, exam_date, updated_at)
+    values (p_student_id, v_exam_name, p_score::text, p_week_start, v_now)
+    on conflict (student_id, exam_name)
+    do update set score = excluded.score, exam_date = excluded.exam_date, updated_at = v_now;
+
+  insert into public.mock_exam_reward_log (student_id, week_start, reward_kind, bubliks)
+    values (p_student_id, p_week_start, 'base', 20)
+    on conflict (student_id, week_start, reward_kind) do nothing;
+  if found then
+    perform public.add_huikons(p_student_id, 20, 'mock_exam_weekly');
+    v_base_awarded := true;
+  end if;
+
+  v_is_record := v_prev_max is not null and p_score >= v_prev_max + 3;
+  if v_is_record then
+    select exists (
+      select 1 from public.mock_exam_reward_log
+        where student_id = p_student_id and reward_kind = 'record'
+          and (awarded_at at time zone 'Europe/Moscow')::date >= v_month_start
+          and (awarded_at at time zone 'Europe/Moscow')::date < (v_month_start + interval '1 month')
+    ) into v_record_this_month;
+
+    if not v_record_this_month then
+      insert into public.mock_exam_reward_log (student_id, week_start, reward_kind, bubliks)
+        values (p_student_id, p_week_start, 'record', 30)
+        on conflict (student_id, week_start, reward_kind) do nothing;
+      if found then
+        perform public.add_huikons(p_student_id, 30, 'mock_exam_record');
+        v_record_awarded := true;
+      end if;
+    end if;
+  end if;
+
+  return json_build_object(
+    'week_start', p_week_start,
+    'score', p_score,
+    'season_points_awarded', v_season_target,
+    'season_points_delta', v_season_delta,
+    'base_awarded', v_base_awarded,
+    'record_eligible', v_is_record,
+    'record_awarded', v_record_awarded
+  );
+end;
 $function$;
