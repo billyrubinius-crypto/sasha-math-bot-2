@@ -70,37 +70,46 @@
         .shield-buy-btn { background: #ff9800; color: white; border: none; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .shield-buy-btn:disabled { opacity: 0.5; cursor: default; }
 
-        /* Сводка заданий */
-        .assignments-summary { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .summary-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
-        .summary-row { display: flex; justify-content: space-between; text-align: center; }
-        .summary-item { flex: 1; }
-        .summary-count { display: block; font-size: 22px; font-weight: 800; color: var(--tg-link); }
-        .summary-label { display: block; font-size: 11px; opacity: 0.7; margin-top: 4px; }
-        .summary-empty { text-align: center; padding: 10px; opacity: 0.6; font-size: 14px; }
-
-        /* Недельный блок (W06) */
-        .week-block { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .week-block-sub { font-size: 11px; opacity: 0.7; margin-bottom: 10px; }
-        .week-day-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(128,128,128,0.08); gap: 8px; }
-        .week-day-row:last-child { border-bottom: none; }
-        .week-day-label { font-size: 12px; font-weight: 600; width: 78px; flex-shrink: 0; }
-        .week-day-status { flex: 1; font-size: 12px; }
-        .week-day-status .wd-note { display: block; font-size: 10px; color: var(--tg-hint); margin-top: 1px; }
-        .week-day-status.wd-approved { color: #28a745; }
-        .week-day-status.wd-shielded { color: #ff9800; }
-        .week-day-status.wd-revision { color: #e6a800; }
-        .week-day-status.wd-missed { color: #dc3545; }
-        .week-day-status.wd-submitted { color: #2196f3; }
-        .week-day-status.wd-none { opacity: 0.4; }
+        /* Единый рабочий блок: неделя сверху, действия сейчас ниже */
+        .week-block { background: var(--tg-secondary); border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .week-block-head, .now-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .week-block-title, .now-title { font-weight: 800; font-size: 15px; }
+        .week-progress { font-size: 20px; font-weight: 800; color: var(--tg-link); white-space: nowrap; }
+        .week-block-sub { font-size: 11px; color: var(--tg-hint); margin-top: 2px; }
+        .week-days-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 13px; }
+        .week-day-chip { min-width: 0; height: 54px; padding: 5px 2px; border: 1px solid transparent; border-radius: 8px; background: var(--tg-bg); color: var(--tg-text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+        .week-day-chip.today { border-color: rgba(36,129,204,0.35); }
+        .week-day-chip.selected { border-color: var(--tg-link); }
+        .week-day-name { font-size: 10px; color: var(--tg-hint); }
+        .week-day-mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: rgba(128,128,128,0.12); }
+        .week-day-chip.wd-approved .week-day-mark { background: #28a745; color: #fff; }
+        .week-day-chip.wd-shielded .week-day-mark { background: #ff9800; color: #fff; }
+        .week-day-chip.wd-revision .week-day-mark { background: #ffc107; color: #3b2d00; }
+        .week-day-chip.wd-missed .week-day-mark { background: #dc3545; color: #fff; }
+        .week-day-chip.wd-submitted .week-day-mark { background: #2196f3; color: #fff; }
+        .week-day-chip.wd-not_assigned { opacity: 0.45; }
+        .week-day-detail { display: none; margin-top: 10px; padding: 10px 0 2px; border-top: 1px solid rgba(128,128,128,0.14); font-size: 12px; line-height: 1.45; }
+        .week-day-detail.open { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .week-day-detail-main { min-width: 0; }
+        .week-day-detail-title { font-weight: 700; overflow-wrap: anywhere; }
+        .week-day-detail-note { color: var(--tg-hint); margin-top: 2px; }
         .week-shield-btn { font-size: 10px; padding: 4px 8px; border-radius: 8px; border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
         .week-shield-btn.apply { background: #ff9800; color: #fff; }
         .week-shield-btn.remove { background: #9e9e9e; color: #fff; }
         .week-shield-btn:disabled { opacity: 0.5; cursor: default; }
-        .week-weekly-row { margin-top: 4px; padding-top: 8px; border-top: 1px solid rgba(128,128,128,0.12); font-size: 12px; }
-        .week-totals { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(128,128,128,0.15); font-size: 13px; line-height: 1.6; }
-        .week-forecast { margin-top: 8px; font-size: 12px; color: var(--tg-hint); }
-        .week-neutral-note { margin-top: 8px; font-size: 12px; color: var(--tg-hint); }
+        .week-weekly-row { margin-top: 10px; font-size: 12px; overflow-wrap: anywhere; }
+        .week-totals, .week-forecast, .week-neutral-note { margin-top: 5px; font-size: 11px; color: var(--tg-hint); line-height: 1.4; }
+        .now-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,0.18); }
+        .now-count { min-width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--tg-link); color: #fff; font-size: 12px; font-weight: 800; }
+        .now-list { margin-top: 8px; }
+        .now-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 0; border: 0; border-bottom: 1px solid rgba(128,128,128,0.1); background: transparent; color: var(--tg-text); text-align: left; cursor: pointer; }
+        .now-item:last-child { border-bottom: none; }
+        .now-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; background: var(--tg-bg); }
+        .now-main { min-width: 0; flex: 1; }
+        .now-item-title { display: block; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+        .now-item-meta { display: block; font-size: 10px; color: var(--tg-hint); margin-top: 2px; overflow-wrap: anywhere; }
+        .now-arrow { font-size: 18px; color: var(--tg-hint); }
+        .summary-empty { text-align: center; padding: 12px 4px 4px; color: var(--tg-hint); font-size: 13px; }
 
         /* График пробников */
         .mock-chart-section { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -427,18 +436,27 @@
             <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 90 🥯</button>
         </div>
 
-        <div class="assignments-summary" id="assignments-summary">
-            <div class="summary-empty">Загрузка...</div>
-        </div>
-
-        <!-- Недельный блок (W06): N/A/S/E, дедлайн, статус каждого дня, ручной выбор щита -->
-        <div class="week-block" id="week-block" style="display:none;">
-            <div class="week-block-title" id="week-block-title">🗓️ Эта неделя</div>
-            <div class="week-block-sub" id="week-block-sub"></div>
-            <div id="week-days-list"></div>
+        <!-- Единый рабочий блок: компактная неделя и конкретные действия сейчас -->
+        <div class="week-block" id="week-block">
+            <div class="week-block-head">
+                <div>
+                    <div class="week-block-title">Эта неделя</div>
+                    <div class="week-block-sub" id="week-block-sub">Загрузка...</div>
+                </div>
+                <div class="week-progress" id="week-progress">—/7</div>
+            </div>
+            <div class="week-days-strip" id="week-days-strip"></div>
+            <div class="week-day-detail" id="week-day-detail"></div>
             <div id="week-weekly-row"></div>
             <div id="week-totals"></div>
             <div id="week-forecast"></div>
+            <div class="now-section">
+                <div class="now-head">
+                    <div class="now-title">Сделать сейчас</div>
+                    <div class="now-count" id="now-count">0</div>
+                </div>
+                <div class="now-list" id="now-list"><div class="summary-empty">Загрузка...</div></div>
+            </div>
         </div>
 
         <div class="stats-grid">
@@ -881,194 +899,230 @@
             el.style.display = 'block';
         }
 
-        // --- СВОДКА ПО ДОСТУПНЫМ ЗАДАНИЯМ (для экрана профиля) ---
+        // --- ДЕЙСТВИЯ, КОТОРЫЕ МОЖНО ВЫПОЛНИТЬ ПРЯМО СЕЙЧАС ---
+        async function getActionableAssignments() {
+            const { data, error } = await db
+                .from('assignments')
+                .select('id, title, type, task_count, content_url, teacher_feedback, scheduled_date, status, approval_status, revision_deadline_at, created_at')
+                .eq('student_id', currentUser.id)
+                .eq('activation_status', 'active')
+                .or('status.eq.assigned,and(status.eq.checked,approval_status.eq.rejected)')
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+
+            const todayMSK = getTodayMSK();
+            const nowInstant = new Date();
+            const typeOrder = { daily: 0, weekly: 1, individual: 2 };
+            return (data || [])
+                .filter(a => isAssignmentAvailable(a, nowInstant, todayMSK))
+                .sort((a, b) => {
+                    const aRevision = a.status === 'checked' && a.approval_status === 'rejected';
+                    const bRevision = b.status === 'checked' && b.approval_status === 'rejected';
+                    if (aRevision !== bRevision) return aRevision ? -1 : 1;
+                    return (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9)
+                        || String(a.created_at).localeCompare(String(b.created_at));
+                });
+        }
+
         async function loadAssignmentsSummary() {
-            const el = document.getElementById('assignments-summary');
+            const list = document.getElementById('now-list');
+            const count = document.getElementById('now-count');
             try {
-                // Тот же набор, что в dropdown: не сданные + возвращённые на переделку —
-                // чтобы возвращённая ежедневка отражалась одинаково во всех экранах (W03).
-                const { data, error } = await db
-                    .from('assignments')
-                    .select('type, scheduled_date, status, approval_status, revision_deadline_at')
-                    .eq('student_id', currentUser.id)
-                    .eq('activation_status', 'active')
-                    .or('status.eq.assigned,and(status.eq.checked,approval_status.eq.rejected)');
-
-                if (error) throw error;
-
-                const todayMSK = getTodayMSK();
-                const nowInstant = new Date();
-                const relevant = (data || []).filter(a => isAssignmentAvailable(a, nowInstant, todayMSK));
+                const relevant = await getActionableAssignments();
+                count.textContent = relevant.length;
 
                 if (relevant.length === 0) {
-                    el.innerHTML = `<div class="summary-empty">🕊️ Нет активных заданий</div>`;
+                    list.innerHTML = '<div class="summary-empty">На сейчас всё сделано</div>';
                     return;
                 }
 
-                const counts = { daily: 0, weekly: 0, individual: 0 };
-                relevant.forEach(a => { if (counts[a.type] !== undefined) counts[a.type]++; });
+                const typeLabels = { daily: 'Ежедневное', weekly: 'Еженедельное', individual: 'Индивидуальное' };
+                const typeIcons = { daily: '📅', weekly: '🔥', individual: '🎯' };
+                list.innerHTML = relevant.map(a => {
+                    const revision = a.status === 'checked' && a.approval_status === 'rejected';
+                    const deadline = revision && a.revision_deadline_at
+                        ? ` · до ${new Date(a.revision_deadline_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`
+                        : '';
+                    const tasks = a.task_count != null ? ` · ${a.task_count} ${pluralTasks(a.task_count)}` : '';
+                    return `
+                        <button class="now-item" type="button" data-assignment-id="${esc(String(a.id))}">
+                            <span class="now-icon">${revision ? '✏️' : typeIcons[a.type]}</span>
+                            <span class="now-main">
+                                <span class="now-item-title">${esc(a.title || 'Без названия')}</span>
+                                <span class="now-item-meta">${revision ? 'Исправить' : typeLabels[a.type]}${tasks}${deadline}</span>
+                            </span>
+                            <span class="now-arrow">›</span>
+                        </button>
+                    `;
+                }).join('');
 
-                el.innerHTML = `
-                    <div class="summary-title">📋 Доступные задания</div>
-                    <div class="summary-row">
-                        <div class="summary-item"><span class="summary-count">${counts.daily}</span><span class="summary-label">📅 Ежедневные</span></div>
-                        <div class="summary-item"><span class="summary-count">${counts.weekly}</span><span class="summary-label">🔥 Еженедельное</span></div>
-                        <div class="summary-item"><span class="summary-count">${counts.individual}</span><span class="summary-label">🎯 Индивидуальные</span></div>
-                    </div>
-                `;
+                list.querySelectorAll('.now-item').forEach(btn => {
+                    btn.addEventListener('click', () => openNowAssignment(btn.dataset.assignmentId));
+                });
             } catch (e) {
-                el.innerHTML = `<div class="summary-empty" style="color:#f44336;">Ошибка загрузки заданий</div>`;
+                count.textContent = '—';
+                list.innerHTML = '<div class="summary-empty" style="color:#f44336;">Ошибка загрузки заданий</div>';
                 log(e.message);
             }
         }
 
-        // --- НЕДЕЛЬНЫЙ БЛОК (W06): N/A/S/E, дедлайн, статус дня, ручной выбор щита ---
-        const WEEK_DAY_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-
-        // Только в этом файле — тот же паттерн UTC-дат, что addDaysToDate в teacher.html
-        // (см. шапку shared.js: однофайловые date-хелперы не выносятся).
-        function addDaysToDateStr(dateStr, days) {
-            const [y, m, d] = dateStr.split('-').map(Number);
-            const r = new Date(Date.UTC(y, m - 1, d + days));
-            return `${r.getUTCFullYear()}-${String(r.getUTCMonth() + 1).padStart(2, '0')}-${String(r.getUTCDate()).padStart(2, '0')}`;
+        async function openNowAssignment(assignmentId) {
+            await switchTab('homework');
+            await switchHwTab('upload');
+            const select = document.getElementById('assignment-select');
+            select.value = String(assignmentId);
+            showAssignmentDetails();
         }
 
-        // Статус дня — производная от уже существующих серверных полей, без нового права
-        // (тот же принцип, что isAssignmentAvailable в W03): щит (requested/consumed) виден
-        // отдельно от реальной сдачи, чтобы «3 выполнено + 1 щит» никогда не читалось как
-        // «4 выполнено» (SPEC §10).
-        function weekDayStatus(row, shielded, todayMSK, nowInstant) {
-            if (shielded) return 'shielded';
-            if (!row) return 'none';
-            if (row.status === 'checked' && row.approval_status === 'approved') return 'approved';
-            if (row.status === 'checked' && row.approval_status === 'rejected') {
-                return (row.revision_deadline_at && new Date(row.revision_deadline_at) > nowInstant) ? 'revision' : 'missed';
-            }
-            if (row.status === 'submitted') return 'submitted';
-            if (row.status === 'assigned') return row.scheduled_date < todayMSK ? 'missed' : 'assigned';
-            return 'none';
-        }
-
+        // --- КОМПАКТНАЯ НЕДЕЛЯ: сервер возвращает готовые N/A/S/E и статусы дней ---
+        const WEEK_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        const WEEK_DAY_FULL_NAMES = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
         const WEEK_DAY_LABELS = {
-            none: '— не назначено', assigned: '📌 назначено', submitted: '📤 отправлено',
-            revision: '✏️ на исправлении', approved: '✅ принято', missed: '❌ пропущено',
-            shielded: '🛡 закрыто щитом'
+            not_assigned: 'не назначено', assigned: 'назначено', submitted: 'отправлено',
+            revision: 'на исправлении', approved: 'принято', missed: 'пропущено',
+            shielded: 'закрыто щитом'
+        };
+        const WEEK_DAY_MARKS = {
+            not_assigned: '–', assigned: '•', submitted: '↑', revision: '!', approved: '✓',
+            missed: '×', shielded: '🛡'
         };
 
-        let weekShieldBusy = false; // синхронная защита от гонки двойного клика (урок W05)
+        let weekShieldBusy = false;
+        let currentWeekView = null;
+        let currentWeekAvailableShields = 0;
+        let selectedWeekDayIndex = null;
+
+        function shortDateRu(value) {
+            if (!value) return '—';
+            const [, month, day] = value.split('-');
+            return `${day}.${month}`;
+        }
+
+        function addDaysToDateStr(dateStr, days) {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const result = new Date(Date.UTC(year, month - 1, day + days));
+            return `${result.getUTCFullYear()}-${String(result.getUTCMonth() + 1).padStart(2, '0')}-${String(result.getUTCDate()).padStart(2, '0')}`;
+        }
+
+        function renderWeekStrip() {
+            const strip = document.getElementById('week-days-strip');
+            strip.innerHTML = (currentWeekView.days || []).map((day, index) => {
+                const status = WEEK_DAY_LABELS[day.status] ? day.status : 'not_assigned';
+                const selected = selectedWeekDayIndex === index ? ' selected' : '';
+                const today = day.date === getTodayMSK() ? ' today' : '';
+                const label = `${WEEK_DAY_FULL_NAMES[index]}: ${WEEK_DAY_LABELS[status]}`;
+                return `
+                    <button class="week-day-chip wd-${status}${today}${selected}" type="button"
+                            aria-label="${esc(label)}" onclick="selectWeekDay(${index})">
+                        <span class="week-day-name">${WEEK_DAY_NAMES[index]}</span>
+                        <span class="week-day-mark">${WEEK_DAY_MARKS[status]}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function selectWeekDay(index) {
+            const detail = document.getElementById('week-day-detail');
+            if (selectedWeekDayIndex === index && detail.classList.contains('open')) {
+                detail.classList.remove('open');
+                selectedWeekDayIndex = null;
+                renderWeekStrip();
+                return;
+            }
+            selectedWeekDayIndex = index;
+            renderWeekStrip();
+            renderWeekDayDetail();
+        }
+
+        function renderWeekDayDetail() {
+            const detail = document.getElementById('week-day-detail');
+            const day = currentWeekView?.days?.[selectedWeekDayIndex];
+            if (!day) {
+                detail.classList.remove('open');
+                detail.innerHTML = '';
+                return;
+            }
+
+            const status = WEEK_DAY_LABELS[day.status] ? day.status : 'not_assigned';
+            let note = WEEK_DAY_LABELS[status];
+            if (status === 'revision' && day.revision_deadline_at) {
+                note += ` · до ${new Date(day.revision_deadline_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК`;
+            }
+            let action = '';
+            if (day.shield_status === 'requested') {
+                action = '<button class="week-shield-btn remove" type="button" data-action="remove">Отменить щит</button>';
+            } else if (status === 'missed' && day.assignment_id && currentWeekAvailableShields > 0) {
+                action = '<button class="week-shield-btn apply" type="button" data-action="apply">Прикрыть щитом</button>';
+            }
+
+            detail.innerHTML = `
+                <div class="week-day-detail-main">
+                    <div class="week-day-detail-title">${WEEK_DAY_FULL_NAMES[selectedWeekDayIndex]} · ${shortDateRu(day.date)}${day.title ? ` · ${esc(day.title)}` : ''}</div>
+                    <div class="week-day-detail-note">${note}</div>
+                </div>
+                ${action}
+            `;
+            detail.classList.add('open');
+
+            const btn = detail.querySelector('[data-action]');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.action === 'remove') removeWeekShield(day.assignment_id, btn);
+                    else applyWeekShield(day.assignment_id, btn);
+                });
+            }
+        }
 
         async function loadWeekBlock() {
             const block = document.getElementById('week-block');
             try {
-                const todayMSK = getTodayMSK();
-                const nowInstant = new Date();
-
-                const { data: weekStart, error: wsErr } = await db.rpc('week_start_of', { p_date: todayMSK });
-                if (wsErr) throw wsErr;
-
-                const { data: wk, error: recalcErr } = await db.rpc('recalc_student_week', {
-                    p_student_id: currentUser.id, p_week_start: weekStart
-                });
-                if (recalcErr) throw recalcErr;
-                const result = Array.isArray(wk) ? wk[0] : wk;
-
-                const [daysRes, shieldsRes, weeklyRes, deadlineRes, availRes] = await Promise.all([
-                    db.from('assignments').select('id, scheduled_date, status, approval_status, revision_deadline_at, first_submitted_at, submitted_at, task_count')
-                        .eq('student_id', currentUser.id).eq('type', 'daily')
-                        .gte('scheduled_date', weekStart).lte('scheduled_date', addDaysToDateStr(weekStart, 6)),
-                    db.from('weekly_shield_uses').select('assignment_id, status')
-                        .eq('student_id', currentUser.id).eq('week_start', weekStart).in('status', ['requested', 'consumed']),
-                    db.from('assignments').select('title, status, approval_status')
-                        .eq('student_id', currentUser.id).eq('type', 'weekly').eq('week_label', weekStart).maybeSingle(),
-                    db.rpc('next_monday_msk', { p_date: weekStart }),
+                const [weekRes, availRes] = await Promise.all([
+                    db.rpc('get_student_current_week', { p_student_id: currentUser.id }),
                     db.rpc('available_shield_quantity', { p_student_id: currentUser.id })
                 ]);
-                if (daysRes.error) throw daysRes.error;
-                if (shieldsRes.error) throw shieldsRes.error;
+                if (weekRes.error) throw weekRes.error;
 
-                const byDate = {};
-                (daysRes.data || []).forEach(r => { byDate[r.scheduled_date] = r; });
-                const shieldedIds = new Set((shieldsRes.data || []).map(s => s.assignment_id));
-                const availableShields = availRes.error ? 0 : (availRes.data || 0);
-                const weekFrozen = result.status === 'finalized' || result.status === 'neutral';
-
-                document.getElementById('week-block-sub').innerText =
-                    `${weekStart} — ${addDaysToDateStr(weekStart, 6)}`;
-
-                // Список дней
-                const daysHtml = [];
-                for (let i = 0; i < 7; i++) {
-                    const date = addDaysToDateStr(weekStart, i);
-                    const row = byDate[date];
-                    const shielded = row && shieldedIds.has(row.id);
-                    const status = weekDayStatus(row, shielded, todayMSK, nowInstant);
-
-                    let actionBtn = '';
-                    if (!weekFrozen && row) {
-                        const shieldRow = (shieldsRes.data || []).find(s => s.assignment_id === row.id);
-                        if (shielded && shieldRow && shieldRow.status === 'requested') {
-                            actionBtn = `<button class="week-shield-btn remove" onclick="removeWeekShield('${row.id}', this)">Отменить щит</button>`;
-                        } else if (status === 'missed' && !shielded && availableShields > 0) {
-                            actionBtn = `<button class="week-shield-btn apply" onclick="applyWeekShield('${row.id}', this)">Прикрыть щитом</button>`;
-                        }
-                    }
-
-                    let note = '';
-                    if (status === 'revision' && row.revision_deadline_at) {
-                        note = `<span class="wd-note">до ${new Date(row.revision_deadline_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК</span>`;
-                    }
-
-                    daysHtml.push(`
-                        <div class="week-day-row">
-                            <span class="week-day-label">${esc(WEEK_DAY_NAMES[i])}</span>
-                            <span class="week-day-status wd-${status}">${WEEK_DAY_LABELS[status]}${note}</span>
-                            ${actionBtn}
-                        </div>
-                    `);
+                currentWeekView = Array.isArray(weekRes.data) ? weekRes.data[0] : weekRes.data;
+                currentWeekAvailableShields = availRes.error ? 0 : (availRes.data || 0);
+                if (selectedWeekDayIndex != null && !currentWeekView.days?.[selectedWeekDayIndex]) {
+                    selectedWeekDayIndex = null;
                 }
-                document.getElementById('week-days-list').innerHTML = daysHtml.join('');
 
-                // Еженедельное задание (SPEC §10: не назначено/назначено/отправлено/принято/возвращено)
-                const wRow = weeklyRes.data;
-                const wLabels = { none:'— не назначено', assigned:'📌 назначено', submitted:'📤 отправлено', approved:'✅ принято', rejected:'↩️ возвращено' };
-                let wStatus = 'none';
-                if (wRow) {
-                    if (wRow.status === 'assigned') wStatus = 'assigned';
-                    else if (wRow.status === 'submitted') wStatus = 'submitted';
-                    else if (wRow.status === 'checked') wStatus = wRow.approval_status === 'approved' ? 'approved' : 'rejected';
-                }
-                document.getElementById('week-weekly-row').innerHTML =
-                    `🔥 Еженедельное: ${wLabels[wStatus]}${wRow ? ` — ${esc(wRow.title || 'Без названия')}` : ''}`;
+                document.getElementById('week-block-sub').textContent =
+                    `${shortDateRu(currentWeekView.week_start)} — ${shortDateRu(currentWeekView.week_end)}`;
+                document.getElementById('week-progress').textContent = `${currentWeekView.a || 0}/7`;
+                renderWeekStrip();
+                renderWeekDayDetail();
 
-                // Итоги N/A/S/E — реальная сдача и щиты показаны раздельно (SPEC §10)
-                const totalsEl = document.getElementById('week-totals');
-                const shieldsCount = result.requested_shields + result.shields_used;
-                totalsEl.innerHTML = `
-                    Назначено: <b>${result.available_daily_count}</b> ·
-                    Принято: <b>${result.approved_daily_count}</b>${shieldsCount ? ` + 🛡 ${shieldsCount}` : ''} ·
-                    Итог: <b>${result.effective_daily_count}</b> из 7
-                `;
+                const weekly = currentWeekView.weekly;
+                const weeklyLabels = {
+                    assigned: 'назначено', submitted: 'отправлено', approved: 'принято',
+                    rejected: 'возвращено', unknown: 'неизвестно'
+                };
+                document.getElementById('week-weekly-row').innerHTML = weekly
+                    ? `🔥 Еженедельное: <b>${weeklyLabels[weekly.status] || 'неизвестно'}</b> · ${esc(weekly.title || 'Без названия')}`
+                    : '🔥 Еженедельное: не назначено';
 
-                // Прогноз и дедлайн — не обещаем результат, пока есть pending review/открытое
-                // исправление (W06); при neutral/finalized показываем зафиксированный итог.
-                const forecastEl = document.getElementById('week-forecast');
-                const deadlineText = deadlineRes.error ? '' :
-                    ` Неделя закрывается: ${new Date(deadlineRes.data).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК.`;
+                document.getElementById('week-totals').innerHTML =
+                    `Назначено: <b>${currentWeekView.n || 0}</b> · Принято: <b>${currentWeekView.a || 0}</b>`
+                    + (currentWeekView.s ? ` + 🛡 ${currentWeekView.s}` : '')
+                    + ` · Эффективно: <b>${currentWeekView.e || 0}/7</b>`;
 
-                if (weekFrozen) {
-                    forecastEl.innerHTML = result.status === 'neutral'
-                        ? `<div class="week-neutral-note">Нейтральная неделя — ${esc(result.neutral_reason || 'меньше 4 доступных ежедневок')}. Без награды, цепочка не сломана.</div>`
-                        : `<div class="week-neutral-note">Итог недели: ${result.effective_daily_count}/7${result.reward_amount != null ? `, +${result.reward_amount} 🥯` : ''}.</div>`;
-                } else if (result.status === 'pending_review' || result.status === 'awaiting_student') {
-                    forecastEl.innerHTML = `<div class="week-forecast">Итог уточняется — есть работа на проверке или открытое исправление.${deadlineText}</div>`;
+                const deadline = shortDateRu(addDaysToDateStr(currentWeekView.week_end, 1));
+                const forecast = document.getElementById('week-forecast');
+                if (currentWeekView.classification === 'pending') {
+                    forecast.textContent = `Итог уточняется: есть работа на проверке или открытое исправление. Закрытие ${deadline} в 00:00 МСК.`;
+                } else if (currentWeekView.classification === 'neutral') {
+                    forecast.textContent = `Назначено меньше 4 ежедневных: неделя нейтральная. Закрытие ${deadline} в 00:00 МСК.`;
                 } else {
-                    const { data: forecastAmount } = await db.rpc('weekly_reward_amount', { p_effective: result.effective_daily_count });
-                    forecastEl.innerHTML = `<div class="week-forecast">Ожидаемая награда при текущем итоге: ${forecastAmount ?? 0} 🥯.${deadlineText}</div>`;
+                    forecast.textContent = `При текущем итоге: ${currentWeekView.reward_forecast || 0} 🥯. Закрытие ${deadline} в 00:00 МСК.`;
                 }
-
                 block.style.display = 'block';
             } catch (e) {
-                block.style.display = 'none';
+                document.getElementById('week-block-sub').textContent = 'Не удалось загрузить неделю';
+                document.getElementById('week-progress').textContent = '—/7';
+                document.getElementById('week-days-strip').innerHTML = '';
+                document.getElementById('week-day-detail').classList.remove('open');
                 log('❌ Ошибка недельного блока: ' + e.message);
             }
         }
@@ -2008,23 +2062,9 @@
             select.innerHTML = '<option value="">Выбери задание из списка...</option>';
             
             try {
-                // Берём задания ученика, у которых activation_status = 'active': либо ещё не сданные ('assigned'),
-                // либо возвращённые учителем на переделку ('checked' + approval_status='rejected')
-                const { data, error } = await db
-                    .from('assignments')
-                    .select('*')
-                    .eq('student_id', currentUser.id)
-                    .eq('activation_status', 'active')
-                    .or('status.eq.assigned,and(status.eq.checked,approval_status.eq.rejected)')
-                    .order('created_at', { ascending: true });
-
-                if (error) throw error;
-
-                // Доступность считается единым признаком: ежедневка своего дня + возвращённая
-                // ежедневка с действующим окном исправления (W04), просроченные скрыты (W03).
-                const todayMSK = getTodayMSK();
-                const nowInstant = new Date();
-                activeAssignments = (data || []).filter(a => isAssignmentAvailable(a, nowInstant, todayMSK));
+                // Тот же источник и порядок, что в «Сделать сейчас»: исправления первыми,
+                // будущие ежедневки не попадают в очередь действий.
+                activeAssignments = await getActionableAssignments();
 
                 if (activeAssignments.length === 0) {
                     select.innerHTML = '<option value="">Нет активных заданий 🕊️</option>';
@@ -2415,7 +2455,7 @@
         }
 
         // --- НАВИГАЦИЯ ---
-        function switchTab(tabName) {
+        async function switchTab(tabName) {
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
 
@@ -2427,7 +2467,7 @@
                 document.getElementById('screen-homework').classList.add('active');
                 document.querySelectorAll('.nav-btn')[1].classList.add('active');
                 loadMyHomework();
-                loadActiveAssignments();
+                await loadActiveAssignments();
             } else if (tabName === 'leaderboard') {
                 document.getElementById('screen-leaderboard').classList.add('active');
                 document.querySelectorAll('.nav-btn')[2].classList.add('active');
@@ -2442,14 +2482,14 @@
             }
         }
 
-        function switchHwTab(viewName) {
+        async function switchHwTab(viewName) {
             document.querySelectorAll('.hw-view').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             
             if (viewName === 'upload') {
                 document.getElementById('hw-upload').classList.add('active');
                 document.querySelectorAll('.tab-btn')[0].classList.add('active');
-                loadActiveAssignments();
+                await loadActiveAssignments();
             } else {
                 document.getElementById('hw-archive').classList.add('active');
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
