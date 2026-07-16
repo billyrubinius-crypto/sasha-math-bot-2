@@ -1241,15 +1241,42 @@
                     } catch (e) { console.error('Не удалось пересчитать неделю: ' + e.message); }
                 }
 
+                // W10 — экономический cutover. До cutover_at действует старая (календарный стрик)
+                // модель на клиенте; после cutover награды идут через серверные RPC W09, а старый
+                // streak-путь больше не выполняется (SPEC §8, ECONOMY §12). cutover_at — глобальный
+                // флаг economy_config (W09); NULL или будущая дата = экономика ещё старая.
+                let cutoverActive = false;
+                {
+                    const { data: cfg } = await db.from('economy_config').select('cutover_at').maybeSingle();
+                    cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
+                }
+
                 if (status === 'approved' && !alreadyApproved) {
-                    if (sub.type === 'daily') {
-                        await processStreak(sub.student_id, sub.scheduled_date);
+                    if (cutoverActive) {
+                        // Недельная модель: season points 10/40/30, first_step и clean_10 начисляются
+                        // атомарно на сервере (record_approved_assignment, W09). Недельные бублики за
+                        // ежедневки приходят при финализации недели; per-day streak-награда, бонус
+                        // возвращения и старые streak-достижения после cutover не выдаются.
+                        await db.rpc('record_approved_assignment', { p_assignment_id: currentSubmissionId });
+                        // Бублики за принятое недельное/индивидуальное сохраняются (ECONOMY §4);
+                        // сезонные очки за них уже начислила RPC выше — здесь только бублики.
+                        if (sub.type === 'weekly' || sub.type === 'individual') {
+                            const bonus = sub.type === 'weekly' ? 20 : 15;
+                            await db.rpc('add_huikons', {
+                                p_student_id: sub.student_id, p_amount: bonus, p_reason: `${sub.type}_approved`
+                            });
+                        }
                     } else {
-                        await awardApprovalBonus(sub.student_id, sub.type);
+                        // Старая модель (до cutover) — без изменений.
+                        if (sub.type === 'daily') {
+                            await processStreak(sub.student_id, sub.scheduled_date);
+                        } else {
+                            await awardApprovalBonus(sub.student_id, sub.type);
+                        }
+                        // Достижение «Первый шаг» (G5): первая принятая работа любого типа.
+                        // Идемпотентно — на второй и далее принятой работе grantAchievement вернёт no-op.
+                        await grantAchievement(sub.student_id, 'first_step');
                     }
-                    // Достижение «Первый шаг» (G5): первая принятая работа любого типа.
-                    // Идемпотентно — на второй и далее принятой работе grantAchievement вернёт no-op.
-                    await grantAchievement(sub.student_id, 'first_step');
                 }
 
                 alert(status === 'approved' ? 'Работа принята!' : 'Работа возвращена!');

@@ -431,7 +431,7 @@
         <div class="shield-widget" id="shield-widget" style="display:none;">
             <div class="shield-info">
                 <span id="shield-count">🛡 0 щитов</span>
-                <span class="shield-hint">Спасает стрик при пропуске одного дня</span>
+                <span class="shield-hint">Щит недели: +1 к результату недели (запас до 7)</span>
             </div>
             <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 90 🥯</button>
         </div>
@@ -857,15 +857,28 @@
                     groupBadge.classList.remove('assigned');
                 }
 
-                // Отображение стрика
+                // W10 — после cutover старая календарная модель стрика уходит из активного UI
+                // (историю current_streak/достижений не удаляем). cutover_at — флаг economy_config (W09);
+                // NULL или будущая дата = экономика ещё старая. Ошибку чтения флага трактуем как «до cutover».
+                let cutoverActive = false;
+                try {
+                    const { data: cfg } = await db.from('economy_config').select('cutover_at').maybeSingle();
+                    cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
+                } catch (e) { cutoverActive = false; }
+
+                // Отображение стрика (только до cutover; после — недельный блок ниже)
                 const streakEl = document.getElementById('streak-display');
-                if (data.current_streak > 0) {
+                if (!cutoverActive && data.current_streak > 0) {
                     streakEl.style.display = 'inline-block';
                     streakEl.innerText = `🔥 ${data.current_streak} дней подряд`;
                 } else {
                     streakEl.style.display = 'none';
                 }
-                renderStreakProgress(data.current_streak);
+                if (cutoverActive) {
+                    document.getElementById('streak-progress').style.display = 'none';
+                } else {
+                    renderStreakProgress(data.current_streak);
+                }
 
                 // Косметика (S3): применяем экипировку к нику/аватару/фону/титулу
                 const { data: eqRows } = await equipmentQuery(currentUser.id, false);
@@ -1290,7 +1303,8 @@
                         'streak_day_2': 'Серия 2 дня 🔥',
                         'streak_day_3': 'Серия 3+ дней 🔥',
                         'weekly_approved': 'Еженедельное принято ✅',
-                        'individual_approved': 'Индивидуальное принято ✅'
+                        'individual_approved': 'Индивидуальное принято ✅',
+                        'weekly_reward': 'Награда за неделю 🥯'
                     };
                   // Специальная логика для штрафов
                     let displayReason = reasonMap[item.reason];
@@ -1298,6 +1312,13 @@
                         // Берем текст после "penalty: "
                         const penaltyText = item.reason.replace('penalty: ', '');
                         displayReason = `⚠️ Штраф: ${penaltyText}`;
+                    }
+                    // Недельные достижения и призы сезона (W09/W10): единый читаемый ярлык
+                    if (!displayReason && item.reason && item.reason.startsWith('achievement_')) {
+                        displayReason = 'Достижение 🏆';
+                    }
+                    if (!displayReason && item.reason && item.reason.startsWith('season_place_')) {
+                        displayReason = 'Приз за место в сезоне 🏆';
                     }
                     if (!displayReason) {
                         displayReason = item.reason || 'Начисление';
@@ -1366,15 +1387,29 @@
         // Альбом достижений (G5). Фиксированный набор из 8 достижений «Дисциплины»: полученные —
         // цветными, ещё не полученные — серым силуэтом (locked). Порядок и метаданные — константа
         // ниже; коды совпадают с achievement_code, которые выдаёт teacher.html (grantAchievement).
+        // Недельные достижения (ECONOMY_V2 §10.1) — активный набор после cutover; коды совпадают
+        // с теми, что выдают grant_weekly_achievements / record_approved_assignment (W09).
+        // Legacy-достижения этапа 1 (streak_*, perfect_month, rebirth) показываются ТОЛЬКО их
+        // владельцам: новая выдача прекращена после cutover, но полученные сохраняются (SPEC §8).
         const ACHIEVEMENTS_META = [
-            { code: 'first_step',    icon: '🌱', name: 'Первый шаг' },
-            { code: 'streak_7',      icon: '🔥', name: 'Неделя огня' },
-            { code: 'streak_30',     icon: '📅', name: 'Месяц без пропусков' },
-            { code: 'streak_100',    icon: '💯', name: 'Сотня' },
-            { code: 'streak_200',    icon: '⚡', name: '200 дней' },
-            { code: 'streak_365',    icon: '👑', name: 'Год дисциплины' },
-            { code: 'perfect_month', icon: '✨', name: 'Идеальный месяц' },
-            { code: 'rebirth',       icon: '🕊', name: 'Возрождение' }
+            { code: 'first_step',           icon: '🌱', name: 'Первый шаг' },
+            { code: 'first_good_week',      icon: '📗', name: 'Неделя получилась' },
+            { code: 'perfect_week',         icon: '🌟', name: 'Семь из семи' },
+            { code: 'rhythm_4',             icon: '📅', name: 'Месяц в ритме' },
+            { code: 'rhythm_12',            icon: '🗓', name: 'Четверть года' },
+            { code: 'rhythm_24',            icon: '🏅', name: 'Полгода в ритме' },
+            { code: 'good_weeks_36',        icon: '🎓', name: 'Учебный год' },
+            { code: 'no_shields_8',         icon: '💪', name: 'Своими силами' },
+            { code: 'perfect_month_weekly', icon: '✨', name: 'Идеальный месяц' },
+            { code: 'rebirth_week',         icon: '🕊', name: 'Возвращение' },
+            { code: 'clean_10',             icon: '🎯', name: 'С первого раза' },
+            { code: 'streak_7',      icon: '🔥', name: 'Неделя огня',            legacy: true },
+            { code: 'streak_30',     icon: '📆', name: 'Месяц без пропусков',     legacy: true },
+            { code: 'streak_100',    icon: '💯', name: 'Сотня',                  legacy: true },
+            { code: 'streak_200',    icon: '⚡', name: '200 дней',               legacy: true },
+            { code: 'streak_365',    icon: '👑', name: 'Год дисциплины',         legacy: true },
+            { code: 'perfect_month', icon: '🌙', name: 'Идеальный месяц (стрик)', legacy: true },
+            { code: 'rebirth',       icon: '🪶', name: 'Возрождение (стрик)',     legacy: true }
         ];
 
         async function loadAchievements() {
@@ -1391,6 +1426,7 @@
                 grid.innerHTML = '';
                 ACHIEVEMENTS_META.forEach(a => {
                     const has = earned.has(a.code);
+                    if (a.legacy && !has) return; // legacy — показываем только владельцам
                     const tile = document.createElement('div');
                     tile.className = `ach-tile ${has ? '' : 'locked'}`;
                     tile.innerHTML = `
