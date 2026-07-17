@@ -464,7 +464,178 @@
             return inserted.id;
         }
 
+        // --- ЛИГИ (L03) ---
+        // Вкладка «Лидеры» имеет два режима: «Моя лига» (по умолчанию) и «Общий топ»
+        // (прежний сезонный топ-10, где топ-3 получают 100/60/30). loadLeaderboard остаётся
+        // точкой входа из switchTab и просто открывает режим лиги. Места и переходы НЕ считаются
+        // на клиенте: их отдаёт сервер (get_student_league_snapshot / preview_league_close, L01).
+        // Названия семи лиг — снимок league_tiers (миграция 019), для лестницы без запроса.
+        const LEAGUE_LADDER = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Мастер', 'Легенда'];
+
         async function loadLeaderboard() {
+            switchLbMode('league');
+        }
+
+        function switchLbMode(mode) {
+            document.getElementById('lb-mode-league').classList.toggle('active', mode === 'league');
+            document.getElementById('lb-mode-global').classList.toggle('active', mode === 'global');
+            document.getElementById('lb-tab-league').classList.toggle('active', mode === 'league');
+            document.getElementById('lb-tab-global').classList.toggle('active', mode === 'global');
+            if (mode === 'league') loadLeague();
+            else loadGlobalTop();
+        }
+
+        // Лестница семи лиг: только названия, текущая подсвечена, ниже — пройдено, выше — впереди.
+        // Пустые рейтинги будущих лиг не рендерим (SPEC_STAGE3 §3).
+        function renderLeagueLadder(currentTier) {
+            let html = '<ul class="league-ladder">';
+            for (let t = 7; t >= 1; t--) {
+                let cls = 'ladder-step';
+                if (t === currentTier) cls += ' current';
+                else if (t < currentTier) cls += ' achieved';
+                const mark = t === currentTier ? '📍' : (t < currentTier ? '✓' : '🔒');
+                html += `<li class="${cls}"><span>${mark}</span><span>${esc(LEAGUE_LADDER[t - 1])}</span></li>`;
+            }
+            html += '</ul>';
+            return html;
+        }
+
+        async function loadLeague() {
+            const box = document.getElementById('league-content');
+            box.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
+            try {
+                const [{ data: snap, error: snapErr }, { data: preview, error: prevErr }] = await Promise.all([
+                    db.rpc('get_student_league_snapshot', { p_student_id: currentUser.id }),
+                    db.rpc('preview_league_close')
+                ]);
+                if (snapErr) throw snapErr;
+                if (prevErr) throw prevErr;
+
+                const tier = snap && snap.tier ? snap.tier : 1;
+                const tierName = (snap && snap.tier_name) || LEAGUE_LADDER[tier - 1];
+
+                // Шапка: текущая лига + корона (снимок отдаёт has_crown только в её действующий сезон).
+                let html = `<div class="league-badge">🏅 ${esc(tierName)}`;
+                if (snap && snap.has_crown) html += ' 👑';
+                html += '</div>';
+
+                if (!snap || !snap.in_season) {
+                    // Нет membership в текущем сезоне (ещё не заработал очков) либо сезон не идёт.
+                    html += '<div class="league-note">Вы ещё не в сезоне. Заработайте очки сезона (принятая домашка, пробники) — и попадёте в лигу.</div>';
+                    html += renderLeagueLadder(tier);
+                    box.innerHTML = html;
+                    return;
+                }
+
+                if (snap.season_id) html += `<div class="league-note">Сезон №${snap.season_id} идёт. Места, переходы и Корона фиксируются при закрытии сезона учителем.</div>`;
+
+                if (snap.is_late_entry) {
+                    // Поздний вход: видит место, но в этот неполный сезон без повышения/понижения.
+                    html += '<div class="league-note">Вы присоединились в середине сезона: ваше место видно, но повышения и понижения в этом неполном сезоне не будет — они начнутся со следующего сезона.</div>';
+                    if (snap.place && snap.cohort_size) {
+                        html += `<div class="league-standing">Ваше место: <b>${snap.place}</b> из ${snap.cohort_size}</div>`;
+                    }
+                    html += renderLeagueLadder(tier);
+                    box.innerHTML = html;
+                    return;
+                }
+
+                // Обычный участник: standings своей когорты из preview (серверные места/переходы).
+                const myRow = (preview || []).find(r => r.student_id === currentUser.id);
+                const cohort = myRow
+                    ? (preview || []).filter(r => r.tier === myRow.tier && r.cohort_index === myRow.cohort_index)
+                        .sort((a, b) => a.place - b.place)
+                    : [];
+                const active = snap.active_in_cohort || 0;
+
+                // Пояснение зон переходов по фактическому числу активных (SPEC_STAGE3 §4).
+                if (active < 5) {
+                    html += `<div class="league-note">В когорте ${active} активных (нужно 5+). В этом сезоне переходов между лигами не будет.</div>`;
+                } else {
+                    const up = cohort.filter(r => r.projected_movement === 'promote').length;
+                    const down = cohort.filter(r => r.projected_movement === 'demote').length;
+                    html += `<div class="league-note">Активных в когорте: ${active}. Сейчас повышаются <b>${up}</b> сверху, понижаются <b>${down}</b> снизу (по текущим очкам).</div>`;
+                }
+
+                box.innerHTML = html;
+
+                if (cohort.length) {
+                    const listEl = document.createElement('ul');
+                    listEl.className = 'leaderboard-list';
+
+                    // Имена и косметика участников когорты — батчами (не N+1), как в общем топе.
+                    const ids = cohort.map(r => r.student_id);
+                    const nameById = {};
+                    const { data: studs } = await db.from('students').select('name, telegram_id').in('telegram_id', ids);
+                    (studs || []).forEach(s => { nameById[s.telegram_id] = s.name || ''; });
+                    const eqByStudent = {};
+                    const { data: eqAll } = await equipmentQuery(ids, true);
+                    (eqAll || []).forEach(r => { (eqByStudent[r.student_id] = eqByStudent[r.student_id] || []).push(r); });
+
+                    cohort.forEach(r => {
+                        const isMe = r.student_id === currentUser.id;
+                        const eq = buildEquipMap(eqByStudent[r.student_id] || []);
+                        const li = document.createElement('li');
+                        li.className = 'lb-item' + (isMe ? ' lb-me' : '') +
+                            (r.projected_movement === 'promote' ? ' lb-promote' : '') +
+                            (r.projected_movement === 'demote' ? ' lb-demote' : '');
+
+                        const rank = document.createElement('div');
+                        rank.className = 'lb-rank'; rank.textContent = `#${r.place}`;
+
+                        const avatar = document.createElement('div');
+                        avatar.className = 'lb-avatar';
+                        avatar.textContent = nameById[r.student_id] ? nameById[r.student_id][0].toUpperCase() : '?';
+                        applyAvatarFrame(avatar, eq);
+
+                        const wrap = document.createElement('div');
+                        wrap.className = 'lb-name-wrap';
+                        const line = document.createElement('div');
+                        line.className = 'lb-name-line';
+                        renderNick(line, nameById[r.student_id] || '', eq, isMe ? ' (Вы)' : '');
+                        wrap.appendChild(line);
+                        if (eq.title) {
+                            const title = equippedTitleText(eq.title);
+                            if (title) {
+                                const t = document.createElement('div');
+                                t.className = 'lb-title'; t.textContent = title;
+                                wrap.appendChild(t);
+                            }
+                        }
+
+                        const score = document.createElement('div');
+                        score.className = 'lb-score';
+                        const arrow = r.projected_movement === 'promote' ? ' ↑' : (r.projected_movement === 'demote' ? ' ↓' : '');
+                        score.textContent = `${r.points} ⭐${arrow}`;
+
+                        li.appendChild(rank);
+                        li.appendChild(avatar);
+                        li.appendChild(wrap);
+                        li.appendChild(score);
+                        listEl.appendChild(li);
+                    });
+                    box.appendChild(listEl);
+                }
+
+                // Предупреждение о неактивных сезонах (второй пустой сезон подряд — понижение).
+                if (snap.inactive_seasons >= 1) {
+                    const warn = document.createElement('div');
+                    warn.className = 'league-note';
+                    warn.style.color = '#e67e22';
+                    warn.textContent = `Пропущено сезонов подряд без очков: ${snap.inactive_seasons}. Ещё один такой сезон — понижение на лигу.`;
+                    box.appendChild(warn);
+                }
+
+                const ladder = document.createElement('div');
+                ladder.innerHTML = renderLeagueLadder(tier);
+                box.appendChild(ladder);
+            } catch (e) {
+                box.innerHTML = '<div style="text-align:center; color:#f44336; padding:30px;">Ошибка лиги</div>';
+                log('❌ Лига: ' + (e.message || e));
+            }
+        }
+
+        async function loadGlobalTop() {
             const list = document.getElementById('lb-list');
             list.innerHTML = '<li style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</li>';
 

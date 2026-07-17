@@ -156,11 +156,26 @@
 
     <!-- ЭКРАН 3: ЛИДЕРБОРД -->
     <div id="screen-leaderboard" class="screen">
-        <h2 style="text-align: center; margin-bottom: 4px; font-size: 22px;"> Топ учеников</h2>
-        <div id="lb-season-label" style="text-align:center; opacity:0.6; font-size:13px; margin-bottom:16px;"></div>
-        <ul class="leaderboard-list" id="lb-list">
-            <li style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</li>
-        </ul>
+        <h2 style="text-align: center; margin-bottom: 12px; font-size: 22px;">🏆 Лиги</h2>
+        <div class="tabs-hw">
+            <button class="tab-btn active" id="lb-tab-league" onclick="switchLbMode('league')" style="font-size: 15px; font-weight: 700;">🏅 Моя лига</button>
+            <button class="tab-btn" id="lb-tab-global" onclick="switchLbMode('global')" style="font-size: 15px; font-weight: 700;">🌍 Общий топ</button>
+        </div>
+
+        <!-- Режим: моя лига -->
+        <div id="lb-mode-league" class="lb-mode active">
+            <div id="league-content">
+                <div style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</div>
+            </div>
+        </div>
+
+        <!-- Режим: общий сезонный топ (топ-3 получают 100/60/30 бубликов) -->
+        <div id="lb-mode-global" class="lb-mode">
+            <div id="lb-season-label" style="text-align:center; opacity:0.6; font-size:13px; margin-bottom:16px;"></div>
+            <ul class="leaderboard-list" id="lb-list">
+                <li style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</li>
+            </ul>
+        </div>
     </div>
 
     <!-- ЭКРАН: МАГАЗИН (S2) -->
