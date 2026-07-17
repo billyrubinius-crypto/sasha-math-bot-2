@@ -124,7 +124,9 @@
 
             <div class="week-planner">
                 <h3 style="margin-top:0">🏁 Сезон</h3>
-                <p style="font-size:13px; color:#666; margin-bottom:15px;">Закрытие сезона: итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон. Делается вручную раз в 2 недели.</p>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Закрытие сезона: итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон. Лиговые переходы и Корона считаются сервером в той же операции. Делается вручную раз в 2 недели.</p>
+                <button class="btn-secondary" id="btn-preview-season" onclick="previewSeasonClose()">📊 Превью закрытия (лиги)</button>
+                <div id="season-preview"></div>
                 <button class="btn-danger" id="btn-close-season" onclick="closeSeason()" style="width:100%;">🏁 Закрыть сезон</button>
             </div>
         </div>

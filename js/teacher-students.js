@@ -29,11 +29,85 @@
             });
         }
 
-        // Закрытие сезона (G8): вся операция — одна транзакция RPC close_season (миграция 006):
-        // архив мест всех учеников, награды топ-3 (100/60/30), обнуление очков, открытие
-        // следующего сезона. Сезон, открытый сегодня, RPC закрыть не даст — двойной клик безопасен.
+        // Превью закрытия лиг (L02): read-only RPC preview_league_close() — активные/размер
+        // когорты, проекция переходов на живых данных. Global top-3 здесь не считаем — его
+        // tie-break (rating → штрафы → ledger → telegram_id) не выведен отдельным RPC,
+        // решение пользователя: показывать только лиговое превью. Ничего не пишет и не
+        // подставляет клиентский расчёт — только группирует и отображает готовые ряды RPC.
+        async function previewSeasonClose() {
+            const btn = document.getElementById('btn-preview-season');
+            const box = document.getElementById('season-preview');
+            if (btn.disabled) return; // защита от двойного клика
+            btn.disabled = true;
+            box.innerHTML = '<p style="font-size:13px; color:#666;">Загрузка превью…</p>';
+            try {
+                const { data, error } = await db.rpc('preview_league_close');
+                if (error) throw error;
+
+                if (!data || !data.length) {
+                    box.innerHTML = '<p style="font-size:13px; color:#666;">Лиговых участников пока нет.</p>';
+                    return;
+                }
+
+                const nameById = {};
+                studentsList.forEach(s => { nameById[s.telegram_id] = s.name || s.telegram_id; });
+
+                // Группировка по (tier, cohort_index) — каждая строка RPC уже несёт tier_name/
+                // active_in_cohort/projected_movement, клиент только раскладывает по когортам.
+                const cohorts = new Map();
+                data.forEach(row => {
+                    const key = row.tier + ':' + row.cohort_index;
+                    if (!cohorts.has(key)) {
+                        cohorts.set(key, { tier: row.tier, tierName: row.tier_name, cohortIndex: row.cohort_index, rows: [] });
+                    }
+                    cohorts.get(key).rows.push(row);
+                });
+
+                const sorted = [...cohorts.values()].sort((a, b) => a.tier - b.tier || a.cohortIndex - b.cohortIndex);
+
+                let html = '';
+                sorted.forEach(c => {
+                    const active = c.rows[0].active_in_cohort;
+                    const promoted = c.rows.filter(r => r.projected_movement === 'promote');
+                    const demoted = c.rows.filter(r => r.projected_movement === 'demote');
+                    html += `<div style="border:1px solid #eee; border-radius:8px; padding:10px; margin-top:10px;">`;
+                    html += `<b>${esc(c.tierName)}${c.cohortIndex > 1 ? ' — когорта ' + c.cohortIndex : ''}</b> `;
+                    html += `<span style="color:#666; font-size:13px;">(${c.rows.length} участников, ${active} активных)</span>`;
+                    if (active < 5) {
+                        html += `<p style="font-size:13px; color:#666; margin:6px 0 0;">Меньше 5 активных — переходов не будет.</p>`;
+                    } else {
+                        if (promoted.length) {
+                            html += `<p style="font-size:13px; color:green; margin:6px 0 0;">↑ Повышение: ${promoted.map(r => esc(nameById[r.student_id])).join(', ')}</p>`;
+                        }
+                        if (demoted.length) {
+                            html += `<p style="font-size:13px; color:#b00; margin:6px 0 0;">↓ Понижение: ${demoted.map(r => esc(nameById[r.student_id])).join(', ')}</p>`;
+                        }
+                        if (!promoted.length && !demoted.length) {
+                            html += `<p style="font-size:13px; color:#666; margin:6px 0 0;">Переходов нет.</p>`;
+                        }
+                    }
+                    html += `</div>`;
+                });
+                box.innerHTML = html;
+            } catch (e) {
+                box.innerHTML = '';
+                alert('Ошибка превью: ' + e.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Закрытие сезона (G8, лиги — L01/L02): вся операция — одна транзакция RPC close_season
+        // (миграция 006, расширена close_league_season в 019): архив мест всех учеников, награды
+        // топ-3 (100/60/30), лиговые переходы и Корона, обнуление очков, открытие следующего
+        // сезона. Клиент не считает места/переходы — только вызывает эту одну RPC. Сезон,
+        // открытый сегодня, RPC закрыть не даст. Кнопка блокируется синхронно до подтверждения
+        // диалогом (confirm блокирует поток) и до ответа RPC — двойной клик не создаёт вторую
+        // параллельную цепочку запросов.
         async function closeSeason() {
             const btn = document.getElementById('btn-close-season');
+            if (btn.disabled) return; // защита от двойного клика
+            btn.disabled = true;
             try {
                 const { data: seasons, error } = await db.from('seasons').select('id, start_date').is('end_date', null).order('id', { ascending: false }).limit(1);
                 if (error) throw error;
@@ -43,12 +117,12 @@
                 }
                 const season = seasons[0];
                 const startText = new Date(season.start_date).toLocaleDateString('ru-RU');
-                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, очки всех учеников обнулятся. Действие необратимо.`)) return;
+                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, лиговые переходы и Корона будут посчитаны сервером, очки всех учеников обнулятся. Действие необратимо.`)) return;
 
-                btn.disabled = true;
                 const { data, error: rpcError } = await db.rpc('close_season');
                 if (rpcError) throw rpcError;
                 alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\nНовый сезон открыт.`);
+                document.getElementById('season-preview').innerHTML = '';
             } catch (e) {
                 alert('Ошибка: ' + e.message);
             } finally {
