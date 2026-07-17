@@ -1215,19 +1215,28 @@
 
             try {
                 // Состояние читаем до обновления: повторное «Принять» уже принятой работы (открытой из Архива) не должно начислять бонус ещё раз
-                const { data: sub } = await db.from('assignments').select('student_id, type, status, approval_status, scheduled_date').eq('id', currentSubmissionId).single();
+                const { data: sub, error: subErr } = await db.from('assignments').select('student_id, type, status, approval_status, scheduled_date').eq('id', currentSubmissionId).single();
+                if (subErr) throw subErr;
                 const alreadyApproved = sub.status === 'checked' && sub.approval_status === 'approved';
 
-                await db.from('assignments').update({
+                // W11 — cutover-флаг читаем ДО изменения задания. Ошибка чтения не должна молча
+                // включить legacy-награды: при сбое чтения прерываем операцию, ничего не меняя.
+                // cutover_at — глобальный флаг economy_config (W09); NULL или будущая дата = ещё старая
+                // модель; после cutover награды идут через серверные RPC, старый streak-путь не выполняется.
+                const { data: cfg, error: cfgErr } = await db.from('economy_config').select('cutover_at').maybeSingle();
+                if (cfgErr) throw cfgErr;
+                const cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
+
+                const { error: updErr } = await db.from('assignments').update({
                     status: 'checked',
                     approval_status: status,
                     teacher_feedback: feedback,
                     checked_at: new Date().toISOString()
                 }).eq('id', currentSubmissionId);
+                if (updErr) throw updErr;
 
-                // Недельный результат пересчитывается сразу (W04/W05), но награда за неделю НЕ
-                // выдаётся на клиенте — reward_amount заполнит только finalize_student_week (W09).
-                // Старый processStreak()/awardApprovalBonus ниже — экономика W05 не меняет.
+                // Недельный результат пересчитывается сразу (W04/W05); награда за неделю на клиенте
+                // не выдаётся — её платит finalize_student_week после cutover (W09).
                 if (sub.type === 'daily' && sub.scheduled_date) {
                     try {
                         const { data: weekStart, error: wsErr } = await db.rpc('week_start_of', { p_date: sub.scheduled_date });
@@ -1241,33 +1250,17 @@
                     } catch (e) { console.error('Не удалось пересчитать неделю: ' + e.message); }
                 }
 
-                // W10 — экономический cutover. До cutover_at действует старая (календарный стрик)
-                // модель на клиенте; после cutover награды идут через серверные RPC W09, а старый
-                // streak-путь больше не выполняется (SPEC §8, ECONOMY §12). cutover_at — глобальный
-                // флаг economy_config (W09); NULL или будущая дата = экономика ещё старая.
-                let cutoverActive = false;
-                {
-                    const { data: cfg } = await db.from('economy_config').select('cutover_at').maybeSingle();
-                    cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
-                }
-
-                if (status === 'approved' && !alreadyApproved) {
+                if (status === 'approved') {
                     if (cutoverActive) {
-                        // Недельная модель: season points 10/40/30, first_step и clean_10 начисляются
-                        // атомарно на сервере (record_approved_assignment, W09). Недельные бублики за
-                        // ежедневки приходят при финализации недели; per-day streak-награда, бонус
-                        // возвращения и старые streak-достижения после cutover не выдаются.
-                        await db.rpc('record_approved_assignment', { p_assignment_id: currentSubmissionId });
-                        // Бублики за принятое недельное/индивидуальное сохраняются (ECONOMY §4);
-                        // сезонные очки за них уже начислила RPC выше — здесь только бублики.
-                        if (sub.type === 'weekly' || sub.type === 'individual') {
-                            const bonus = sub.type === 'weekly' ? 20 : 15;
-                            await db.rpc('add_huikons', {
-                                p_student_id: sub.student_id, p_amount: bonus, p_reason: `${sub.type}_approved`
-                            });
-                        }
-                    } else {
-                        // Старая модель (до cutover) — без изменений.
+                        // Идемпотентно на ЛЮБОЕ «Принять», включая уже принятую работу: восстанавливает
+                        // награду после сетевого сбоя между update и RPC (W11). Внутри RPC атомарно и
+                        // идемпотентно: season points 10/40/30, first_step, clean_10 и бублики 20/15 за
+                        // weekly/individual. Per-day streak-награда/бонус возвращения/старые достижения
+                        // после cutover не выдаются; недельные бублики за ежедневки — при финализации.
+                        const { error: recErr } = await db.rpc('record_approved_assignment', { p_assignment_id: currentSubmissionId });
+                        if (recErr) throw recErr;
+                    } else if (!alreadyApproved) {
+                        // Старая модель (до cutover) — только при реальном переходе в approved.
                         if (sub.type === 'daily') {
                             await processStreak(sub.student_id, sub.scheduled_date);
                         } else {

@@ -579,7 +579,7 @@ begin
     left join (
       select student_id, max(created_at) as last_scored
         from season_points_log
-       where season_id = v_season_id and amount > 0
+       where season_id = v_season_id and amount <> 0
        group by student_id) pts on pts.student_id = s.telegram_id;
   get diagnostics v_archived = row_count;
 
@@ -2330,9 +2330,11 @@ begin
       where student_id = p_student_id and week_start = p_week_start;
   end if;
 
+  -- Компенсирующая дельта до целевого значения — через ledger (W11): award_season_points
+  -- пишет событие season_points_log и no-op при дельте 0 (повтор результата события не даёт).
   v_season_delta := v_season_target - v_season_prev;
   if v_season_delta <> 0 then
-    perform public.add_season_points(p_student_id, v_season_delta);
+    perform public.award_season_points(p_student_id, v_season_delta, 'mock_exam_season', null);
   end if;
 
   v_exam_name := 'Недельный пробник ' || to_char(p_week_start, 'DD.MM.YYYY');
@@ -2424,6 +2426,7 @@ create index if not exists idx_season_points_student
 alter table public.season_points_log disable row level security;
 
 -- award_season_points — начисление очков сезона + запись в ledger, идемпотентно по event_key.
+-- W11: нулевая дельта не создаёт событие и ничего не начисляет (повтор пробника не «набирает очки»).
 create or replace function public.award_season_points(
   p_student_id bigint, p_amount integer, p_reason text, p_event_key text default null)
  returns integer
@@ -2434,6 +2437,11 @@ declare
   v_inserted integer;
   v_rating   integer;
 begin
+  if p_amount = 0 then
+    select rating into v_rating from public.students where telegram_id = p_student_id;
+    return v_rating;
+  end if;
+
   select id into v_season from public.seasons where end_date is null order by id desc limit 1;
 
   insert into public.season_points_log (season_id, student_id, amount, reason, event_key)
@@ -2473,8 +2481,10 @@ begin
 end;
 $function$;
 
--- record_approved_assignment — идемпотентный per-approval поток (W10 будет звать из teacher.html):
--- season points 10/40/30 (event_key на assignment), first_step, clean_10.
+-- record_approved_assignment — идемпотентный per-approval поток (зовётся из teacher.html на любое
+-- «Принять», в т.ч. по уже принятой работе — восстановление после сбоя): season points 10/40/30
+-- (event_key на assignment), first_step, clean_10 и бублики 20/15 за weekly/individual (W11,
+-- ledger assignment_reward_log). Daily per-approval бублики не получает.
 create or replace function public.record_approved_assignment(p_assignment_id uuid)
  returns json
  language plpgsql
@@ -2485,6 +2495,8 @@ declare
   v_reason    text;
   v_run       integer := 0;
   v_clean_10  boolean := false;
+  v_bonus     integer;
+  v_paid      integer;
   r           record;
 begin
   select * into v_asn from public.assignments where id = p_assignment_id;
@@ -2520,6 +2532,18 @@ begin
   end loop;
   if v_clean_10 then
     perform public.grant_achievement_server(v_asn.student_id, 'clean_10', 25);
+  end if;
+
+  -- Бублики за принятое weekly/individual (ECONOMY §4), идемпотентно по assignment (W11).
+  if v_asn.type in ('weekly', 'individual') then
+    v_bonus := case v_asn.type when 'weekly' then 20 else 15 end;
+    insert into public.assignment_reward_log (assignment_id, student_id, reward_amount)
+      values (v_asn.id, v_asn.student_id, v_bonus)
+      on conflict (assignment_id) do nothing;
+    get diagnostics v_paid = row_count;
+    if v_paid = 1 then
+      perform public.add_huikons(v_asn.student_id, v_bonus, v_asn.type || '_approved');
+    end if;
   end if;
 
   return json_build_object('student_id', v_asn.student_id, 'type', v_asn.type, 'season_points', v_pts);
@@ -2613,3 +2637,15 @@ create table if not exists public.weekly_reward_log (
   unique (student_id, week_start)
 );
 alter table public.weekly_reward_log disable row level security;
+
+-- assignment_reward_log (W11) — ledger выплаты 20/15 за принятое weekly/individual,
+-- уникальность по assignment: record_approved_assignment платит ровно один раз.
+create table if not exists public.assignment_reward_log (
+  id            uuid         primary key default gen_random_uuid(),
+  assignment_id uuid         not null references public.assignments (id) on delete cascade,
+  student_id    bigint       not null references public.students (telegram_id),
+  reward_amount integer      not null,
+  paid_at       timestamptz  not null default now(),
+  unique (assignment_id)
+);
+alter table public.assignment_reward_log disable row level security;
