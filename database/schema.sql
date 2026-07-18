@@ -2399,6 +2399,11 @@ $function$;
 create table if not exists public.economy_config (
   id         boolean      primary key default true check (id),
   cutover_at timestamptz,
+  -- Stage 4 (миграция 021, U02A): спящие флаги старта ежедневных квестов.
+  -- stage4_started_at — неизменяемое время cutover (заполнит U07); пока NULL.
+  -- stage4_generation_enabled — включена ли выдача новых дневных наборов; пока false.
+  stage4_started_at         timestamptz,
+  stage4_generation_enabled boolean      not null default false,
   updated_at timestamptz  not null default now()
 );
 insert into public.economy_config (id, cutover_at) values (true, null)
@@ -3279,3 +3284,85 @@ begin
   );
 end;
 $function$;
+
+-- =============================================================================
+-- --- Ежедневные квесты Stage 4 (миграция 021, карточка U02A) ------------------
+-- Спящий фундамент данных: каталог, дневной набор, история показов, pay-once ledger.
+-- Генерация/random/выплаты/RPC/UI ещё нет (economy_config.stage4_generation_enabled=false).
+-- Полная мотивация и rollback — в database/migrations/021_stage4_quest_foundation.sql.
+-- RLS выключен, как везде; production identity-привязка отложена на T10.
+-- =============================================================================
+
+-- life_quest_templates — редактируемый каталог жизненных челленджей (SPEC_STAGE4 §3).
+-- Удаление использованного шаблона запрещено FK; выключается через active=false.
+create table if not exists public.life_quest_templates (
+  template_code text        primary key,
+  name          text        not null,
+  description   text,
+  category      text        not null,
+  active        boolean     not null default true,
+  weight        integer     not null default 1 check (weight > 0),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists idx_life_quest_templates_active
+  on public.life_quest_templates (template_code) where active;
+alter table public.life_quest_templates disable row level security;
+
+-- student_daily_quests — один сохранённый набор на (ученик, дата MSK). daily_assignment_id и
+-- life_template_code nullable; replacements_used 0..2; unique(student_id, quest_date).
+create table if not exists public.student_daily_quests (
+  id                  uuid        primary key default gen_random_uuid(),
+  student_id          bigint      not null references public.students (telegram_id),
+  quest_date          date        not null,
+  daily_assignment_id uuid        references public.assignments (id) on delete set null,
+  life_template_code  text        references public.life_quest_templates (template_code),
+  replacements_used   integer     not null default 0 check (replacements_used between 0 and 2),
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now(),
+  unique (student_id, quest_date)
+);
+
+-- student_daily_quest_options — история показанных за день шаблонов + ordinal 0..2.
+create table if not exists public.student_daily_quest_options (
+  id             uuid        primary key default gen_random_uuid(),
+  daily_quest_id uuid        not null references public.student_daily_quests (id) on delete cascade,
+  template_code  text        not null references public.life_quest_templates (template_code),
+  ordinal        integer     not null check (ordinal between 0 and 2),
+  shown_at       timestamptz not null default now(),
+  unique (daily_quest_id, ordinal),
+  unique (daily_quest_id, template_code)
+);
+alter table public.student_daily_quest_options disable row level security;
+
+-- daily_quest_reward_log — pay-once ledger: math=3, life=3, combo=2; уникальность
+-- (student_id, quest_date, reward_kind). Composite FK гарантирует наличие дневного набора.
+create table if not exists public.daily_quest_reward_log (
+  id          uuid        primary key default gen_random_uuid(),
+  student_id  bigint      not null references public.students (telegram_id),
+  quest_date  date        not null,
+  reward_kind text        not null check (reward_kind in ('math', 'life', 'combo')),
+  bubliks     integer     not null check (bubliks > 0),
+  paid_at     timestamptz not null default now(),
+  unique (student_id, quest_date, reward_kind),
+  check (
+    (reward_kind = 'math'  and bubliks = 3) or
+    (reward_kind = 'life'  and bubliks = 3) or
+    (reward_kind = 'combo' and bubliks = 2)
+  ),
+  foreign key (student_id, quest_date)
+    references public.student_daily_quests (student_id, quest_date)
+);
+alter table public.daily_quest_reward_log disable row level security;
+
+-- Стартовый каталог (SPEC_STAGE4 §3), идемпотентный seed со стабильными ASCII-кодами.
+insert into public.life_quest_templates (template_code, name, category, weight) values
+  ('read_fiction_30m', 'Читать художественную литературу не менее 30 минут',                                    'Чтение',      1),
+  ('walk_30m',         'Гулять не менее 30 минут',                                                               'Движение',    1),
+  ('squats_50',        'Сделать 50 приседаний в течение дня',                                                    'Движение',    1),
+  ('pushups_30',       'Сделать 30 отжиманий в течение дня; допустим подходящий вариант с колен или от опоры',   'Движение',    1),
+  ('warmup_full',      'Сделать полноценную разминку',                                                           'Движение',    1),
+  ('no_phone_45m',     'Провести 45 минут без телефона',                                                         'Внимание',    1),
+  ('tidy_workspace',   'Привести в порядок рабочее место и учебные материалы',                                   'Организация', 1),
+  ('plan_next_day',    'Подготовить план занятий на следующий день',                                             'Организация', 1)
+on conflict (template_code) do nothing;
