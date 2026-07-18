@@ -30,6 +30,7 @@ SUPABASE_HEADERS = {
 MSK = timezone(timedelta(hours=3))
 MORNING_DIGEST_TIME_MSK = (9, 0)    # (час, минута) — сколько заданий доступно сегодня
 EVENING_REMINDER_TIME_MSK = (19, 0)  # (час, минута) — напоминание о несданном
+LEAGUE_RESULT_CHECK_TIME_MSK = (9, 0)  # (час, минута) — проверка новых итогов закрытого сезона (L06)
 
 TYPE_LABELS = {'daily': '📅 Ежедневные', 'weekly': '🔥 Еженедельное', 'individual': '🎯 Индивидуальные'}
 
@@ -269,6 +270,113 @@ def mark_sent(key: str, sent_date):
     resp.raise_for_status()
 
 
+def league_result_key(season_id, student_id) -> str:
+    return f'league_result:{season_id}:{student_id}'
+
+
+def fetch_latest_closed_season():
+    """Последний закрытый сезон (id), если он вообще есть — по возрастанию id, не по дате
+    (несколько сезонов теоретически могут закрыться в один календарный день)."""
+    resp = requests.get(
+        f'{SUPABASE_URL}/rest/v1/seasons',
+        headers=SUPABASE_HEADERS,
+        params={'end_date': 'not.is.null', 'order': 'id.desc', 'limit': 1, 'select': 'id'}
+    )
+    resp.raise_for_status()
+    rows = resp.json()
+    return rows[0]['id'] if rows else None
+
+
+def fetch_already_notified_student_ids(season_id) -> set:
+    """Кто уже получил итог этого сезона — читаем существующий bot_notification_state одним
+    запросом (не по одному ключу на ученика), переживает рестарт/передеплой процесса."""
+    resp = requests.get(
+        f'{SUPABASE_URL}/rest/v1/bot_notification_state',
+        headers=SUPABASE_HEADERS,
+        params={'notification_key': f'like.{league_result_key(season_id, "*")}', 'select': 'notification_key'}
+    )
+    resp.raise_for_status()
+    return {int(row['notification_key'].rsplit(':', 1)[1]) for row in resp.json()}
+
+
+async def send_league_result_notifications():
+    """Один раз на закрытый сезон и ученика: место в когорте, движение между лигами и Корона
+    Легенды. Ничего не вычисляет — все три поля уже посчитаны и зафиксированы серверной
+    close_league_season (миграция 019) при закрытии сезона учителем; бот только читает и
+    форматирует. Разовые достижения за повышения (SPEC_STAGE3 §6) в L01 не реализованы —
+    в уведомление сознательно не включаются (решение пользователя, карточка L06).
+
+    Дедупликация — существующий bot_notification_state с ключом league_result:<season_id>:
+    <student_id>, без отдельной таблицы (карточка L06). Neutral/no movement формулируется
+    спокойно, без него ученик просто «остался» в своей лиге."""
+    season_id = fetch_latest_closed_season()
+    if season_id is None:
+        return
+
+    resp = requests.get(
+        f'{SUPABASE_URL}/rest/v1/league_memberships',
+        headers=SUPABASE_HEADERS,
+        params={'season_id': f'eq.{season_id}', 'select': 'student_id,tier,place,movement'}
+    )
+    resp.raise_for_status()
+    memberships = resp.json()
+    if not memberships:
+        return  # legacy сезон без лиговых данных (закрыт до применения L01) — уведомлять нечего
+
+    already_notified = fetch_already_notified_student_ids(season_id)
+    pending = [m for m in memberships if m['student_id'] not in already_notified]
+    if not pending:
+        return
+
+    tiers_resp = requests.get(
+        f'{SUPABASE_URL}/rest/v1/league_tiers', headers=SUPABASE_HEADERS, params={'select': 'tier,name'}
+    )
+    tiers_resp.raise_for_status()
+    tier_name = {row['tier']: row['name'] for row in tiers_resp.json()}
+
+    moves_resp = requests.get(
+        f'{SUPABASE_URL}/rest/v1/league_movements',
+        headers=SUPABASE_HEADERS,
+        params={'season_id': f'eq.{season_id}', 'select': 'student_id,from_tier,to_tier,kind'}
+    )
+    moves_resp.raise_for_status()
+    move_by_student = {row['student_id']: row for row in moves_resp.json()}
+
+    crown_resp = requests.get(
+        f'{SUPABASE_URL}/rest/v1/league_season_awards',
+        headers=SUPABASE_HEADERS,
+        params={'award_code': 'eq.legend_crown', 'earned_season_id': f'eq.{season_id}', 'select': 'student_id'}
+    )
+    crown_resp.raise_for_status()
+    crown_rows = crown_resp.json()
+    crown_student_id = crown_rows[0]['student_id'] if crown_rows else None
+
+    today = datetime.now(MSK).date()
+    for m in pending:
+        student_id = m['student_id']
+        move = move_by_student.get(student_id)
+
+        if move and move['kind'] == 'promote':
+            headline = f"🎉 Сезон закрыт! Вы повысились: «{tier_name.get(move['from_tier'], '?')}» → «{tier_name.get(move['to_tier'], '?')}»!"
+        elif move and move['kind'] in ('demote', 'inactive_demote'):
+            headline = f"Сезон закрыт. Вы понизились: «{tier_name.get(move['from_tier'], '?')}» → «{tier_name.get(move['to_tier'], '?')}»."
+        else:
+            headline = f"Сезон закрыт. Вы остались в лиге «{tier_name.get(m['tier'], '?')}»."
+
+        lines = [headline]
+        if m['place']:
+            lines.append(f"Место в вашей когорте: {m['place']}.")
+        if student_id == crown_student_id:
+            lines.append("👑 Вы получили Корону Легенды на следующий сезон!")
+        lines.append("Открой приложение, чтобы увидеть новую лигу 🚀")
+
+        await send_safely(student_id, '\n'.join(lines))
+        try:
+            mark_sent(league_result_key(season_id, student_id), today)
+        except Exception as e:
+            logging.error(f"Не удалось сохранить отметку об уведомлении лиги для {student_id}: {e}")
+
+
 async def scheduler_loop():
     """Раз в сутки, в фиксированное время по МСК (проверка раз в минуту), без сторонних зависимостей
     вроде APScheduler. Срабатывает при «время уже наступило или прошло», а не по точному совпадению —
@@ -281,10 +389,12 @@ async def scheduler_loop():
     try:
         last_morning_sent = fetch_last_sent('morning_digest')
         last_evening_sent = fetch_last_sent('evening_reminder')
+        last_league_checked = fetch_last_sent('league_result_check')
     except Exception as e:
         logging.error(f"Не удалось загрузить состояние рассылки, начинаем с нуля: {e}")
         last_morning_sent = None
         last_evening_sent = None
+        last_league_checked = None
 
     while True:
         now = datetime.now(MSK)
@@ -313,6 +423,19 @@ async def scheduler_loop():
                     mark_sent('evening_reminder', today)
                 except Exception as e:
                     logging.error(f"Не удалось сохранить состояние вечерней рассылки: {e}")
+        elif now_hm >= LEAGUE_RESULT_CHECK_TIME_MSK and last_league_checked != today:
+            # Раз в сутки проверяем, не закрылся ли сезон (L06) — само уведомление дедуплицируется
+            # per-student через bot_notification_state, этот маркер только ограничивает частоту проверки.
+            last_league_checked = today
+            try:
+                await send_league_result_notifications()
+            except Exception as e:
+                logging.error(f"Ошибка проверки итогов сезона: {e}")
+            else:
+                try:
+                    mark_sent('league_result_check', today)
+                except Exception as e:
+                    logging.error(f"Не удалось сохранить состояние проверки итогов сезона: {e}")
 
         await asyncio.sleep(60)
 
