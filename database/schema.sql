@@ -3643,21 +3643,23 @@ end;
 $function$;
 
 -- =============================================================================
--- --- Math settlement и combo Stage 4 (миграция 023, карточка U02C) ------------
+-- --- Math settlement и combo Stage 4 (миграция 023, карточка U02C; гейт — 024/U02D) --------
 -- Принятие сегодняшней/прошлой daily -> pay-once math=3; combo=2 после обоих слотов.
--- Время teacher approval settlement не ограничивает. Гейт — stage4_settlement_active()
--- (неизменяемое start time), не generation-флаг. Полная мотивация и rollback — в
--- database/migrations/023_stage4_math_combo_settlement.sql.
+-- Время teacher approval settlement не ограничивает. Гейт — stage4_settlement_active(timestamptz)
+-- (точный момент действия vs неизменяемый stage4_started_at, U02D), не generation-флаг. Полная
+-- мотивация и rollback — в database/migrations/023_*.sql и 024_stage4_exact_cutover_gate.sql.
 -- =============================================================================
 
--- stage4_settlement_active — гейт выплат: старт наступил и quest_date не раньше даты старта.
-create or replace function public.stage4_settlement_active(p_quest_date date)
+-- stage4_settlement_active — гейт выплат (U02D, миграция 024): точное сравнение момента
+-- исходного действия с неизменяемым stage4_started_at (timestamptz, без приведения к date).
+create or replace function public.stage4_settlement_active(p_action_at timestamptz)
  returns boolean
  language sql
  stable
 as $function$
   select ec.stage4_started_at is not null
-     and p_quest_date >= (ec.stage4_started_at at time zone 'Europe/Moscow')::date
+     and p_action_at is not null
+     and p_action_at >= ec.stage4_started_at
     from public.economy_config ec
    where ec.id;
 $function$;
@@ -3712,7 +3714,9 @@ begin
   end if;
 
   v_qdate := a.scheduled_date;
-  if not public.stage4_settlement_active(v_qdate) then
+
+  -- U02D: точный timestamp-гейт cutover по моменту ПЕРВОГО действия (не по календарной дате).
+  if not public.stage4_settlement_active(coalesce(a.first_submitted_at, a.submitted_at)) then
     return;
   end if;
 

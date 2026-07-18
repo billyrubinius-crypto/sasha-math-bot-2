@@ -311,9 +311,13 @@
                 // включить legacy-награды: при сбое чтения прерываем операцию, ничего не меняя.
                 // cutover_at — глобальный флаг economy_config (W09); NULL или будущая дата = ещё старая
                 // модель; после cutover награды идут через серверные RPC, старый streak-путь не выполняется.
-                const { data: cfg, error: cfgErr } = await db.from('economy_config').select('cutover_at').maybeSingle();
+                // stage4_started_at — независимый флаг запуска Stage 4 (U02D): math settlement принятой
+                // ежедневки идёт независимо от недельного cutover. Точная eligibility по моменту действия
+                // проверяется на сервере в settle_daily_math; здесь гейт лишь решает, звать ли RPC.
+                const { data: cfg, error: cfgErr } = await db.from('economy_config').select('cutover_at, stage4_started_at').maybeSingle();
                 if (cfgErr) throw cfgErr;
                 const cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
+                const stage4Active = !!(cfg && cfg.stage4_started_at) && Date.now() >= Date.parse(cfg.stage4_started_at);
 
                 const { error: updErr } = await db.from('assignments').update({
                     status: 'checked',
@@ -345,8 +349,15 @@
                         // идемпотентно: season points 10/40/30, first_step, clean_10 и бублики 20/15 за
                         // weekly/individual. Per-day streak-награда/бонус возвращения/старые достижения
                         // после cutover не выдаются; недельные бублики за ежедневки — при финализации.
+                        // Хвост record_approved_assignment уже вызывает settle_daily_math — второй math RPC не нужен.
                         const { error: recErr } = await db.rpc('record_approved_assignment', { p_assignment_id: currentSubmissionId });
                         if (recErr) throw recErr;
+                    } else if (stage4Active) {
+                        // Stage 4 запущен без недельного cutover (U02D): math settlement принятой ежедневки
+                        // идёт независимо. Идемпотентно (pay-once ledger) — повтор тем же assignment доплатит
+                        // ровно один раз. Ошибка не маскируется (throw -> модалка остаётся, retry возможен).
+                        const { error: setErr } = await db.rpc('settle_daily_math', { p_assignment_id: currentSubmissionId });
+                        if (setErr) throw setErr;
                     } else if (!alreadyApproved) {
                         // Старая модель (до cutover) — только при реальном переходе в approved.
                         if (sub.type === 'daily') {
