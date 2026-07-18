@@ -41,6 +41,7 @@
         let db, currentSubmissionId = null, selectedPenalty = -20, studentsList = [];
         let currentCheckView = 'pending';
         let currentCustomTitleStudentId = null;
+        let currentQuestCode = null; // редактируемый template_code в quest-modal (null = режим добавления)
 
         // getTodayMSK(), normalizeUrl(), esc(), pluralBubliks() — в shared.js (F4).
 
@@ -89,6 +90,7 @@
             
             if (tab === 'check') loadSubmissions();
             if (tab === 'titles') loadCustomTitleRequests();
+            if (tab === 'quests') loadQuestTemplates();
         }
 
         function switchSubTab(view, el) {

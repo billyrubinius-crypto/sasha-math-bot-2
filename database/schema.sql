@@ -3750,3 +3750,113 @@ begin
   perform public.settle_daily_combo(a.student_id, v_qdate);
 end;
 $function$;
+
+-- =============================================================================
+-- --- Teacher-каталог жизненных челленджей Stage 4 (миграция 025, карточка U03) ------------
+-- Три узких admin RPC над life_quest_templates: list/upsert/set-active. Никакой истории или
+-- completion учеников (§9). code — ключ конфликта upsert, поэтому структурно неизменяем после
+-- создания; удаления нет вовсе (используемый шаблон только active=false). RLS не менялся.
+-- Полная мотивация и rollback — в database/migrations/025_stage4_teacher_quest_catalog.sql.
+-- =============================================================================
+
+-- admin_list_life_quest_templates — весь каталог (active и неактивные) для списка UI.
+create or replace function public.admin_list_life_quest_templates()
+ returns table (
+   template_code text,
+   name          text,
+   description   text,
+   category      text,
+   active        boolean,
+   weight        integer,
+   created_at    timestamptz,
+   updated_at    timestamptz
+ )
+ language sql
+ stable
+as $function$
+  select template_code, name, description, category, active, weight, created_at, updated_at
+    from public.life_quest_templates
+   order by category, name;
+$function$;
+
+-- admin_upsert_life_quest_template — добавить новый ИЛИ изменить текст/категорию/вес
+-- существующего по template_code; active этим RPC не трогается. Возвращает public.
+-- life_quest_templates (одна строка), не RETURNS TABLE: последний в PL/pgSQL автоматически
+-- объявляет OUT-переменные с именами колонок, что делает неквалифицированные ссылки на
+-- template_code в WHERE/ON CONFLICT неоднозначными (Postgres 42702) — найдено live-проверкой
+-- U03 и исправлено в миграции 026.
+create function public.admin_upsert_life_quest_template(
+  p_template_code text,
+  p_name          text,
+  p_description   text,
+  p_category      text,
+  p_weight        integer
+)
+ returns public.life_quest_templates
+ language plpgsql
+as $function$
+declare
+  v_code text := trim(coalesce(p_template_code, ''));
+  v_name text := trim(coalesce(p_name, ''));
+  v_desc text := trim(coalesce(p_description, ''));
+  v_cat  text := trim(coalesce(p_category, ''));
+  v_row  public.life_quest_templates%rowtype;
+begin
+  if v_code !~ '^[a-z][a-z0-9_]{1,63}$' then
+    raise exception 'Код шаблона должен начинаться с латинской буквы и содержать только строчные латинские буквы, цифры и "_" (2–64 символа)';
+  end if;
+  if v_name = '' or char_length(v_name) > 300 then
+    raise exception 'Текст задания обязателен (до 300 символов)';
+  end if;
+  if v_desc = '' or char_length(v_desc) > 1000 then
+    raise exception 'Описание обязательно (до 1000 символов)';
+  end if;
+  if v_cat = '' or char_length(v_cat) > 100 then
+    raise exception 'Категория обязательна (до 100 символов)';
+  end if;
+  if p_weight is null or p_weight < 1 or p_weight > 100 then
+    raise exception 'Вес должен быть целым числом от 1 до 100';
+  end if;
+
+  insert into public.life_quest_templates (template_code, name, description, category, weight)
+    values (v_code, v_name, v_desc, v_cat, p_weight)
+  on conflict (template_code) do update
+    set name        = excluded.name,
+        description = excluded.description,
+        category    = excluded.category,
+        weight      = excluded.weight,
+        updated_at  = now();
+
+  select * into v_row from public.life_quest_templates where template_code = v_code;
+  return v_row;
+end;
+$function$;
+
+-- admin_set_life_quest_template_active — только toggle active; не удаляет, не трогает текст/вес.
+-- Возвращает public.life_quest_templates (одна строка) — по той же причине, что и upsert выше.
+create function public.admin_set_life_quest_template_active(
+  p_template_code text,
+  p_active        boolean
+)
+ returns public.life_quest_templates
+ language plpgsql
+as $function$
+declare
+  v_row public.life_quest_templates%rowtype;
+begin
+  if p_active is null then
+    raise exception 'p_active обязателен';
+  end if;
+
+  update public.life_quest_templates
+     set active = p_active, updated_at = now()
+   where template_code = p_template_code;
+
+  if not found then
+    raise exception 'Шаблон % не найден', p_template_code;
+  end if;
+
+  select * into v_row from public.life_quest_templates where template_code = p_template_code;
+  return v_row;
+end;
+$function$;

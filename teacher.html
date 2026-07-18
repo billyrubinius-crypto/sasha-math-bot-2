@@ -25,6 +25,7 @@
         <div class="tab-btn active" onclick="switchTab('check', this)">✅ Проверка</div>
         <div class="tab-btn" onclick="switchTab('plan', this)">📅 Планирование</div>
         <div class="tab-btn" onclick="switchTab('titles', this)">🏷️ Титулы<span id="custom-title-count-badge" class="tab-count-badge" style="display:none;"></span></div>
+        <div class="tab-btn" onclick="switchTab('quests', this)">🎲 Квесты</div>
     </div>
 
     <!-- Под-табы для проверки -->
@@ -168,6 +169,15 @@
         </div>
     </div>
 
+    <!-- Вкладка каталога жизненных челленджей Stage 4 (U03). Только справочник: без истории
+         и выполнений учеников (SPEC_STAGE4 §9). -->
+    <div id="tab-quests" class="content-area">
+        <button class="btn-primary" onclick="openQuestModal()">+ Добавить челлендж</button>
+        <div id="quest-list">
+            <div style="text-align:center; padding:40px; color:#999;">Загрузка каталога...</div>
+        </div>
+    </div>
+
     <!-- Модальное окно редактирования недели (Текущая неделя) -->
     <div id="edit-group-modal">
         <div class="modal-content" style="max-width:500px;">
@@ -250,6 +260,26 @@
         </div>
     </div>
 
+    <!-- Модальное окно добавления/редактирования жизненного челленджа (U03) -->
+    <div id="quest-modal">
+        <div class="modal-content" style="max-width:480px;">
+            <button class="close-modal" onclick="closeQuestModal()">✕</button>
+            <h3 id="quest-modal-title" style="margin-top:0">Добавить челлендж</h3>
+            <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Код (латиница, цифры, «_»; нельзя изменить после создания):</label>
+            <input type="text" id="quest-code" placeholder="walk_30m" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px; font-family:monospace;">
+            <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Текст задания:</label>
+            <input type="text" id="quest-name" placeholder="Гулять не менее 30 минут" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+            <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Описание:</label>
+            <textarea id="quest-description" placeholder="Что именно нужно сделать" style="min-height:60px; margin-bottom:10px;"></textarea>
+            <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Категория:</label>
+            <input type="text" id="quest-category" placeholder="Движение" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+            <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Вес случайного выбора (1–100):</label>
+            <input type="number" id="quest-weight" min="1" max="100" step="1" value="1" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
+            <p id="quest-modal-error" class="warning-text" style="display:none;"></p>
+            <button class="btn-primary" id="btn-save-quest" onclick="saveQuestTemplate()">💾 Сохранить</button>
+        </div>
+    </div>
+
     <!-- Lightbox -->
     <div id="lightbox" onclick="closeLightbox()">
         <button class="lb-close" onclick="event.stopPropagation(); closeLightbox()">✕</button>
@@ -261,6 +291,7 @@
     <script src="js/teacher-planning.js"></script>
     <script src="js/teacher-students.js"></script>
     <script src="js/teacher-titles.js"></script>
+    <script src="js/teacher-quests.js"></script>
     <script src="js/teacher-app.js"></script>
 </body>
 </html>
