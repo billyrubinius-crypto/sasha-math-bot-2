@@ -150,8 +150,47 @@
                 loadShields();
                 loadCollections();
                 loadShowcase();
+                loadRankTitle();
 
             } catch (e) { log('❌ Ошибка профиля: ' + e.message); }
+        }
+
+        // --- ЗВАНИЕ ПО ТРУДУ (L04, SPEC_STAGE3 §8) ---
+        // Читает готовый серверный RPC get_student_rank_title (L01/020) — семь ступеней и их
+        // пороги остаются единственным источником истины в БД, здесь их не копируем. Звание не
+        // хранится в students и не зависит от очков сезона/пробников — это отдельная сущность от
+        // экипированного custom title (#profile-title), рендерится в свой собственный элемент.
+        async function loadRankTitle() {
+            const badge = document.getElementById('rank-badge');
+            const progress = document.getElementById('rank-progress');
+            try {
+                const { data, error } = await db.rpc('get_student_rank_title', { p_student_id: currentUser.id });
+                if (error) throw error;
+
+                badge.textContent = `🎓 ${data.title}`;
+                badge.style.display = 'inline-block';
+
+                let text;
+                if (data.next_title) {
+                    const parts = [];
+                    if (data.tasks_to_next > 0) parts.push(`${data.tasks_to_next} задач`);
+                    if (data.days_to_next > 0) parts.push(`${data.days_to_next} дней занятий`);
+                    text = parts.length
+                        ? `До звания «${data.next_title}»: осталось ${parts.join(' и ')}`
+                        : `Звание «${data.next_title}» откроется на следующей принятой работе`;
+                } else {
+                    text = 'Максимальное звание достигнуто';
+                }
+                if (data.has_unknown_legacy) {
+                    text += ' · счётчик задач ведётся с даты запуска (старые работы не учтены)';
+                }
+                progress.textContent = text;
+                progress.style.display = 'block';
+            } catch (e) {
+                badge.style.display = 'none';
+                progress.style.display = 'none';
+                log('❌ Звание: ' + (e.message || e));
+            }
         }
 
         // Мини-индикатор прогресса стрика: 3 уровня награды (5 / 10 / 15 бубликов за 1/2/3+ дня подряд)

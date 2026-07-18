@@ -367,6 +367,14 @@
         /* Титул — строка под ником */
         .profile-title { font-size: 13px; font-weight: 600; color: var(--tg-hint); margin-top: 2px; text-align: left; }
 
+        /* Звание по труду (L04) — отдельная сущность от экипированного custom title */
+        .rank-badge {
+            display: inline-block; flex-shrink: 0;
+            background: rgba(255,152,0,0.15); color: #ff9800;
+            padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 700;
+        }
+        .rank-progress { font-size: 12px; color: var(--tg-hint); margin-top: 4px; text-align: left; }
+
         /* Рамки аватара (слот frame). База — кольцо вокруг круглого аватара. */
         .frame { box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px currentColor; }
         .frame-notebook { color: #1e88e5; box-shadow: 0 0 0 2px var(--tg-bg), 0 0 0 4px #1e88e5; }

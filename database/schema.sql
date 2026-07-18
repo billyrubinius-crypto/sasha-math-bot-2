@@ -3217,6 +3217,9 @@ $function$;
 -- Звание не понижается и вычисляется из get_student_task_totals (solved_tasks + active_days):
 -- берётся высшая ступень, где выполнены ОБА порога. Баллы пробников не участвуют. Флаг
 -- has_unknown_legacy сигналит UI, что счётчик задач ведётся с запуска (legacy task_count null).
+-- Расширено в 020 (L04): next_title/next_level/next_tasks_required/next_days_required и
+-- tasks_to_next/days_to_next — прогресс к следующей ступени, чтобы клиент не копировал таблицу
+-- порогов. На топ-ступени (Легенда ЕГЭ) все next_*/*_to_next — null.
 create or replace function public.get_student_rank_title(p_student_id bigint)
  returns json
  language plpgsql
@@ -3228,6 +3231,10 @@ declare
   v_unknown bigint;
   v_name    text;
   v_level   integer;
+  v_next_name  text;
+  v_next_level integer;
+  v_next_tasks integer;
+  v_next_days  integer;
 begin
   select solved_tasks, active_days, unknown_approved_assignments
     into v_tasks, v_days, v_unknown
@@ -3246,12 +3253,29 @@ begin
   else                                         v_name := 'Новичок';     v_level := 1;
   end if;
 
+  -- Следующая ступень (для прогресса в UI). На седьмой ступени некуда — next_* остаются null.
+  case v_level
+    when 1 then v_next_name := 'Ученик';      v_next_level := 2; v_next_tasks := 100;  v_next_days := 15;
+    when 2 then v_next_name := 'Решатель';    v_next_level := 3; v_next_tasks := 400;  v_next_days := 40;
+    when 3 then v_next_name := 'Магистр';     v_next_level := 4; v_next_tasks := 1000; v_next_days := 80;
+    when 4 then v_next_name := 'Академик';    v_next_level := 5; v_next_tasks := 2000; v_next_days := 130;
+    when 5 then v_next_name := 'Профессор';   v_next_level := 6; v_next_tasks := 3500; v_next_days := 190;
+    when 6 then v_next_name := 'Легенда ЕГЭ'; v_next_level := 7; v_next_tasks := 5000; v_next_days := 250;
+    else        v_next_name := null;          v_next_level := null; v_next_tasks := null; v_next_days := null;
+  end case;
+
   return json_build_object(
-    'title',             v_name,
-    'level',             v_level,
-    'solved_tasks',      v_tasks,
-    'active_days',       v_days,
-    'has_unknown_legacy', coalesce(v_unknown, 0) > 0
+    'title',               v_name,
+    'level',                v_level,
+    'solved_tasks',         v_tasks,
+    'active_days',          v_days,
+    'has_unknown_legacy',   coalesce(v_unknown, 0) > 0,
+    'next_title',           v_next_name,
+    'next_level',           v_next_level,
+    'next_tasks_required',  v_next_tasks,
+    'next_days_required',   v_next_days,
+    'tasks_to_next',        case when v_next_tasks is null then null else greatest(v_next_tasks - v_tasks, 0) end,
+    'days_to_next',         case when v_next_days is null then null else greatest(v_next_days - v_days, 0) end
   );
 end;
 $function$;
