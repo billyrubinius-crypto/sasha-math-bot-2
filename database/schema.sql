@@ -2563,6 +2563,11 @@ begin
     end if;
   end if;
 
+  -- U02C: math settlement принятой ежедневки (pay-once, время проверки не ограничивает).
+  if v_asn.type = 'daily' then
+    perform public.settle_daily_math(v_asn.id);
+  end if;
+
   return json_build_object('student_id', v_asn.student_id, 'type', v_asn.type, 'season_points', v_pts);
 end;
 $function$;
@@ -3516,16 +3521,26 @@ end;
 $function$;
 
 -- get_daily_quests — публичный read/generate сегодняшнего набора.
+-- U02C: резервный settlement уже привязанного target (работает и при disabled generation).
 create or replace function public.get_daily_quests(p_student_id bigint)
  returns json
  language plpgsql
 as $function$
 declare
-  v_today date := (now() at time zone 'Europe/Moscow')::date;
+  v_today  date := (now() at time zone 'Europe/Moscow')::date;
+  v_target uuid;
 begin
   if public.stage4_generation_active() then
     perform public.ensure_daily_quest(p_student_id, v_today, true);
   end if;
+
+  select daily_assignment_id into v_target
+    from public.student_daily_quests
+   where student_id = p_student_id and quest_date = v_today;
+  if v_target is not null then
+    perform public.settle_daily_math(v_target);
+  end if;
+
   return public.daily_quest_state(p_student_id, v_today);
 end;
 $function$;
@@ -3620,6 +3635,114 @@ begin
     perform public.add_huikons(p_student_id, 3, 'daily_quest_life');
   end if;
 
+  -- U02C: combo, если math за сегодня уже оплачен (сериализовано FOR UPDATE выше).
+  perform public.settle_daily_combo(p_student_id, v_today);
+
   return public.daily_quest_state(p_student_id, v_today);
+end;
+$function$;
+
+-- =============================================================================
+-- --- Math settlement и combo Stage 4 (миграция 023, карточка U02C) ------------
+-- Принятие сегодняшней/прошлой daily -> pay-once math=3; combo=2 после обоих слотов.
+-- Время teacher approval settlement не ограничивает. Гейт — stage4_settlement_active()
+-- (неизменяемое start time), не generation-флаг. Полная мотивация и rollback — в
+-- database/migrations/023_stage4_math_combo_settlement.sql.
+-- =============================================================================
+
+-- stage4_settlement_active — гейт выплат: старт наступил и quest_date не раньше даты старта.
+create or replace function public.stage4_settlement_active(p_quest_date date)
+ returns boolean
+ language sql
+ stable
+as $function$
+  select ec.stage4_started_at is not null
+     and p_quest_date >= (ec.stage4_started_at at time zone 'Europe/Moscow')::date
+    from public.economy_config ec
+   where ec.id;
+$function$;
+
+-- settle_daily_combo — pay-once combo=2 при наличии math и life за дату (под FOR UPDATE вызова).
+create or replace function public.settle_daily_combo(p_student_id bigint, p_quest_date date)
+ returns void
+ language plpgsql
+as $function$
+declare
+  v_paid integer;
+begin
+  if exists (select 1 from public.daily_quest_reward_log
+              where student_id = p_student_id and quest_date = p_quest_date and reward_kind = 'math')
+     and exists (select 1 from public.daily_quest_reward_log
+                  where student_id = p_student_id and quest_date = p_quest_date and reward_kind = 'life') then
+    insert into public.daily_quest_reward_log (student_id, quest_date, reward_kind, bubliks)
+      values (p_student_id, p_quest_date, 'combo', 2)
+      on conflict (student_id, quest_date, reward_kind) do nothing;
+    get diagnostics v_paid = row_count;
+    if v_paid = 1 then
+      perform public.add_huikons(p_student_id, 2, 'daily_quest_combo');
+    end if;
+  end if;
+end;
+$function$;
+
+-- settle_daily_math — internal math settlement принятой daily (по серверным полям assignment).
+create or replace function public.settle_daily_math(p_assignment_id uuid)
+ returns void
+ language plpgsql
+as $function$
+declare
+  a        public.assignments%rowtype;
+  v_qdate  date;
+  v_qid    uuid;
+  v_target uuid;
+  v_paid   integer;
+begin
+  select * into a from public.assignments where id = p_assignment_id;
+  if not found or a.type <> 'daily' then
+    return;
+  end if;
+
+  if not (a.status = 'checked' and a.approval_status = 'approved'
+          and public.is_first_submission_on_time(a.first_submitted_at, a.submitted_at, a.scheduled_date)
+          and (coalesce(a.revision_count, 0) = 0
+               or (a.revision_deadline_at is not null
+                   and a.submitted_at is not null
+                   and a.submitted_at <= a.revision_deadline_at))) then
+    return;
+  end if;
+
+  v_qdate := a.scheduled_date;
+  if not public.stage4_settlement_active(v_qdate) then
+    return;
+  end if;
+
+  perform public.ensure_daily_quest(a.student_id, v_qdate, false);
+
+  select id, daily_assignment_id
+    into v_qid, v_target
+    from public.student_daily_quests
+   where student_id = a.student_id and quest_date = v_qdate
+   for update;
+
+  if v_target is null then
+    update public.student_daily_quests
+       set daily_assignment_id = a.id, updated_at = now()
+     where id = v_qid;
+    v_target := a.id;
+  end if;
+
+  if v_target <> a.id then
+    return;
+  end if;
+
+  insert into public.daily_quest_reward_log (student_id, quest_date, reward_kind, bubliks)
+    values (a.student_id, v_qdate, 'math', 3)
+    on conflict (student_id, quest_date, reward_kind) do nothing;
+  get diagnostics v_paid = row_count;
+  if v_paid = 1 then
+    perform public.add_huikons(a.student_id, 3, 'daily_quest_math');
+  end if;
+
+  perform public.settle_daily_combo(a.student_id, v_qdate);
 end;
 $function$;
