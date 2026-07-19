@@ -3850,13 +3850,22 @@ begin
     return;
   end if;
 
-  perform public.ensure_daily_quest(a.student_id, v_qdate, false);
+  -- U07: отсутствующую дневную строку создаём ТОЛЬКО при активной генерации. После rollback
+  -- (generation off, stage4_started_at сохранён) settlement уже созданных дней продолжается, но
+  -- НОВЫЙ день не создаётся — rollback останавливает новые наборы (SPEC §8).
+  if public.stage4_generation_active() then
+    perform public.ensure_daily_quest(a.student_id, v_qdate, false);
+  end if;
 
   select id, daily_assignment_id
     into v_qid, v_target
     from public.student_daily_quests
    where student_id = a.student_id and quest_date = v_qdate
    for update;
+
+  if not found then
+    return;  -- U07: генерация выключена и дневной строки нет — не создаём и не платим
+  end if;
 
   if v_target is null then
     update public.student_daily_quests
