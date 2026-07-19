@@ -101,6 +101,26 @@
         .now-arrow { font-size: 18px; color: var(--tg-hint); }
         .summary-empty { text-align: center; padding: 12px 4px 4px; color: var(--tg-hint); font-size: 13px; }
 
+        /* Сегодня: math + life квесты Stage 4 (U04) */
+        .today-block { background: var(--tg-secondary); border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .today-block-title { font-weight: 800; font-size: 15px; }
+        .quest-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(128,128,128,0.14); }
+        .quest-row:last-child { border-bottom: none; }
+        .quest-row-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; background: var(--tg-bg); font-size: 15px; }
+        .quest-row-main { min-width: 0; flex: 1; }
+        .quest-row-title { display: block; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+        .quest-row-meta { display: block; font-size: 11px; color: var(--tg-hint); margin-top: 2px; overflow-wrap: anywhere; }
+        .quest-row-note { display: block; font-size: 10px; color: var(--tg-hint); margin-top: 4px; font-style: italic; }
+        .quest-row-trailing { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .quest-badge { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 10px; white-space: nowrap; }
+        .quest-badge-paid { background: rgba(40,167,69,0.15); color: #28a745; }
+        .quest-badge-wait { background: rgba(33,150,243,0.15); color: #2196f3; }
+        .quest-badge-locked { background: rgba(128,128,128,0.15); color: var(--tg-hint); }
+        .quest-claim-btn { background: var(--tg-btn); color: var(--tg-btn-text); border: none; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .quest-claim-btn:disabled { opacity: 0.5; cursor: default; }
+        .quest-replace-btn { background: var(--tg-bg); border: 1px solid rgba(128,128,128,0.3); border-radius: 8px; width: 32px; height: 32px; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+        .quest-replace-btn:disabled { opacity: 0.4; cursor: default; }
+
         /* График пробников */
         .mock-chart-section { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .chart-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }

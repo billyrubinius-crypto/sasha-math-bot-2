@@ -62,6 +62,15 @@
             </div>
         </div>
 
+        <!-- Сегодня: math + life квесты Stage 4 (U04). Все состояния — только с сервера
+             (daily_quest_state); клиент их не выводит из assignments и не считает eligibility. -->
+        <div class="today-block" id="today-block">
+            <div class="today-block-head">
+                <div class="today-block-title">Сегодня</div>
+            </div>
+            <div id="today-quests-content"><div class="summary-empty">Загрузка...</div></div>
+        </div>
+
         <div class="stats-grid">
             <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
             <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
@@ -270,6 +279,7 @@
     <script src="js/student-week.js"></script>
     <script src="js/student-progress.js"></script>
     <script src="js/student-shop.js"></script>
+    <script src="js/student-quests.js"></script>
     <script src="js/student-app.js"></script>
 </body>
 </html>

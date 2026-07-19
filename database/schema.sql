@@ -3406,7 +3406,10 @@ as $function$
    limit 1;
 $function$;
 
--- daily_quest_state — read-модель дневного набора для собственного ученика (§9).
+-- daily_quest_state — read-модель дневного набора для собственного ученика (§9). Расширена
+-- в U04 (миграция 027): math_paid/combo_paid/math_status/combo_status — сервер вычисляет
+-- статусы для отображения по assignments/ledger, клиент их только показывает (не выводит из
+-- assignments сам). Правила и обоснование — в 027_stage4_math_combo_status.sql.
 create or replace function public.daily_quest_state(p_student_id bigint, p_quest_date date)
  returns json
  language sql
@@ -3416,9 +3419,22 @@ as $function$
     select * from public.student_daily_quests
      where student_id = p_student_id and quest_date = p_quest_date
   ),
+  a as (
+    select status, approval_status
+      from public.assignments
+     where id = (select daily_assignment_id from q)
+  ),
+  math_paid as (
+    select 1 from public.daily_quest_reward_log
+     where student_id = p_student_id and quest_date = p_quest_date and reward_kind = 'math'
+  ),
   life_paid as (
     select 1 from public.daily_quest_reward_log
      where student_id = p_student_id and quest_date = p_quest_date and reward_kind = 'life'
+  ),
+  combo_paid as (
+    select 1 from public.daily_quest_reward_log
+     where student_id = p_student_id and quest_date = p_quest_date and reward_kind = 'combo'
   )
   select json_build_object(
     'quest_date',          p_quest_date,
@@ -3427,7 +3443,23 @@ as $function$
     'replacements_used',   coalesce((select replacements_used from q), 0),
     'replacements_left',   greatest(2 - coalesce((select replacements_used from q), 0), 0),
     'life_paid',           exists (select 1 from life_paid),
+    'math_paid',           exists (select 1 from math_paid),
+    'combo_paid',          exists (select 1 from combo_paid),
     'generation_active',   public.stage4_generation_active(),
+    'math_status',
+      case
+        when exists (select 1 from math_paid) then 'completed'
+        when (select daily_assignment_id from q) is null then 'unavailable'
+        when (select status from a) = 'submitted' then 'waiting_review'
+        when (select status from a) = 'checked' and (select approval_status from a) = 'rejected' then 'active'
+        else 'active'
+      end,
+    'combo_status',
+      case
+        when exists (select 1 from combo_paid) then 'completed'
+        when exists (select 1 from life_paid) and not exists (select 1 from math_paid) then 'waiting_review'
+        else 'locked'
+      end,
     'life', (
       select json_build_object(
         'template_code', t.template_code,
