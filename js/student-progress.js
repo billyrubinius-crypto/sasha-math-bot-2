@@ -210,18 +210,16 @@
         // --- ГРАФИК РЕЗУЛЬТАТОВ ПРОБНИКОВ ---
         let mockExamPoints = [];
 
+        // U05B: единственный источник — RPC get_mock_exam_trajectory (U05A), читает только
+        // weekly_mock_exams. avg/range/trend/delta считает сервер; клиент их не пересчитывает
+        // (SPEC_STAGE4 §7). Legacy mock_exam_results (до P02A) здесь больше не читается.
         async function loadMockExamChart() {
             const container = document.getElementById('mock-chart-container');
             try {
-                const { data, error } = await db
-                    .from('mock_exam_results')
-                    .select('exam_name, score, exam_date, created_at')
-                    .eq('student_id', currentUser.id)
-                    .order('created_at', { ascending: true });
-
+                const { data, error } = await db.rpc('get_mock_exam_trajectory', { p_student_id: currentUser.id });
                 if (error) throw error;
 
-                if (!data || data.length === 0) {
+                if (!data || !data.count) {
                     container.innerHTML = `<div class="chart-empty">🧮 Пока нет результатов пробников</div>`;
                     return;
                 }
@@ -233,8 +231,11 @@
             }
         }
 
-        // Свой SVG-график без внешних библиотек: точка = один пробник, ось X — название пробника (в порядке синхронизации)
-        function renderMockChart(container, points) {
+        // Свой SVG-график без внешних библиотек: точка = один пробник, ось X — порядковый номер
+        // недели (в хронологическом порядке; пропущенные недели не интерполируются — здесь просто
+        // нет промежуточной точки, ось не «знает» про календарный разрыв, как и раньше).
+        function renderMockChart(container, trajectory) {
+            const points = trajectory.points || [];
             mockExamPoints = points;
 
             const W = 320, H = 140;
@@ -280,12 +281,38 @@
                     ${dots}
                     ${labels}
                 </svg>
-                <div id="exam-info-box" class="exam-info-box">${esc(lastResultSummary(points))}</div>
+                <div id="exam-info-box" class="exam-info-box">${esc(trajectorySummary(trajectory))}</div>
+                <div class="chart-disclaimer">Диапазон последних пробников — не гарантия балла ЕГЭ.</div>
             `;
         }
 
-        // Последний результат и его изменение к предыдущему пробнику (P02B) — простая разница
-        // двух чисел, не прогноз: карточка запрещает медицинские/гарантирующие формулировки.
+        // Сводка по готовым серверным полям (U05A): delta/avg/range/trend клиент не считает сам.
+        function trajectorySummary(trajectory) {
+            const { last_score, delta_last, avg_last_3, min_last_3, max_last_3, trend } = trajectory;
+            const parts = [`Последний результат: ${last_score}`];
+            if (delta_last !== null && delta_last !== undefined) {
+                const sign = delta_last > 0 ? '+' : '';
+                parts.push(`(${sign}${delta_last} к предыдущему)`);
+            }
+            if (avg_last_3 !== null && avg_last_3 !== undefined) {
+                parts.push(`· среднее по 3: ${avg_last_3} (${min_last_3}–${max_last_3})`);
+            }
+            const trendLabels = { up: 'растёт 📈', flat: 'стабильно ➖', down: 'снижается 📉' };
+            if (trend) parts.push(`· ${trendLabels[trend] || trend}`);
+            parts.push('· нажми на точку для деталей');
+            return parts.join(' ');
+        }
+
+        function showExamInfo(index) {
+            const p = mockExamPoints[index];
+            const box = document.getElementById('exam-info-box');
+            if (!p || !box) return;
+            const [y, m, d] = p.week_start.split('-');
+            box.innerHTML = `Неделя от ${d}.${m}.${y} • ${esc(p.score)} баллов`;
+        }
+
+        // Не используются с U05B (трактория читается из get_mock_exam_trajectory, delta/summary
+        // считает сервер) — оставлены нетронутыми по правилу «не удалять существующий код».
         function lastResultSummary(points) {
             const last = Number(points[points.length - 1].score) || 0;
             if (points.length < 2) return `Последний результат: ${last}. Нажми на точку, чтобы увидеть детали`;
@@ -295,19 +322,9 @@
             return `Последний результат: ${last} (${sign}${delta} к предыдущему). Нажми на точку, чтобы увидеть детали`;
         }
 
-        // exam_date — чистая дата (YYYY-MM-DD, без времени), парсим вручную, чтобы не словить сдвиг на день из-за часового пояса браузера
         function formatPlainDate(dateStr) {
             const [y, m, d] = dateStr.split('-');
             return `${d}.${m}.${y}`;
-        }
-
-        function showExamInfo(index) {
-            const p = mockExamPoints[index];
-            const box = document.getElementById('exam-info-box');
-            if (!p || !box) return;
-            const date = p.exam_date ? formatPlainDate(p.exam_date)
-                : (p.created_at ? new Date(p.created_at).toLocaleDateString('ru-RU') : '—');
-            box.innerHTML = `<b>${esc(p.exam_name || 'Пробник')}</b> • ${esc(p.score)} баллов • ${date}`;
         }
 
         async function loadBalanceHistory() {

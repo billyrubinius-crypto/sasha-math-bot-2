@@ -121,6 +121,9 @@
                 <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Результат (0–100):</label>
                 <input type="number" id="mock-score" min="0" max="100" step="1" placeholder="Балл пробника" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
                 <button class="btn-primary" id="btn-submit-mock" onclick="submitMockExam()">Сохранить результат</button>
+                <!-- Траектория выбранного ученика (U05B) — та же RPC get_mock_exam_trajectory,
+                     что и student/parent; без life quests, только пробники (SPEC_STAGE4 §9). -->
+                <div id="mock-trajectory-container"></div>
             </div>
 
             <div class="week-planner">

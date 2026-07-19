@@ -220,6 +220,7 @@
 
         function onMockUsernameInput() {
             selectedMockStudentId = null;
+            document.getElementById('mock-trajectory-container').innerHTML = '';
             const query = document.getElementById('mock-username-input').value.trim();
             const box = document.getElementById('mock-username-suggestions');
             clearTimeout(mockSearchTimeout);
@@ -255,6 +256,63 @@
             selectedMockStudentId = telegramId;
             document.getElementById('mock-username-input').value = username;
             document.getElementById('mock-username-suggestions').style.display = 'none';
+            loadMockTrajectory(telegramId);
+        }
+
+        // Траектория пробников выбранного ученика (U05B) — единственный источник —
+        // get_mock_exam_trajectory (U05A, только weekly_mock_exams); avg/range/trend уже
+        // посчитаны сервером, здесь их не пересчитываем. Никакой life-истории — эта RPC её и не
+        // возвращает (SPEC_STAGE4 §9: teacher видит каталог + траекторию, без life quests).
+        async function loadMockTrajectory(studentId) {
+            const container = document.getElementById('mock-trajectory-container');
+            container.innerHTML = '<div style="text-align:center; padding:10px; color:#999; font-size:12px;">Загрузка траектории...</div>';
+            try {
+                const { data, error } = await db.rpc('get_mock_exam_trajectory', { p_student_id: studentId });
+                if (error) throw error;
+                renderMockTrajectory(container, data);
+            } catch (e) {
+                container.innerHTML = '<div style="text-align:center; padding:10px; color:#dc3545; font-size:12px;">Не удалось загрузить траекторию</div>';
+            }
+        }
+
+        // Компактная inline-SVG «искра» + текстовая сводка — тот же приём, что в student-progress.js
+        // (index.html), но минимальный и независимый: teacher.html не подключает student-скрипты.
+        function renderMockTrajectory(container, trajectory) {
+            if (!trajectory || !trajectory.count) {
+                container.innerHTML = '<div style="text-align:center; padding:10px; color:#999; font-size:12px;">Пока нет результатов пробников</div>';
+                return;
+            }
+
+            const points = trajectory.points || [];
+            const W = 260, H = 70, padL = 24, padR = 8, padT = 6, padB = 6;
+            const plotW = W - padL - padR, plotH = H - padT - padB;
+            const scores = points.map(p => Number(p.score) || 0);
+            const minScore = Math.min(40, Math.floor(Math.min(...scores) / 10) * 10);
+            const maxScore = Math.max(minScore + 20, Math.ceil(Math.max(...scores) / 10) * 10);
+            const xFor = (i) => points.length > 1 ? padL + (plotW * i / (points.length - 1)) : padL + plotW / 2;
+            const yFor = (v) => padT + plotH - (plotH * (v - minScore) / (maxScore - minScore));
+            const linePoints = points.map((p, i) => `${xFor(i)},${yFor(Number(p.score) || 0)}`).join(' ');
+            const dots = points.map((p, i) => `<circle cx="${xFor(i)}" cy="${yFor(Number(p.score) || 0)}" r="3" fill="#2481cc"/>`).join('');
+
+            const trendLabels = { up: 'растёт 📈', flat: 'стабильно ➖', down: 'снижается 📉' };
+            const parts = [`Последний результат: ${trajectory.last_score}`];
+            if (trajectory.delta_last !== null && trajectory.delta_last !== undefined) {
+                const sign = trajectory.delta_last > 0 ? '+' : '';
+                parts.push(`(${sign}${trajectory.delta_last})`);
+            }
+            if (trajectory.avg_last_3 !== null && trajectory.avg_last_3 !== undefined) {
+                parts.push(`· среднее по 3: ${trajectory.avg_last_3} (${trajectory.min_last_3}–${trajectory.max_last_3})`);
+            }
+            if (trajectory.trend) parts.push(`· ${trendLabels[trajectory.trend] || trajectory.trend}`);
+
+            container.innerHTML = `
+                <svg viewBox="0 0 ${W} ${H}" style="width:100%; max-width:260px; height:auto; display:block; margin-top:10px;">
+                    <polyline points="${linePoints}" fill="none" stroke="#2481cc" stroke-width="1.5" opacity="0.5"/>
+                    ${dots}
+                </svg>
+                <div style="font-size:12px; color:#666; margin-top:4px;">${esc(parts.join(' '))}</div>
+                <div style="font-size:10px; color:#999; margin-top:2px;">Диапазон последних пробников — не гарантия балла ЕГЭ.</div>
+            `;
         }
 
         // Запись результата пробника — только через RPC record_weekly_mock_exam (P02A):
@@ -305,6 +363,9 @@
                 if (data.base_awarded) msg += '\n+20 🥯 за пробник';
                 if (data.record_awarded) msg += '\n+30 🥯 личный рекорд!';
                 alert(msg);
+
+                // Траектория сразу отражает исправление (U05B) — до сброса выбранного ученика.
+                await loadMockTrajectory(selectedMockStudentId);
 
                 document.getElementById('mock-username-input').value = '';
                 selectedMockStudentId = null;

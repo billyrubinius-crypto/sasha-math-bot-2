@@ -110,6 +110,19 @@ async def get_current_week(student_id: int) -> dict:
     return resp.json()
 
 
+# U05B — единственный источник траектории пробников: get_mock_exam_trajectory (U05A), читает
+# только weekly_mock_exams. avg/range/trend/delta считает сервер; здесь их не пересчитываем
+# (SPEC_STAGE4 §7). Legacy mock_exam_results (до P02A, get_mock_exams ниже) этой RPC не задета.
+async def get_mock_exam_trajectory(student_id: int) -> dict:
+    resp = await http_client.post(
+        f'{SUPABASE_URL}/rest/v1/rpc/get_mock_exam_trajectory',
+        headers=SUPABASE_HEADERS,
+        json={'p_student_id': student_id}
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def format_date_ru(value: str | None) -> str:
     try:
         return datetime.strptime(value, '%Y-%m-%d').strftime('%d.%m')
@@ -208,35 +221,66 @@ def format_score_delta(exams: list) -> str | None:
     return f"Изменение к предыдущему: {sign}{delta}"
 
 
-def format_progress_message(student_name: str, progress_rows: list, exams: list) -> str:
+def format_plain_date(date_str: str | None) -> str:
+    """week_start — чистая дата (YYYY-MM-DD, без времени), парсим вручную, без часовых поясов
+    (как format_exam_date выше)."""
+    if not date_str:
+        return '—'
+    try:
+        y, m, d = date_str.split('-')
+        return f'{d}.{m}.{y}'
+    except (ValueError, AttributeError):
+        return '—'
+
+
+def format_trajectory_summary(trajectory: dict) -> str:
+    """Сводка по готовым серверным полям get_mock_exam_trajectory (U05A) — delta/avg/range/trend
+    здесь не пересчитываются, только форматируются (SPEC_STAGE4 §7)."""
+    parts = [f"Последний результат: {trajectory.get('last_score')}"]
+    delta = trajectory.get('delta_last')
+    if delta is not None:
+        sign = '+' if delta > 0 else ''
+        parts.append(f"({sign}{delta})")
+    avg = trajectory.get('avg_last_3')
+    if avg is not None:
+        parts.append(f"· среднее по 3: {avg} ({trajectory.get('min_last_3')}–{trajectory.get('max_last_3')})")
+    trend = trajectory.get('trend')
+    trend_labels = {'up': 'растёт 📈', 'flat': 'стабильно ➖', 'down': 'снижается 📉'}
+    if trend:
+        parts.append(f"· {trend_labels.get(trend, trend)}")
+    return " ".join(parts) + "\nДиапазон последних пробников — не гарантия балла ЕГЭ."
+
+
+def format_progress_message(student_name: str, progress_rows: list, trajectory: dict) -> str:
     progress_by_type = {row['type']: row for row in progress_rows}
     lines = [f"📊 Результаты ученика <b>{student_name}</b>:\n"]
     for key, label in TYPE_LABELS.items():
         row = progress_by_type.get(key, {'issued': 0, 'completed': 0})
         lines.append(f"{label}: {row['completed']} из {row['issued']} выполнено")
 
-    if exams:
+    points = (trajectory or {}).get('points') or []
+    if points:
         lines.append("\n🧮 Пробники:")
-        for i, exam in enumerate(exams, 1):
-            date_str = format_exam_date(exam)
-            lines.append(f"№{i} «{exam['exam_name']}» — {exam['score']} баллов ({date_str})")
-        delta_text = format_score_delta(exams)
-        if delta_text:
-            lines.append(delta_text)
+        for i, point in enumerate(points, 1):
+            date_str = format_plain_date(point.get('week_start'))
+            lines.append(f"№{i} — {point['score']} баллов ({date_str})")
+        lines.append(format_trajectory_summary(trajectory))
     else:
         lines.append("\n🧮 Пробников пока нет.")
 
     return "\n".join(lines)
 
 
-def render_mock_chart(exams: list):
-    """Рисует график результатов пробников в PNG — так же, как график на экране профиля в Mini App:
-    ось X — порядковый номер («№1», «№2»...), название пробника и дата синхронизации уходят в текст сообщения."""
-    if not exams:
+def render_mock_chart(trajectory: dict):
+    """Рисует график траектории пробников в PNG — так же, как график на экране профиля в Mini App:
+    ось X — порядковый номер («№1», «№2»...), дата уходит в текст сообщения. Источник — points из
+    get_mock_exam_trajectory (U05A/U05B), не legacy mock_exam_results."""
+    points = (trajectory or {}).get('points') or []
+    if not points:
         return None
 
-    labels = [f'№{i + 1}' for i in range(len(exams))]
-    scores = [float(e['score']) for e in exams]
+    labels = [f'№{i + 1}' for i in range(len(points))]
+    scores = [float(p['score']) for p in points]
 
     fig, ax = plt.subplots(figsize=(6, 3.6), dpi=150)
     ax.plot(labels, scores, marker='o', color='#2481cc', linewidth=2)
@@ -262,13 +306,13 @@ def render_mock_chart(exams: list):
 async def send_student_progress(message: types.Message, student_id: int, student_name: str):
     try:
         progress = await get_progress(student_id)
-        exams = await get_mock_exams(student_id)
+        trajectory = await get_mock_exam_trajectory(student_id)
     except httpx.HTTPError as e:
         logging.warning(f"Не удалось загрузить прогресс {student_id}: {e}")
         await message.answer(NETWORK_ERROR_TEXT)
         return
 
-    text = format_progress_message(student_name, progress, exams)
+    text = format_progress_message(student_name, progress, trajectory)
 
     # Блок текущей недели (W07) — необязательное дополнение: сбой её загрузки не должен
     # ломать старый /progress (карточка требует "старый /progress работает").
@@ -280,7 +324,7 @@ async def send_student_progress(message: types.Message, student_id: int, student
 
     await message.answer(text, parse_mode="HTML")
 
-    chart = render_mock_chart(exams)
+    chart = render_mock_chart(trajectory)
     if chart:
         photo = types.BufferedInputFile(chart.read(), filename="progress.png")
         await message.answer_photo(photo)
