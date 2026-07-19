@@ -2390,6 +2390,53 @@ begin
 end;
 $function$;
 
+-- get_mock_exam_trajectory — read-only траектория пробников для student/teacher/parent (U05A,
+-- миграция 028, SPEC_STAGE4 §7). Источник только weekly_mock_exams; ничего не пишет/не
+-- начисляет. count/points всегда; delta_last при 2+; avg/min/max_last_3 при 3+; trend
+-- (сравнение двух непересекающихся троек по позиции, threshold 2) при 6+. Пропуски не
+-- интерполируются — в points только реально существующие строки.
+create or replace function public.get_mock_exam_trajectory(p_student_id bigint)
+ returns jsonb
+ language sql
+ stable
+as $function$
+  with ordered as (
+    select array_agg(week_start order by week_start) as week_starts,
+           array_agg(score      order by week_start) as scores,
+           count(*)::int as cnt
+      from public.weekly_mock_exams
+     where student_id = p_student_id
+  )
+  select jsonb_build_object(
+    'count', cnt,
+    'points', (
+      select coalesce(jsonb_agg(jsonb_build_object('week_start', ws, 'score', sc) order by ws), '[]'::jsonb)
+        from ordered, unnest(week_starts, scores) as u(ws, sc)
+    ),
+    'last_score', case when cnt >= 1 then scores[cnt] else null end,
+    'delta_last', case when cnt >= 2 then scores[cnt] - scores[cnt - 1] else null end,
+    'avg_last_3', case when cnt >= 3
+      then (select round(avg(x), 1) from unnest(scores[cnt - 2:cnt]) as x)
+      else null end,
+    'min_last_3', case when cnt >= 3
+      then (select min(x) from unnest(scores[cnt - 2:cnt]) as x)
+      else null end,
+    'max_last_3', case when cnt >= 3
+      then (select max(x) from unnest(scores[cnt - 2:cnt]) as x)
+      else null end,
+    'trend', case when cnt >= 6 then (
+      case
+        when (select avg(x) from unnest(scores[cnt - 2:cnt]) as x)
+           - (select avg(x) from unnest(scores[cnt - 5:cnt - 3]) as x) >= 2 then 'up'
+        when (select avg(x) from unnest(scores[cnt - 5:cnt - 3]) as x)
+           - (select avg(x) from unnest(scores[cnt - 2:cnt]) as x) >= 2 then 'down'
+        else 'flat'
+      end
+    ) else null end
+  )
+  from ordered;
+$function$;
+
 -- =============================================================================
 -- W09 / миграция 017 — экономический cutover на недельную модель. Полная мотивация,
 -- решения пользователя и предел леджера пробников — в шапке 017_weekly_economy_cutover.sql.
