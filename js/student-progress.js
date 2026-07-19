@@ -455,6 +455,13 @@
             { code: 'perfect_month_weekly', icon: '✨', name: 'Идеальный месяц' },
             { code: 'rebirth_week',         icon: '🕊', name: 'Возвращение' },
             { code: 'clean_10',             icon: '🎯', name: 'С первого раза' },
+            // Достижения жизненных привычек Stage 4 (U06) — без бубликов, только badge.
+            { code: 'life_first',           icon: '🌿', name: 'Первый челлендж' },
+            { code: 'life_7',               icon: '🏃', name: 'Семь челленджей' },
+            { code: 'life_30',              icon: '🧗', name: 'Тридцать челленджей' },
+            { code: 'life_100',             icon: '🏆', name: 'Сотня челленджей' },
+            { code: 'life_variety_5',       icon: '🎨', name: 'Пять разных' },
+            { code: 'life_streak_7',        icon: '🌈', name: 'Неделя привычки' },
             { code: 'streak_7',      icon: '🔥', name: 'Неделя огня',            legacy: true },
             { code: 'streak_30',     icon: '📆', name: 'Месяц без пропусков',     legacy: true },
             { code: 'streak_100',    icon: '💯', name: 'Сотня',                  legacy: true },

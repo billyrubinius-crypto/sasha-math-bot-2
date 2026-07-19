@@ -3681,6 +3681,54 @@ begin
 end;
 $function$;
 
+-- grant_life_achievements — pay-zero достижения жизненных привычек (U06, миграция 029, §6/§10.4).
+-- Идемпотентный пересчёт из daily_quest_reward_log; выдача через grant_achievement_server(...,0)
+-- (без add_huikons/balance_history). Полная мотивация — в 029_stage4_life_achievements.sql.
+create or replace function public.grant_life_achievements(p_student_id bigint)
+ returns void
+ language plpgsql
+as $function$
+declare
+  v_life_count integer;
+  v_variety    integer;
+  v_max_streak integer;
+begin
+  select count(*) into v_life_count
+    from public.daily_quest_reward_log
+   where student_id = p_student_id and reward_kind = 'life';
+
+  if v_life_count >= 1   then perform public.grant_achievement_server(p_student_id, 'life_first', 0); end if;
+  if v_life_count >= 7   then perform public.grant_achievement_server(p_student_id, 'life_7',     0); end if;
+  if v_life_count >= 30  then perform public.grant_achievement_server(p_student_id, 'life_30',    0); end if;
+  if v_life_count >= 100 then perform public.grant_achievement_server(p_student_id, 'life_100',   0); end if;
+
+  select count(distinct q.life_template_code) into v_variety
+    from public.daily_quest_reward_log r
+    join public.student_daily_quests q
+      on q.student_id = r.student_id and q.quest_date = r.quest_date
+   where r.student_id = p_student_id and r.reward_kind = 'life'
+     and q.life_template_code is not null;
+
+  if v_variety >= 5 then perform public.grant_achievement_server(p_student_id, 'life_variety_5', 0); end if;
+
+  with both_days as (
+    select quest_date
+      from public.daily_quest_reward_log
+     where student_id = p_student_id and reward_kind in ('math', 'life')
+     group by quest_date
+    having count(distinct reward_kind) = 2
+  ),
+  grouped as (
+    select quest_date - (row_number() over (order by quest_date))::int as grp
+      from both_days
+  )
+  select coalesce(max(cnt), 0) into v_max_streak
+    from (select count(*) as cnt from grouped group by grp) runs;
+
+  if v_max_streak >= 7 then perform public.grant_achievement_server(p_student_id, 'life_streak_7', 0); end if;
+end;
+$function$;
+
 -- claim_life_quest — self-report life=3, идемпотентно (pay-once ledger + add_huikons).
 create or replace function public.claim_life_quest(p_student_id bigint)
  returns json
@@ -3716,6 +3764,9 @@ begin
 
   -- U02C: combo, если math за сегодня уже оплачен (сериализовано FOR UPDATE выше).
   perform public.settle_daily_combo(p_student_id, v_today);
+
+  -- U06: pay-zero достижения жизненных привычек (идемпотентно).
+  perform public.grant_life_achievements(p_student_id);
 
   return public.daily_quest_state(p_student_id, v_today);
 end;
@@ -3827,6 +3878,9 @@ begin
   end if;
 
   perform public.settle_daily_combo(a.student_id, v_qdate);
+
+  -- U06: pay-zero достижения жизненных привычек (идемпотентно; поздний math может закрыть streak).
+  perform public.grant_life_achievements(a.student_id);
 end;
 $function$;
 
