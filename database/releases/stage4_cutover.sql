@@ -12,18 +12,31 @@
 -- raise откатывает всё, частичный firing невозможен.
 --
 -- Аварийная остановка (ничего не применяется) при:
+--   * economy_config не содержит ровно одну singleton-строку (U08B: повреждённое окружение —
+--     firing не пытается молча восстановить конфиг, только останавливается до любого UPDATE);
 --   * stage4_started_at не NULL или generation уже true (уже запущено);
 --   * наличии строк student_daily_quests / daily_quest_reward_log (частичный/реальный прогон);
 --   * отсутствии любого ожидаемого item_code;
 --   * любой текущей цене, не равной зафиксированной pre-cutover;
---   * frame_fire100 отсутствует или уже не active.
+--   * frame_fire100 отсутствует или уже не active;
+--   * финальный UPDATE economy_config затронул не ровно одну строку (U08B: singleton исчез между
+--     preflight и APPLY — весь do-блок аварийно откатывается, включая уже применённые shop_items).
 -- =============================================================================
 do $$
 declare
-  v_missing  int;
-  v_badprice int;
-  v_frame    boolean;
+  v_missing    int;
+  v_badprice   int;
+  v_frame      boolean;
+  v_config_cnt int;
+  v_row_count  int;
 begin
+  -- preflight 0 (U08B): economy_config обязана содержать ровно одну singleton-строку id=true.
+  -- Проверяется ДО любого UPDATE — отсутствие строки не чинится молча (нет fallback insert/upsert).
+  select count(*) into v_config_cnt from public.economy_config where id;
+  if v_config_cnt <> 1 then
+    raise exception 'FIRING ABORT: economy_config singleton-строка отсутствует (count=%), окружение повреждено', v_config_cnt;
+  end if;
+
   -- preflight 1: конфиг обязан быть чистым dormant
   if (select stage4_started_at from public.economy_config where id) is not null then
     raise exception 'FIRING ABORT: stage4_started_at не NULL — Stage 4 уже запущена';
@@ -90,6 +103,10 @@ begin
      set stage4_started_at         = coalesce(stage4_started_at, now()),
          stage4_generation_enabled = true
    where id;
+  get diagnostics v_row_count = row_count;
+  if v_row_count <> 1 then
+    raise exception 'FIRING ABORT: финальный UPDATE economy_config затронул % строк(и) вместо 1 — весь firing откатывается', v_row_count;
+  end if;
 
   raise notice 'Stage 4 FIRED: approved prices applied, generation on, started_at=%',
     (select stage4_started_at from public.economy_config where id);

@@ -1,8 +1,9 @@
 -- =============================================================================
--- database/tests/u08a_regression.sql — U08A regression harness
--- (Bot 2.0, Stage 4; SPEC_STAGE4.md §§2, 8, 9; карточка U08A)
+-- database/tests/u08a_regression.sql — U08A/U08B regression harness
+-- (Bot 2.0, Stage 4; SPEC_STAGE4.md §§2, 8, 9; карточки U08A, U08B)
 --
--- Проверки 1–8 карточки U08A (toggle-проверки 9 и живой smoke 10 — в браузере, не в SQL).
+-- Проверки 1–8 карточки U08A (toggle-проверки 9 и живой smoke 10 — в браузере, не в SQL) +
+-- проверка 9 (B2-U23, карточка U08B) — singleton-guard economy_config в release firing.
 -- Каждый ГРУППОВОЙ блок выполняется в отдельной begin;...rollback; — dev не изменяется, вся
 -- синтетика (telegram_id >= 995000000, шаблон 'u08_r') откатывается. Прогонять по одному блоку;
 -- каждый блок отдаёт свой грид отчёта последним SELECT перед rollback.
@@ -195,6 +196,148 @@ begin
     and (select stage4_started_at is null from public.economy_config where id),
     format('a: raised=%s gen_after=%s crown_after=%s | b: raised=%s gen_after=%s',
       raised_a, gen, crown_p, raised_b, (select stage4_generation_enabled from public.economy_config where id)));
+end $$;
+
+-- 9. B2-U23 (U08B) — singleton-guard economy_config: success ROW_COUNT=1 + missing-config abort.
+-- Дословно повторяет actual preflight/APPLY блок из database/releases/stage4_cutover.sql
+-- (singleton-guard + все 4 существующих preflight + полный список из 28 item_code + финальный
+-- economy_config UPDATE с проверкой ROW_COUNT). Восстановление — только общим rollback блока,
+-- без ручного компенсирующего UPDATE после missing-config сценария.
+do $$
+declare
+  v_missing int; v_badprice int; v_frame boolean; v_config_cnt int; v_row_count int;
+  crown_before int; crown_after_success int; crown_after_abort int;
+  frame_before boolean; frame_after_abort boolean;
+  gen_after_success boolean; started_after_success timestamptz; success_raised boolean := false;
+  abort_raised boolean := false;
+begin
+  -- Check 9 не полагается на состояние, оставленное предыдущими проверками файла (check 8
+  -- намеренно не восстанавливает crown после своего sub-check 'b' с неожиданной ценой) —
+  -- явно приводим каталог/config к чистому pre-cutover dormant перед success sub-check.
+  update public.shop_items set price = 50
+   where item_code in ('color_red','color_orange','color_green','color_teal',
+                       'color_blue','color_indigo','color_pink','color_brown');
+  update public.shop_items set price = 30   where item_code = 'status_emoji_change';
+  update public.shop_items set price = 600  where item_code = 'crown';
+  update public.shop_items set price = 700  where item_code = 'golden_nick';
+  update public.shop_items set price = 900  where item_code = 'title_yaschenko';
+  update public.shop_items set price = 2000 where item_code = 'title_custom';
+  update public.shop_items set active = true where item_code = 'frame_fire100';
+  update public.shop_items set price = 200  where item_code = 'title_groza';
+  update public.shop_items set price = 150  where item_code in ('title_elon','title_derivative');
+  update public.shop_items set price = 120  where item_code = 'title_sanchez';
+  update public.shop_items set price = 150  where item_code in ('frame_notebook','frame_winter');
+  update public.shop_items set price = 200  where item_code in ('bg_grid','bg_space','bg_aurora','bg_draft');
+  update public.shop_items set price = 750  where item_code in ('frame_pulsar','frame_orbit');
+  update public.shop_items set price = 1500 where item_code in ('frame_legend_1','frame_legend_2','frame_legend_3','frame_legend_4');
+  update public.economy_config set stage4_generation_enabled = false, stage4_started_at = null where id;
+
+  -- --- (a) success path на присутствующей singleton-строке: firing проходит, ROW_COUNT=1 ---
+  select price into crown_before from public.shop_items where item_code='crown';
+  begin
+    select count(*) into v_config_cnt from public.economy_config where id;
+    if v_config_cnt <> 1 then raise exception 'singleton missing (count=%)', v_config_cnt; end if;
+
+    if (select stage4_started_at from public.economy_config where id) is not null then
+      raise exception 'FIRING ABORT: start not null'; end if;
+    if (select stage4_generation_enabled from public.economy_config where id) then
+      raise exception 'FIRING ABORT: generation already true'; end if;
+    if exists (select 1 from public.student_daily_quests) or exists (select 1 from public.daily_quest_reward_log) then
+      raise exception 'FIRING ABORT: quest data present'; end if;
+
+    with expected(item_code, old_price) as (values
+      ('color_red',50),('color_orange',50),('color_green',50),('color_teal',50),
+      ('color_blue',50),('color_indigo',50),('color_pink',50),('color_brown',50),
+      ('status_emoji_change',30),('crown',600),('golden_nick',700),
+      ('title_yaschenko',900),('title_custom',2000),
+      ('title_groza',200),('title_elon',150),('title_sanchez',120),('title_derivative',150),
+      ('frame_notebook',150),('frame_winter',150),
+      ('bg_grid',200),('bg_space',200),('bg_aurora',200),('bg_draft',200),
+      ('frame_pulsar',750),('frame_orbit',750),
+      ('frame_legend_1',1500),('frame_legend_2',1500),('frame_legend_3',1500),('frame_legend_4',1500)
+    )
+    select count(*) filter (where s.item_code is null),
+           count(*) filter (where s.item_code is not null and s.price is distinct from e.old_price)
+      into v_missing, v_badprice
+      from expected e left join public.shop_items s on s.item_code = e.item_code;
+    if v_missing > 0 then raise exception 'FIRING ABORT: % missing item_code', v_missing; end if;
+    if v_badprice > 0 then raise exception 'FIRING ABORT: % unexpected price', v_badprice; end if;
+
+    select active into v_frame from public.shop_items where item_code = 'frame_fire100';
+    if v_frame is null then raise exception 'FIRING ABORT: frame_fire100 missing'; end if;
+    if v_frame is not true then raise exception 'FIRING ABORT: frame_fire100 not active'; end if;
+
+    update public.shop_items set price = 80
+     where item_code in ('color_red','color_orange','color_green','color_teal',
+                         'color_blue','color_indigo','color_pink','color_brown');
+    update public.shop_items set price = 40   where item_code = 'status_emoji_change';
+    update public.shop_items set price = 900  where item_code = 'crown';
+    update public.shop_items set price = 1100 where item_code = 'golden_nick';
+    update public.shop_items set price = 1300 where item_code = 'title_yaschenko';
+    update public.shop_items set price = 3000 where item_code = 'title_custom';
+    update public.shop_items set active = false where item_code = 'frame_fire100';
+    update public.shop_items set price = 250  where item_code in ('title_groza','title_elon','title_sanchez','title_derivative');
+    update public.shop_items set price = 300  where item_code in ('frame_notebook','frame_winter');
+    update public.shop_items set price = 380  where item_code in ('bg_grid','bg_space','bg_aurora','bg_draft');
+    update public.shop_items set price = 1200 where item_code in ('frame_pulsar','frame_orbit');
+    update public.shop_items set price = 2200 where item_code in ('frame_legend_1','frame_legend_2','frame_legend_3','frame_legend_4');
+
+    update public.economy_config
+       set stage4_started_at         = coalesce(stage4_started_at, now()),
+           stage4_generation_enabled = true
+     where id;
+    get diagnostics v_row_count = row_count;
+    if v_row_count <> 1 then raise exception 'FIRING ABORT: final UPDATE affected % rows', v_row_count; end if;
+  exception when others then success_raised := true;
+  end;
+  select price into crown_after_success from public.shop_items where item_code='crown';
+  select stage4_generation_enabled, stage4_started_at into gen_after_success, started_after_success
+    from public.economy_config where id;
+
+  -- reset to dormant для второго sub-check (внутритестовая подготовка; полное восстановление
+  -- dev делает общий rollback блока в конце файла)
+  update public.shop_items set price = 50
+   where item_code in ('color_red','color_orange','color_green','color_teal',
+                       'color_blue','color_indigo','color_pink','color_brown');
+  update public.shop_items set price = 30   where item_code = 'status_emoji_change';
+  update public.shop_items set price = 600  where item_code = 'crown';
+  update public.shop_items set price = 700  where item_code = 'golden_nick';
+  update public.shop_items set price = 900  where item_code = 'title_yaschenko';
+  update public.shop_items set price = 2000 where item_code = 'title_custom';
+  update public.shop_items set active = true where item_code = 'frame_fire100';
+  update public.shop_items set price = 200  where item_code = 'title_groza';
+  update public.shop_items set price = 150  where item_code in ('title_elon','title_derivative');
+  update public.shop_items set price = 120  where item_code = 'title_sanchez';
+  update public.shop_items set price = 150  where item_code in ('frame_notebook','frame_winter');
+  update public.shop_items set price = 200  where item_code in ('bg_grid','bg_space','bg_aurora','bg_draft');
+  update public.shop_items set price = 750  where item_code in ('frame_pulsar','frame_orbit');
+  update public.shop_items set price = 1500 where item_code in ('frame_legend_1','frame_legend_2','frame_legend_3','frame_legend_4');
+  update public.economy_config set stage4_generation_enabled = false, stage4_started_at = null where id;
+
+  -- --- (b) missing-config abort: удалить singleton-строку внутри теста, прогнать тот же путь ---
+  select price into crown_before from public.shop_items where item_code='crown';
+  select active into frame_before from public.shop_items where item_code='frame_fire100';
+  delete from public.economy_config where id;
+  begin
+    select count(*) into v_config_cnt from public.economy_config where id;
+    if v_config_cnt <> 1 then
+      raise exception 'FIRING ABORT: economy_config singleton missing (count=%)', v_config_cnt;
+    end if;
+    -- (недостижимо при отсутствующей строке — singleton-guard останавливает раньше)
+    update public.shop_items set price = 80 where item_code = 'crown';
+    update public.economy_config set stage4_generation_enabled = true where id;
+  exception when others then abort_raised := true;
+  end;
+  select price into crown_after_abort from public.shop_items where item_code='crown';
+  select active into frame_after_abort from public.shop_items where item_code='frame_fire100';
+
+  insert into u08_report values (9,'B2-U23','singleton-guard: success ROW_COUNT=1 + missing-config abort, no partial firing',
+    (not success_raised) and crown_after_success=900 and gen_after_success=true and started_after_success is not null
+    and abort_raised and crown_after_abort=crown_before and crown_after_abort=600
+    and frame_after_abort=frame_before and frame_after_abort=true,
+    format('success(raised=%s crown=%s gen=%s started_set=%s) abort(raised=%s crown %s->%s frame %s->%s)',
+      success_raised, crown_after_success, gen_after_success, (started_after_success is not null),
+      abort_raised, crown_before, crown_after_abort, frame_before, frame_after_abort));
 end $$;
 
 select seq,code,title,case when pass then 'PASS' else 'FAIL' end as result,detail from u08_report order by seq;

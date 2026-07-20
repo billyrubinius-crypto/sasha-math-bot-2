@@ -22,12 +22,13 @@ pre-cutover ценам, `frame_fire100.active=true`. Это гарантируе
    (`student_daily_quests` / `daily_quest_reward_log`) — это защита от случайной нейтрализации
    запущенной Stage 4.
 3. **Deploy T10 / server / client** — привязка identity (T10), серверный и клиентский код.
-5. **Preflight** — убедиться, что `stage4_started_at IS NULL`, `generation=false`, цены = pre-cutover,
-   `frame_fire100.active=true`, нет строк квестов. Сам `stage4_cutover.sql` повторяет эти проверки и
-   аварийно останавливается при любом несоответствии (частичный firing невозможен).
-6. **Firing** — выполнить [`stage4_cutover.sql`](stage4_cutover.sql) **отдельно**, предпочтительно в
+4. **Preflight** — убедиться, что `stage4_started_at IS NULL`, `generation=false`, цены = pre-cutover,
+   `frame_fire100.active=true`, нет строк квестов, `economy_config` содержит ровно одну singleton-
+   строку. Сам `stage4_cutover.sql` повторяет эти проверки и аварийно останавливается при любом
+   несоответствии (частичный firing невозможен).
+5. **Firing** — выполнить [`stage4_cutover.sql`](stage4_cutover.sql) **отдельно**, предпочтительно в
    **понедельник**. Одна guarded транзакция: old→approved цены + `stage4_started_at=now()` (только из
-   NULL) + `generation=true`.
+   NULL) + `generation=true`; финальный `UPDATE economy_config` проверяется на `ROW_COUNT=1`.
 6. **Post-check** — approved цены на витрине, `generation=true`, `started_at` зафиксирован; первая
    отправка раньше `started_at` не оплачивается задним числом (U02D-гейт).
 
