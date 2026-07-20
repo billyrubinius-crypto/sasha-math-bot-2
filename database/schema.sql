@@ -4128,3 +4128,45 @@ revoke all on all tables    in schema private from anon, authenticated;
 revoke all on all functions in schema private from anon, authenticated, public;
 revoke all on function public.security_auth_mode() from public;
 grant execute on function public.security_auth_mode() to anon, authenticated;
+
+-- =============================================================================
+-- T10-02 (migration 033): student-auth bridge RPC (public SECURITY DEFINER, service_role only).
+-- Мост Edge -> закрытая схема private (не reachable через Data API). Ни политик на business-
+-- таблицах, ни изменений экономики; auth_mode остаётся 'legacy'.
+-- =============================================================================
+create or replace function public.student_auth_upsert_principal(p_telegram_id bigint)
+ returns json language plpgsql security definer set search_path = ''
+as $function$
+declare v_principal uuid; v_token_version integer;
+begin
+  if p_telegram_id is null or p_telegram_id <= 0 then raise exception 'invalid telegram_id'; end if;
+  insert into public.students (telegram_id) values (p_telegram_id) on conflict (telegram_id) do nothing;
+  insert into private.security_principals (app_role, telegram_id) values ('student', p_telegram_id) on conflict do nothing;
+  select id, token_version into v_principal, v_token_version
+    from private.security_principals where app_role = 'student' and telegram_id = p_telegram_id;
+  return json_build_object('principal_id', v_principal, 'token_version', v_token_version);
+end;
+$function$;
+
+create or replace function public.security_rate_limit_hit(
+  p_bucket text, p_fingerprint text, p_max integer, p_window_seconds integer)
+ returns boolean language plpgsql security definer set search_path = ''
+as $function$
+declare v_window timestamptz; v_attempts integer;
+begin
+  if p_bucket is null or p_fingerprint is null or coalesce(p_window_seconds,0) <= 0 then
+    raise exception 'invalid rate limit args'; end if;
+  v_window := to_timestamp(floor(extract(epoch from clock_timestamp()) / p_window_seconds) * p_window_seconds);
+  insert into private.security_rate_limits (bucket, fingerprint, window_start, attempts)
+    values (p_bucket, p_fingerprint, v_window, 1)
+  on conflict (bucket, fingerprint, window_start)
+    do update set attempts = private.security_rate_limits.attempts + 1
+  returning attempts into v_attempts;
+  return v_attempts <= p_max;
+end;
+$function$;
+
+revoke all on function public.student_auth_upsert_principal(bigint) from public, anon, authenticated;
+revoke all on function public.security_rate_limit_hit(text, text, integer, integer) from public, anon, authenticated;
+grant execute on function public.student_auth_upsert_principal(bigint) to service_role;
+grant execute on function public.security_rate_limit_hit(text, text, integer, integer) to service_role;
