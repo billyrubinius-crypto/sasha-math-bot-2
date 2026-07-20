@@ -4005,3 +4005,126 @@ begin
   return v_row;
 end;
 $function$;
+
+-- =============================================================================
+-- T10-01 (migration 032): dormant security foundation. Закрытая схема private не входит в
+-- exposed schemas Data API. RLS deny-client + явные revoke — security-объекты opt-in. Ни одной
+-- политики на business-таблицах, ни одного revoke legacy-пути: старый клиент работает неизменно.
+-- =============================================================================
+create schema if not exists private;
+revoke all on schema private from public;
+revoke usage on schema private from anon, authenticated;
+
+create table if not exists private.security_principals (
+  id            uuid        primary key default gen_random_uuid(),
+  app_role      text        not null check (app_role in ('student','teacher')),
+  telegram_id   bigint,
+  teacher_id    text,
+  token_version integer     not null default 1,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  constraint security_principals_shape check (
+    (app_role = 'student' and telegram_id is not null and teacher_id is null) or
+    (app_role = 'teacher' and teacher_id  is not null and telegram_id is null)
+  )
+);
+create unique index if not exists uq_security_principals_student
+  on private.security_principals (telegram_id) where app_role = 'student';
+create unique index if not exists uq_security_principals_teacher
+  on private.security_principals (teacher_id)  where app_role = 'teacher';
+
+create table if not exists private.security_runtime_config (
+  id                    boolean     primary key default true check (id),
+  auth_mode             text        not null default 'legacy' check (auth_mode in ('legacy','shadow','enforced')),
+  teacher_token_version integer     not null default 1,
+  updated_at            timestamptz not null default now()
+);
+insert into private.security_runtime_config (id, auth_mode) values (true, 'legacy')
+  on conflict (id) do nothing;
+
+create table if not exists private.security_audit_log (
+  id             uuid        primary key default gen_random_uuid(),
+  event_type     text        not null,
+  app_role       text,
+  principal_id   uuid        references private.security_principals (id),
+  ip_fingerprint text,
+  detail         jsonb,
+  created_at     timestamptz not null default now()
+);
+create index if not exists idx_security_audit_log_created on private.security_audit_log (created_at);
+
+create table if not exists private.teacher_sessions (
+  id                 uuid        primary key default gen_random_uuid(),
+  principal_id       uuid        not null references private.security_principals (id),
+  refresh_token_hash text        not null,
+  created_at         timestamptz not null default now(),
+  expires_at         timestamptz not null,
+  rotated_at         timestamptz,
+  revoked            boolean     not null default false
+);
+create index if not exists idx_teacher_sessions_principal on private.teacher_sessions (principal_id);
+
+create table if not exists private.security_rate_limits (
+  bucket       text        not null,
+  fingerprint  text        not null,
+  window_start timestamptz not null,
+  attempts     integer     not null default 0,
+  primary key (bucket, fingerprint, window_start)
+);
+
+alter table private.security_principals     enable row level security;
+alter table private.security_runtime_config enable row level security;
+alter table private.security_audit_log      enable row level security;
+alter table private.teacher_sessions        enable row level security;
+alter table private.security_rate_limits    enable row level security;
+
+create or replace function private.jwt_claims()
+ returns jsonb language sql stable
+ set search_path = ''
+as $function$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb;
+$function$;
+
+create or replace function private.current_app_role()
+ returns text language sql stable
+ set search_path = ''
+as $function$
+  select private.jwt_claims() ->> 'app_role';
+$function$;
+
+create or replace function private.current_principal()
+ returns uuid language sql stable
+ set search_path = ''
+as $function$
+  select nullif(private.jwt_claims() ->> 'sub', '')::uuid;
+$function$;
+
+create or replace function private.current_telegram_id()
+ returns bigint language sql stable
+ set search_path = ''
+as $function$
+  select case when private.jwt_claims() ->> 'app_role' = 'student'
+              then nullif(private.jwt_claims() ->> 'telegram_id', '')::bigint
+         end;
+$function$;
+
+create or replace function private.current_teacher_id()
+ returns text language sql stable
+ set search_path = ''
+as $function$
+  select case when private.jwt_claims() ->> 'app_role' = 'teacher'
+              then private.jwt_claims() ->> 'teacher_id'
+         end;
+$function$;
+
+create or replace function public.security_auth_mode()
+ returns text language sql stable security definer
+ set search_path = ''
+as $function$
+  select auth_mode from private.security_runtime_config where id;
+$function$;
+
+revoke all on all tables    in schema private from anon, authenticated;
+revoke all on all functions in schema private from anon, authenticated, public;
+revoke all on function public.security_auth_mode() from public;
+grant execute on function public.security_auth_mode() to anon, authenticated;
