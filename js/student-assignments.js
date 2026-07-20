@@ -316,15 +316,26 @@
                 }
                 
                 status.innerText = "💾 Сохранение в базу...";
-                
-                // 2. Обновляем запись в assignments
-                const { error: dbError } = await db.from('assignments').update({
-                    photo_url: JSON.stringify(photoUrls),
-                    status: 'submitted',
-                    submitted_at: new Date().toISOString()
-                }).eq('id', assignmentId);
-                
-                if (dbError) throw dbError;
+
+                // 2. Сохраняем сдачу. secure path (JWT активен) — через серверный gateway
+                // submit_assignment_self (owner/status/окно/URL проверяются на сервере; T10-04A).
+                // Legacy fallback — прежний прямой update. Поля revision-жизненного цикла в обоих
+                // случаях проставляет триггер trg_assignments_revision_lifecycle (W04).
+                const photoUrlJson = JSON.stringify(photoUrls);
+                if (studentSecurePathActive()) {
+                    const { error: rpcError } = await db.rpc('submit_assignment_self', {
+                        p_assignment_id: assignmentId,
+                        p_photo_url: photoUrlJson
+                    });
+                    if (rpcError) throw rpcError;
+                } else {
+                    const { error: dbError } = await db.from('assignments').update({
+                        photo_url: photoUrlJson,
+                        status: 'submitted',
+                        submitted_at: new Date().toISOString()
+                    }).eq('id', assignmentId);
+                    if (dbError) throw dbError;
+                }
 
                 // Награда за загрузку убрана (G11) — бублики теперь только за принятую работу,
                 // учитель как quality gate (SPEC_STAGE1.md, раздел 7). isResubmission оставлен

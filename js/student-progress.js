@@ -88,14 +88,24 @@
                 if (error && error.code === 'PGRST116') {
                     // Повторяем не больше одного раза: если insert не удался, без этого select→insert зациклились бы навсегда
                     if (isRetryAfterInsert) throw new Error('Не удалось создать профиль ученика');
-                    const { error: insertError } = await db.from('students').insert([{
-                        telegram_id: currentUser.id, name: currentUser.first_name,
-                        telegram_username: currentUser.username || null,
-                        // rating = очки текущего сезона (см. database/migrations/005), не старый
-                        // рейтинг — новый ученик стартует с 0, а не с наследственных 50
-                        rating: 0, huikons: 0, lives: 3, current_streak: 0
-                    }]);
-                    if (insertError) throw insertError;
+                    // secure path (JWT активен) — создание своей строки только через серверный
+                    // gateway ensure_student_self (identity из claim; T10-04A). Legacy fallback —
+                    // прежний прямой insert. rating = очки текущего сезона (миграция 005/034):
+                    // новый ученик стартует с 0, а не с наследственных 50.
+                    if (studentSecurePathActive()) {
+                        const { error: rpcError } = await db.rpc('ensure_student_self', {
+                            p_name: currentUser.first_name,
+                            p_username: currentUser.username || null
+                        });
+                        if (rpcError) throw rpcError;
+                    } else {
+                        const { error: insertError } = await db.from('students').insert([{
+                            telegram_id: currentUser.id, name: currentUser.first_name,
+                            telegram_username: currentUser.username || null,
+                            rating: 0, huikons: 0, lives: 3, current_streak: 0
+                        }]);
+                        if (insertError) throw insertError;
+                    }
                     return loadProfile(true);
                 } else if (error) { throw error; }
                 

@@ -17,6 +17,13 @@ const STUDENT_JWT_REFRESH_DELAY_MS = 55 * 60 * 1000; // SPEC §3.2: JWT живё
 
 let _studentToken = null;
 let _refreshTimer = null;
+let _secureActive = false; // true — установлена authenticated session (JWT), secure gateway-путь активен
+
+// Активен ли secure path (есть подтверждённый JWT). Клиентские writes при true идут через
+// серверные gateway (T10-04A+); при false работает legacy-путь (shadow fallback / legacy mode).
+function studentSecurePathActive() {
+    return _secureActive;
+}
 
 function _decodeJwtPayload(jwt) {
     try {
@@ -87,5 +94,6 @@ async function initStudentSession(tg) {
         accessToken: async () => _studentToken,
     });
 
+    _secureActive = true; // JWT подтверждён — secure gateway-путь активен
     return { db: authedDb, telegramId };
 }
