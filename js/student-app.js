@@ -4,17 +4,31 @@
                 const tg = window.Telegram.WebApp;
                 tg.ready(); tg.expand();
 
-                db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                
-                const tgUser = tg.initDataUnsafe?.user;
-                
-                if (tgUser && tgUser.id) {
-                    currentUser = tgUser;
+                const tgUser = tg.initDataUnsafe?.user; // косметика (имя/аватар) до подтверждения auth
+
+                let session = null;
+                try {
+                    session = await initStudentSession(tg);
+                } catch (e) {
+                    log('❌ student-auth: ' + e.message);
+                    document.getElementById('user-name').innerText = 'Откройте приложение заново';
+                    return;
+                }
+
+                if (session) {
+                    db = session.db;
+                    currentUser = tgUser ? { ...tgUser, id: session.telegramId } : { id: session.telegramId };
                 } else {
-                    currentUser = null;
-                    document.getElementById('user-name').innerText = 'Ошибка доступа';
-                    log('❌ Нет данных пользователя.');
-                    return; 
+                    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+                    if (tgUser && tgUser.id) {
+                        currentUser = tgUser;
+                    } else {
+                        currentUser = null;
+                        document.getElementById('user-name').innerText = 'Ошибка доступа';
+                        log('❌ Нет данных пользователя.');
+                        return;
+                    }
                 }
 
                 document.getElementById('user-name').innerText = currentUser.first_name;
