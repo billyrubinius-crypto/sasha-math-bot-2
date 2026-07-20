@@ -3498,13 +3498,16 @@ as $function$
         when exists (select 1 from math_paid) then 'completed'
         when (select daily_assignment_id from q) is null then 'unavailable'
         when (select status from a) = 'submitted' then 'waiting_review'
+        when (select status from a) = 'checked' and (select approval_status from a) = 'approved' then 'unavailable'
         when (select status from a) = 'checked' and (select approval_status from a) = 'rejected' then 'active'
         else 'active'
       end,
     'combo_status',
       case
         when exists (select 1 from combo_paid) then 'completed'
-        when exists (select 1 from life_paid) and not exists (select 1 from math_paid) then 'waiting_review'
+        when exists (select 1 from life_paid)
+             and not exists (select 1 from math_paid)
+             and (select status from a) = 'submitted' then 'waiting_review'
         else 'locked'
       end,
     'life', (

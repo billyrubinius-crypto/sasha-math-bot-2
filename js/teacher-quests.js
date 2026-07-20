@@ -111,8 +111,16 @@
             });
             if (error) {
                 alert('Не удалось изменить статус: ' + error.message);
-                checkboxEl.checked = !nextActive; // откат визуального состояния
-                checkboxEl.dispatchEvent(new Event('change'));
+                // Один визуальный откат напрямую, БЕЗ dispatchEvent('change'): иначе повторно
+                // сработал бы onchange -> второй admin RPC. Возвращаем checked, подпись и
+                // inactive-class руками (U08A: ровно один RPC на действие).
+                checkboxEl.checked = !nextActive;
+                const card = checkboxEl.closest('.quest-card');
+                if (card) {
+                    card.classList.toggle('quest-card-inactive', !checkboxEl.checked);
+                    const label = card.querySelector('.quest-toggle-text');
+                    if (label) label.textContent = checkboxEl.checked ? 'Активен' : 'Выключен';
+                }
             }
             checkboxEl.disabled = false;
         }
