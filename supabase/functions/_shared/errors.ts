@@ -30,3 +30,8 @@ export function auditLine(event: string, code: string, telegramId?: number): str
   const id = telegramId != null ? ` tg=${telegramId}` : "";
   return `[student-auth] ${event} code=${code}${id}`;
 }
+
+// Тегированный безопасный лог для прочих функций (teacher-auth/refresh). Без пароля/hash/токенов.
+export function tagAuditLine(tag: string, event: string, code: string): string {
+  return `[${tag}] ${event} code=${code}`;
+}

@@ -4060,9 +4060,13 @@ create table if not exists private.teacher_sessions (
   created_at         timestamptz not null default now(),
   expires_at         timestamptz not null,
   rotated_at         timestamptz,
-  revoked            boolean     not null default false
+  revoked            boolean     not null default false,
+  family_id          uuid,                                    -- T10-05/036: цепочка ротаций (reuse-family)
+  token_version      integer                                  -- T10-05/036: снимок teacher_token_version (kill-switch)
 );
 create index if not exists idx_teacher_sessions_principal on private.teacher_sessions (principal_id);
+create index if not exists idx_teacher_sessions_family on private.teacher_sessions (family_id);
+create index if not exists idx_teacher_sessions_refresh_hash on private.teacher_sessions (refresh_token_hash);
 
 create table if not exists private.security_rate_limits (
   bucket       text        not null,
@@ -4170,6 +4174,117 @@ revoke all on function public.student_auth_upsert_principal(bigint) from public,
 revoke all on function public.security_rate_limit_hit(text, text, integer, integer) from public, anon, authenticated;
 grant execute on function public.student_auth_upsert_principal(bigint) to service_role;
 grant execute on function public.security_rate_limit_hit(text, text, integer, integer) to service_role;
+
+-- =============================================================================
+-- T10-05 (migration 036): teacher auth bridge (public SECURITY DEFINER, service_role only).
+-- Мост для teacher-auth/teacher-refresh Edge к закрытой схеме private: upsert principal, создание/
+-- ротация refresh-семьи (reuse-detection + family-revoke + kill-switch), peek rate-limit по неудачам,
+-- audit. Пароль/hash/refresh token в БД не хранятся (только SHA-256 hash токена). auth_mode=legacy.
+-- teacher_sessions расширена family_id/token_version (см. выше).
+-- =============================================================================
+create or replace function public.teacher_auth_upsert_principal(p_teacher_id text)
+ returns json language plpgsql security definer set search_path = ''
+as $function$
+declare v_principal uuid; v_version integer;
+begin
+  if p_teacher_id is null or length(btrim(p_teacher_id)) = 0 then
+    raise exception 'invalid teacher_id'; end if;
+  insert into private.security_principals (app_role, teacher_id)
+    values ('teacher', p_teacher_id) on conflict do nothing;
+  select id into v_principal from private.security_principals
+   where app_role = 'teacher' and teacher_id = p_teacher_id;
+  select teacher_token_version into v_version from private.security_runtime_config where id;
+  return json_build_object('principal_id', v_principal, 'teacher_token_version', v_version);
+end;
+$function$;
+
+create or replace function public.teacher_session_create(
+  p_principal_id uuid, p_family_id uuid, p_refresh_hash text,
+  p_expires_at timestamptz, p_token_version integer)
+ returns void language plpgsql security definer set search_path = ''
+as $function$
+begin
+  if p_principal_id is null or p_family_id is null or p_refresh_hash is null
+     or p_expires_at is null or p_token_version is null then
+    raise exception 'invalid session args'; end if;
+  insert into private.teacher_sessions
+    (principal_id, family_id, refresh_token_hash, expires_at, token_version)
+  values (p_principal_id, p_family_id, p_refresh_hash, p_expires_at, p_token_version);
+end;
+$function$;
+
+create or replace function public.teacher_session_rotate(
+  p_old_hash text, p_new_hash text, p_reuse_grace_seconds integer default 10)
+ returns json language plpgsql security definer set search_path = ''
+as $function$
+declare v_row private.teacher_sessions%rowtype; v_cur_ver integer; v_teacher text;
+begin
+  if p_old_hash is null or p_new_hash is null then raise exception 'invalid rotate args'; end if;
+  select * into v_row from private.teacher_sessions
+   where refresh_token_hash = p_old_hash for update;
+  if not found then return json_build_object('status', 'invalid'); end if;
+  if v_row.revoked or v_row.rotated_at is not null then
+    if v_row.rotated_at is not null
+       and v_row.rotated_at > (now() - make_interval(secs => greatest(coalesce(p_reuse_grace_seconds, 0), 0))) then
+      return json_build_object('status', 'race'); end if;
+    update private.teacher_sessions set revoked = true where family_id = v_row.family_id;
+    return json_build_object('status', 'reuse');
+  end if;
+  if v_row.expires_at <= now() then
+    update private.teacher_sessions set revoked = true where family_id = v_row.family_id;
+    return json_build_object('status', 'expired'); end if;
+  select teacher_token_version into v_cur_ver from private.security_runtime_config where id;
+  if v_row.token_version is distinct from v_cur_ver then
+    update private.teacher_sessions set revoked = true where family_id = v_row.family_id;
+    return json_build_object('status', 'version'); end if;
+  update private.teacher_sessions set rotated_at = now(), revoked = true where id = v_row.id;
+  insert into private.teacher_sessions
+    (principal_id, family_id, refresh_token_hash, expires_at, token_version)
+  values (v_row.principal_id, v_row.family_id, p_new_hash, v_row.expires_at, v_row.token_version);
+  select teacher_id into v_teacher from private.security_principals where id = v_row.principal_id;
+  return json_build_object('status', 'ok', 'principal_id', v_row.principal_id,
+    'teacher_id', v_teacher, 'token_version', v_row.token_version);
+end;
+$function$;
+
+create or replace function public.security_rate_limit_peek(
+  p_bucket text, p_fingerprint text, p_max integer, p_window_seconds integer)
+ returns boolean language plpgsql security definer set search_path = ''
+as $function$
+declare v_window timestamptz; v_attempts integer;
+begin
+  if p_bucket is null or p_fingerprint is null or coalesce(p_window_seconds, 0) <= 0 then
+    raise exception 'invalid rate limit args'; end if;
+  v_window := to_timestamp(floor(extract(epoch from clock_timestamp()) / p_window_seconds) * p_window_seconds);
+  select attempts into v_attempts from private.security_rate_limits
+   where bucket = p_bucket and fingerprint = p_fingerprint and window_start = v_window;
+  return coalesce(v_attempts, 0) < p_max;
+end;
+$function$;
+
+create or replace function public.security_audit(
+  p_event_type text, p_app_role text, p_principal_id uuid,
+  p_ip_fingerprint text, p_detail jsonb default null)
+ returns void language plpgsql security definer set search_path = ''
+as $function$
+begin
+  if p_event_type is null then raise exception 'invalid audit event'; end if;
+  insert into private.security_audit_log
+    (event_type, app_role, principal_id, ip_fingerprint, detail)
+  values (p_event_type, p_app_role, p_principal_id, p_ip_fingerprint, p_detail);
+end;
+$function$;
+
+revoke all on function public.teacher_auth_upsert_principal(text) from public, anon, authenticated;
+revoke all on function public.teacher_session_create(uuid, uuid, text, timestamptz, integer) from public, anon, authenticated;
+revoke all on function public.teacher_session_rotate(text, text, integer) from public, anon, authenticated;
+revoke all on function public.security_rate_limit_peek(text, text, integer, integer) from public, anon, authenticated;
+revoke all on function public.security_audit(text, text, uuid, text, jsonb) from public, anon, authenticated;
+grant execute on function public.teacher_auth_upsert_principal(text) to service_role;
+grant execute on function public.teacher_session_create(uuid, uuid, text, timestamptz, integer) to service_role;
+grant execute on function public.teacher_session_rotate(text, text, integer) to service_role;
+grant execute on function public.security_rate_limit_peek(text, text, integer, integer) to service_role;
+grant execute on function public.security_audit(text, text, uuid, text, jsonb) to service_role;
 
 -- =============================================================================
 -- T10-04A (migration 034): student core mutation gateways (public SECURITY DEFINER,
