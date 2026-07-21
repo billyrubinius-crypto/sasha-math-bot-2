@@ -4572,7 +4572,11 @@ begin
   if p_status = 'approved' then
     if v_cutover then perform public.record_approved_assignment(p_assignment_id); v_reward_path := 'cutover';
     elsif v_stage4 then perform public.settle_daily_math(p_assignment_id); v_reward_path := 'stage4';
-    else v_reward_path := 'legacy'; end if;
+    else
+      -- T10-06C: legacy контур B платится серверно в этой же транзакции при свежей приёмке.
+      if not v_was_approved then perform public.settle_legacy_approval(p_assignment_id); end if;
+      v_reward_path := 'legacy';
+    end if;
   else v_reward_path := 'reject'; end if;
   perform public.security_audit('teacher_review', 'teacher', v_princ, null,
     json_build_object('assignment_id', p_assignment_id, 'status', p_status, 'reward_path', v_reward_path)::jsonb);
@@ -4793,3 +4797,92 @@ grant execute on function public.record_weekly_mock_exam_self(bigint, date, inte
 grant execute on function public.review_custom_title_self(bigint, text, text) to authenticated;
 grant execute on function public.admin_upsert_life_quest_template_self(text, text, text, text, integer) to authenticated;
 grant execute on function public.admin_set_life_quest_template_active_self(text, boolean) to authenticated;
+
+-- =============================================================================
+-- T10-06C (migration 039): settle_legacy_approval — серверный порт контура B (legacy pre-cutover
+-- teacher streak-награда). Internal primitive (revoke от anon/authenticated/public), зовётся только
+-- из review_assignment_self (SECURITY DEFINER, owner) в legacy-ветке при свежей приёмке. Точный порт
+-- клиентского processStreak/awardApprovalBonus/grantAchievement/checkPerfectMonth: те же цепочка/
+-- тиры/bonus_return/season/достижения/щит-мост. Экономика не переписана (add_huikons/add_season_
+-- points/consume_streak_shield/grant_achievement_server как есть). review_assignment_self выше
+-- обновлена (legacy-ветка вызывает settle_legacy_approval).
+-- =============================================================================
+create or replace function public.settle_legacy_approval(p_assignment_id uuid)
+ returns void language plpgsql set search_path = public, pg_temp
+as $function$
+declare
+  v_a public.assignments%rowtype; v_sid bigint; v_sched date;
+  v_dates date[]; v_bridged date[] := '{}'; v_effective date[];
+  v_prevappr date; v_missing date; v_lastdate date; v_d date; v_prev date;
+  v_position integer; v_max integer; v_count30 integer; v_pos_this integer; v_pos_last integer;
+  v_current integer; v_reward integer; v_idx integer; v_month_start date; v_next_month date;
+begin
+  select * into v_a from public.assignments where id = p_assignment_id;
+  if not found then raise exception 'assignment % not found', p_assignment_id; end if;
+  v_sid := v_a.student_id;
+  if v_a.type = 'daily' then
+    v_sched := v_a.scheduled_date;
+    select array_agg(d order by d) into v_dates from (
+      select distinct scheduled_date d from public.assignments
+       where student_id = v_sid and type = 'daily' and status = 'checked'
+         and approval_status = 'approved' and scheduled_date is not null
+       order by d desc limit 400) t;
+    if v_dates is null then v_dates := '{}'; end if;
+    select coalesce(array_agg(distinct bridged_date), '{}') into v_bridged
+      from public.streak_shield_uses where student_id = v_sid;
+    select max(d) into v_prevappr from unnest(v_dates) d where d < v_sched;
+    if v_prevappr is not null and (v_sched - v_prevappr) = 2 then
+      v_missing := v_prevappr + 1;
+      if not (v_missing = any(v_bridged)) then
+        if public.consume_streak_shield(v_sid, v_missing) then
+          v_bridged := array_append(v_bridged, v_missing);
+        end if;
+      end if;
+    end if;
+    select array_agg(d order by d) into v_effective
+      from (select distinct unnest(v_dates || v_bridged) d) t;
+    if v_effective is null then v_effective := '{}'; end if;
+    v_prev := null; v_position := 0; v_max := 0; v_count30 := 0; v_pos_this := 1; v_pos_last := 0;
+    if array_length(v_dates, 1) is not null then v_lastdate := v_dates[array_length(v_dates, 1)]; end if;
+    foreach v_d in array v_effective loop
+      if v_prev is not null and v_d = v_prev + 1 then v_position := v_position + 1; else v_position := 1; end if;
+      if v_d = v_sched then v_pos_this := v_position; end if;
+      if v_lastdate is not null and v_d = v_lastdate then v_pos_last := v_position; end if;
+      if v_position > v_max then v_max := v_position; end if;
+      if v_position = 30 then v_count30 := v_count30 + 1; end if;
+      v_prev := v_d;
+    end loop;
+    v_current := case when v_lastdate is not null then v_pos_last else 0 end;
+    v_reward := case when v_pos_this >= 30 then 25 when v_pos_this >= 7 then 20
+                     when v_pos_this >= 3 then 15 when v_pos_this = 2 then 10 else 5 end;
+    update public.students set current_streak = v_current, last_submission_date_msk = v_lastdate where telegram_id = v_sid;
+    perform public.add_huikons(v_sid, v_reward, 'streak_day_' || v_pos_this);
+    perform public.add_season_points(v_sid, 12);
+    v_idx := array_position(v_dates, v_sched);
+    if v_idx is not null and v_idx > 1 and (v_sched - v_dates[v_idx - 1]) >= 7 then
+      perform public.add_huikons(v_sid, 20, 'bonus_return');
+    end if;
+    if v_max >= 7   then perform public.grant_achievement_server(v_sid, 'streak_7',   25);   end if;
+    if v_max >= 30  then perform public.grant_achievement_server(v_sid, 'streak_30',  100);  end if;
+    if v_max >= 100 then perform public.grant_achievement_server(v_sid, 'streak_100', 300);  end if;
+    if v_max >= 200 then perform public.grant_achievement_server(v_sid, 'streak_200', 500);  end if;
+    if v_max >= 365 then perform public.grant_achievement_server(v_sid, 'streak_365', 1000); end if;
+    if v_count30 >= 2 then perform public.grant_achievement_server(v_sid, 'rebirth', 200);   end if;
+    v_month_start := date_trunc('month', v_sched)::date;
+    v_next_month  := (v_month_start + interval '1 month')::date;
+    if exists (select 1 from public.assignments where student_id = v_sid and type = 'daily'
+                and scheduled_date >= v_month_start and scheduled_date < v_next_month)
+       and not exists (select 1 from public.assignments where student_id = v_sid and type = 'daily'
+                        and scheduled_date >= v_month_start and scheduled_date < v_next_month
+                        and not (status = 'checked' and approval_status = 'approved')) then
+      perform public.grant_achievement_server(v_sid, 'perfect_month', 150);
+    end if;
+  elsif v_a.type in ('weekly', 'individual') then
+    perform public.add_huikons(v_sid, case v_a.type when 'weekly' then 20 else 15 end, v_a.type || '_approved');
+    perform public.add_season_points(v_sid, case v_a.type when 'weekly' then 40 else 30 end);
+  end if;
+  perform public.grant_achievement_server(v_sid, 'first_step', 10);
+end;
+$function$;
+
+revoke all on function public.settle_legacy_approval(uuid) from public, anon, authenticated;
