@@ -65,10 +65,19 @@
             }
         }
 
-        // Идемпотентная выдача бонуса за закрытую коллекцию сезона — тот же паттерн, что
-        // grantAchievement в teacher.html (G5): награда только если строка реально вставилась,
+        // Идемпотентная выдача бонуса за закрытую коллекцию сезона.
+        // secure path (JWT активен) — через claim_collection_bonus_self (T10-06D): сервер САМ
+        // проверяет полноту коллекции (анти-фарм) и идемпотентно начисляет достижение + 50; клиент
+        // не делает прямых writes и не передаёт student_id. Legacy fallback (shadow без JWT) —
+        // прежний прямой insert + add_huikons: награда только если строка реально вставилась,
         // конфликт unique(student_id, achievement_code) = уже выдано, no-op.
         async function grantCollectionBonus(seasonId) {
+            if (studentSecurePathActive()) {
+                const { error } = await db.rpc('claim_collection_bonus_self', { p_season_id: seasonId });
+                if (error) throw error;
+                return;
+            }
+
             const code = `collection_season_${seasonId}`;
             const { data, error } = await db.from('student_achievements')
                 .insert({ student_id: currentUser.id, achievement_code: code })

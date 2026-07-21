@@ -4886,3 +4886,38 @@ end;
 $function$;
 
 revoke all on function public.settle_legacy_approval(uuid) from public, anon, authenticated;
+
+-- =============================================================================
+-- T10-06D (migration 040): claim_collection_bonus_self — student self-gateway для бонуса за
+-- собранную коллекцию сезона. Заменяет прямые client insert(student_achievements)+add_huikons в
+-- student-shop.js. app_role='student', identity из claim; p_season_id — бизнес-аргумент. Сервер
+-- САМ проверяет владение всеми rotation-предметами бандла (анти-фарм) и идемпотентно выдаёт
+-- достижение+50 через grant_achievement_server. Grant только authenticated; anon исключён.
+-- =============================================================================
+create or replace function public.claim_collection_bonus_self(p_season_id bigint)
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint; v_bundle integer; v_total integer; v_owned integer; v_granted boolean := false;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  if p_season_id is null then raise exception 'season required' using errcode = '22023'; end if;
+  select bundle into v_bundle from public.season_bundles where season_id = p_season_id;
+  if v_bundle is null then return json_build_object('granted', false, 'eligible', false); end if;
+  select count(*), count(si.item_code) into v_total, v_owned
+    from public.shop_items s
+    left join public.student_items si on si.item_code = s.item_code and si.student_id = v_tid
+   where s.availability = 'rotation' and s.rotation_bundle = v_bundle;
+  if v_total >= 1 and v_owned = v_total then
+    v_granted := public.grant_achievement_server(v_tid, 'collection_season_' || p_season_id, 50);
+    return json_build_object('granted', v_granted, 'eligible', true);
+  end if;
+  return json_build_object('granted', false, 'eligible', false);
+end;
+$function$;
+
+revoke all on function public.claim_collection_bonus_self(bigint) from public, anon;
+grant execute on function public.claim_collection_bonus_self(bigint) to authenticated;
