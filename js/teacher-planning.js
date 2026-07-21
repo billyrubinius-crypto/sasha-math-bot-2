@@ -79,7 +79,7 @@
             try {
                 const published = [];
                 for (const aud of audiences) {
-                    const { data, error } = await db.rpc('publish_weekly_plan', {
+                    const { data, error } = await db.rpc('publish_weekly_plan_self', {
                         p_week_start: weekStart,
                         p_audience_type: aud.audience_type,
                         p_group_name: aud.group_name,
@@ -448,7 +448,7 @@
             const items = (await planItemsForPublish(g.planId)).filter(i => !isSameSlot(i, slot));
             if (extraItem) items.push(extraItem);
 
-            return db.rpc('publish_weekly_plan', {
+            return db.rpc('publish_weekly_plan_self', {
                 p_week_start: g.weekStart,
                 p_audience_type: g.audienceType,
                 p_group_name: g.groupName,
@@ -517,7 +517,7 @@
 
             btn.disabled = true;
             try {
-                const { error } = await db.rpc('cancel_weekly_plan', { p_plan_id: w.planId });
+                const { error } = await db.rpc('cancel_weekly_plan_self', { p_plan_id: w.planId });
                 if (error) return alert('Ошибка: ' + error.message);
                 alert('Неделя отменена.');
                 reloadCurrentPlanView();
@@ -557,7 +557,10 @@
         async function deleteIndividualAssignment(id) {
             if (!confirm('Удалить это индивидуальное задание? Отменить будет нельзя.')) return;
             try {
-                await db.from('assignments').delete().eq('id', id);
+                // delete_individual_assignment_self (T10-06B/07): сервер проверяет тип/статус
+                // (только individual+assigned), заменяет прямой browser delete.
+                const { error } = await db.rpc('delete_individual_assignment_self', { p_assignment_id: id });
+                if (error) throw error;
                 alert('Удалено.');
                 loadArchiveIndividual('active');
             } catch(e) { alert('Ошибка: ' + e.message); }

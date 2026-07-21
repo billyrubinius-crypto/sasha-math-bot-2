@@ -55,10 +55,10 @@
         async function updatePendingCount() {
             const badge = document.getElementById('pending-count-badge');
             if (!badge) return;
-            const { count, error } = await db
-                .from('assignments')
-                .select('id', { count: 'exact', head: true })
-                .eq('status', 'submitted');
+            // Teacher read gateway (T10-06A/07): assignment/студент читаются сервером, не напрямую
+            // из таблицы под publishable key.
+            const { data, error } = await db.rpc('get_review_queue_self', { p_view: 'pending' });
+            const count = !error && data ? data.pending_count : 0;
 
             if (error || !count) {
                 badge.style.display = 'none';
@@ -74,25 +74,19 @@
             list.innerHTML = '<div style="text-align:center; padding:40px;">Загрузка...</div>';
             updatePendingCount();
 
-            let query = db.from('assignments').select('*, students(name, group_name)').order('submitted_at', { ascending: false });
-
-            if (currentCheckView === 'pending') {
-                query = query.eq('status', 'submitted');
-            } else {
-                // Архив принятых/возвращённых работ растёт неограниченно — без лимита Supabase молча
-                // режет ответ на 1000 строк, и часть архива беззвучно пропадает (T7)
-                query = query.eq('status', 'checked').limit(200);
-            }
-
-            const { data, error } = await query;
+            // get_review_queue_self (T10-06A) уже воспроизводит прежний контракт: тот же порядок
+            // (submitted_at desc), тот же лимит 200 для архива (T7), та же форма students{name,
+            // group_name}.
+            const { data, error } = await db.rpc('get_review_queue_self', { p_view: currentCheckView });
             if (error) return list.innerHTML = `<div style="color:red; padding:20px">${error.message}</div>`;
 
-            if (!data.length) {
+            const items = data.items || [];
+            if (!items.length) {
                 const msg = currentCheckView === 'pending' ? 'Нет работ на проверку 🎉' : 'Архив пуст';
                 return list.innerHTML = `<div style="text-align:center; padding:40px; color:#999">${msg}</div>`;
             }
 
-            renderGroupedSubmissions(list, data);
+            renderGroupedSubmissions(list, items);
         }
 
         // Группирует сданные работы по группе ученика, внутри группы — по типу задания
@@ -288,11 +282,9 @@
         async function submitReview(status) {
             if (!currentSubmissionId) return;
 
-            // Двойной клик/повтор не должен начислить награду дважды (W05): SELECT alreadyApproved
-            // читается ДО update, поэтому без синхронной защиты два почти одновременных вызова
-            // могли бы оба увидеть alreadyApproved=false и оба выдать streak/сезонные очки.
-            // Проверка и установка disabled должны быть СИНХРОННЫМИ (до первого await): иначе
-            // второй вызов проскочит проверку раньше, чем первый успеет выставить disabled.
+            // Двойной клик/повтор не должен начислить награду дважды (W05): проверка и установка
+            // disabled должны быть СИНХРОННЫМИ (до первого await), иначе второй вызов проскочит
+            // проверку раньше, чем первый успеет выставить disabled.
             const approveBtn = document.querySelector('#review-modal .btn-success');
             const rejectBtn = document.querySelector('#review-modal .btn-danger');
             if (approveBtn.disabled || rejectBtn.disabled) return; // запрос уже выполняется
@@ -302,73 +294,31 @@
             const feedback = document.getElementById('rev-feedback').value.trim();
 
             try {
-                // Состояние читаем до обновления: повторное «Принять» уже принятой работы (открытой из Архива) не должно начислять бонус ещё раз
-                const { data: sub, error: subErr } = await db.from('assignments').select('student_id, type, status, approval_status, scheduled_date').eq('id', currentSubmissionId).single();
-                if (subErr) throw subErr;
-                const alreadyApproved = sub.status === 'checked' && sub.approval_status === 'approved';
+                // review_assignment_self (T10-06A/07): status-переход + recalc недели + серверный
+                // reward-гейт (cutover/Stage 4) — одной транзакцией. Owner/тип/scheduled_date и
+                // cutover/stage4-флаги теперь читает и проверяет сервер, не клиент; двойной approve
+                // не даёт второй серверной награды (идемпотентность внутри record_approved_assignment/
+                // settle_daily_math сохранена).
+                const { data: res, error } = await db.rpc('review_assignment_self', {
+                    p_assignment_id: currentSubmissionId,
+                    p_status: status,
+                    p_feedback: feedback
+                });
+                if (error) throw error;
 
-                // W11 — cutover-флаг читаем ДО изменения задания. Ошибка чтения не должна молча
-                // включить legacy-награды: при сбое чтения прерываем операцию, ничего не меняя.
-                // cutover_at — глобальный флаг economy_config (W09); NULL или будущая дата = ещё старая
-                // модель; после cutover награды идут через серверные RPC, старый streak-путь не выполняется.
-                // stage4_started_at — независимый флаг запуска Stage 4 (U02D): math settlement принятой
-                // ежедневки идёт независимо от недельного cutover. Точная eligibility по моменту действия
-                // проверяется на сервере в settle_daily_math; здесь гейт лишь решает, звать ли RPC.
-                const { data: cfg, error: cfgErr } = await db.from('economy_config').select('cutover_at, stage4_started_at').maybeSingle();
-                if (cfgErr) throw cfgErr;
-                const cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
-                const stage4Active = !!(cfg && cfg.stage4_started_at) && Date.now() >= Date.parse(cfg.stage4_started_at);
-
-                const { error: updErr } = await db.from('assignments').update({
-                    status: 'checked',
-                    approval_status: status,
-                    teacher_feedback: feedback,
-                    checked_at: new Date().toISOString()
-                }).eq('id', currentSubmissionId);
-                if (updErr) throw updErr;
-
-                // Недельный результат пересчитывается сразу (W04/W05); награда за неделю на клиенте
-                // не выдаётся — её платит finalize_student_week после cutover (W09).
-                if (sub.type === 'daily' && sub.scheduled_date) {
-                    try {
-                        const { data: weekStart, error: wsErr } = await db.rpc('week_start_of', { p_date: sub.scheduled_date });
-                        if (wsErr) throw wsErr;
-                        if (weekStart) {
-                            const { error: recalcErr } = await db.rpc('recalc_student_week', {
-                                p_student_id: sub.student_id, p_week_start: weekStart
-                            });
-                            if (recalcErr) throw recalcErr;
-                        }
-                    } catch (e) { console.error('Не удалось пересчитать неделю: ' + e.message); }
-                }
-
-                if (status === 'approved') {
-                    if (cutoverActive) {
-                        // Идемпотентно на ЛЮБОЕ «Принять», включая уже принятую работу: восстанавливает
-                        // награду после сетевого сбоя между update и RPC (W11). Внутри RPC атомарно и
-                        // идемпотентно: season points 10/40/30, first_step, clean_10 и бублики 20/15 за
-                        // weekly/individual. Per-day streak-награда/бонус возвращения/старые достижения
-                        // после cutover не выдаются; недельные бублики за ежедневки — при финализации.
-                        // Хвост record_approved_assignment уже вызывает settle_daily_math — второй math RPC не нужен.
-                        const { error: recErr } = await db.rpc('record_approved_assignment', { p_assignment_id: currentSubmissionId });
-                        if (recErr) throw recErr;
-                    } else if (stage4Active) {
-                        // Stage 4 запущен без недельного cutover (U02D): math settlement принятой ежедневки
-                        // идёт независимо. Идемпотентно (pay-once ledger) — повтор тем же assignment доплатит
-                        // ровно один раз. Ошибка не маскируется (throw -> модалка остаётся, retry возможен).
-                        const { error: setErr } = await db.rpc('settle_daily_math', { p_assignment_id: currentSubmissionId });
-                        if (setErr) throw setErr;
-                    } else if (!alreadyApproved) {
-                        // Старая модель (до cutover) — только при реальном переходе в approved.
-                        if (sub.type === 'daily') {
-                            await processStreak(sub.student_id, sub.scheduled_date);
-                        } else {
-                            await awardApprovalBonus(sub.student_id, sub.type);
-                        }
-                        // Достижение «Первый шаг» (G5): первая принятая работа любого типа.
-                        // Идемпотентно — на второй и далее принятой работе grantAchievement вернёт no-op.
-                        await grantAchievement(sub.student_id, 'first_step');
+                // Legacy pre-cutover streak-контур (T10-06A scope decision, не реимплементирован
+                // сервером — нет соответствующей migration): сервер сообщает reward_path='legacy',
+                // когда ни недельный cutover, ни Stage 4 ещё не активны, и награду не платит.
+                // student_id/scheduled_date берём из ОТВЕТА шлюза (сервер уже нашёл и залочил
+                // строку), а не из отдельного клиентского select до апдейта, как было раньше.
+                if (status === 'approved' && res.reward_path === 'legacy' && !res.was_approved) {
+                    if (res.type === 'daily') {
+                        await processStreak(res.student_id, res.scheduled_date);
+                    } else {
+                        await awardApprovalBonus(res.student_id, res.type);
                     }
+                    // Достижение «Первый шаг» (G5): первая принятая работа любого типа. Идемпотентно.
+                    await grantAchievement(res.student_id, 'first_step');
                 }
 
                 alert(status === 'approved' ? 'Работа принята!' : 'Работа возвращена!');
@@ -622,15 +572,15 @@
             const reason = document.getElementById('pen-reason').value.trim();
             if (!reason) return alert('Укажите причину штрафа!');
 
-            const { data: sub } = await db.from('assignments').select('student_id').eq('id', currentSubmissionId).single();
-
             try {
-                // Кламп нулём и фактически списанная сумма в историю теперь считаются атомарно внутри RPC
-                const { data: result, error: rpcError } = await db.rpc('add_huikons', {
-                    p_student_id: sub.student_id,
+                // apply_penalty_self (T10-06A/07): student выводится сервером из assignment,
+                // клиент не передаёт student_id как "доказательство". Кламп нулём и запись
+                // фактически списанной суммы — по-прежнему внутри add_huikons (не переписано).
+                const { data: result, error: rpcError } = await db.rpc('apply_penalty_self', {
+                    p_assignment_id: currentSubmissionId,
                     p_amount: selectedPenalty,
-                    p_reason: `penalty: ${reason}`
-                }).single();
+                    p_reason: reason
+                });
                 if (rpcError) throw rpcError;
 
                 alert(`Списано ${Math.abs(result.actual_change)} ${pluralBubliks(result.actual_change)}. Новый баланс: ${result.new_balance} 🥯`);

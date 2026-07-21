@@ -95,7 +95,7 @@
         async function reviewCustomTitle(studentId, decision, comment, btn) {
             if (btn) btn.disabled = true;
             try {
-                const { error } = await db.rpc('review_custom_title', {
+                const { error } = await db.rpc('review_custom_title_self', {
                     p_student_id: studentId,
                     p_decision: decision,
                     p_teacher_comment: comment

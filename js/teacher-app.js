@@ -1,8 +1,10 @@
 // teacher-app.js — финальная инициализация/оркестрация (R02)
         // Инициализация
         document.addEventListener('DOMContentLoaded', () => {
-            db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            if (sessionStorage.getItem('auth')) showApp();
+            // Серверная identity (T10-05/07): db создаётся ТОЛЬКО после успешного логина/резюме
+            // сессии (teacher-auth.js), не здесь анонимно. Резюме — по refresh-токену из
+            // sessionStorage (переживает reload вкладки); неудача молча остаётся на login-screen.
+            tryResumeTeacherSession().then(resumed => { if (resumed) showApp(); });
 
             // Генерация полей для дней недели
             const container = document.getElementById('days-container');

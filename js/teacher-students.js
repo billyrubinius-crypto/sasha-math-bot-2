@@ -119,7 +119,7 @@
                 const startText = new Date(season.start_date).toLocaleDateString('ru-RU');
                 if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, лиговые переходы и Корона будут посчитаны сервером, очки всех учеников обнулятся. Действие необратимо.`)) return;
 
-                const { data, error: rpcError } = await db.rpc('close_season');
+                const { data, error: rpcError } = await db.rpc('close_season_self');
                 if (rpcError) throw rpcError;
                 alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\nНовый сезон открыт.`);
                 document.getElementById('season-preview').innerHTML = '';
@@ -190,16 +190,16 @@
             const btn = document.getElementById('btn-assign-indiv');
             btn.disabled = true;
             try {
-                await db.from('assignments').insert([{
-                    student_id: selectedIndivStudentId,
-                    type: 'individual',
-                    title,
-                    content_url: url,
-                    teacher_comment: comment,
-                    activation_status: 'active',
-                    status: 'assigned',
-                    task_count: taskCount
-                }]);
+                // create_individual_assignment_self (T10-06B/07): заменяет прямой browser insert;
+                // student_id — легитимный бизнес-аргумент учителя (target ученика), не self-claim.
+                const { error } = await db.rpc('create_individual_assignment_self', {
+                    p_student_id: selectedIndivStudentId,
+                    p_title: title,
+                    p_content_url: url,
+                    p_teacher_comment: comment,
+                    p_task_count: taskCount
+                });
+                if (error) throw error;
                 alert('Индивидуальное задание назначено!');
                 document.getElementById('indiv-username-input').value = '';
                 selectedIndivStudentId = null;
@@ -352,7 +352,7 @@
                     }
                 }
 
-                const { data, error } = await db.rpc('record_weekly_mock_exam', {
+                const { data, error } = await db.rpc('record_weekly_mock_exam_self', {
                     p_student_id: selectedMockStudentId,
                     p_week_start: weekStart,
                     p_score: score

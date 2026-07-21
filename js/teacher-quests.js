@@ -105,7 +105,7 @@
         // блокируем сам чекбокс на время запроса, как approve/reject в review-модалке.
         async function toggleQuestActive(code, nextActive, checkboxEl) {
             checkboxEl.disabled = true;
-            const { error } = await db.rpc('admin_set_life_quest_template_active', {
+            const { error } = await db.rpc('admin_set_life_quest_template_active_self', {
                 p_template_code: code,
                 p_active: nextActive
             });
@@ -169,7 +169,7 @@
             const btn = document.getElementById('btn-save-quest');
             btn.disabled = true;
             try {
-                const { error } = await db.rpc('admin_upsert_life_quest_template', {
+                const { error } = await db.rpc('admin_upsert_life_quest_template_self', {
                     p_template_code: code,
                     p_name: name,
                     p_description: description,

@@ -15,7 +15,7 @@
         <div class="login-box">
             <h2>👨‍🏫 Учительская</h2>
             <input type="password" id="pass" placeholder="Пароль">
-            <button onclick="checkPass()">Войти</button>
+            <button onclick="submitTeacherLogin()">Войти</button>
             <p id="err" style="color:red; display:none; margin-top:10px;">Неверно!</p>
         </div>
     </div>
@@ -26,6 +26,11 @@
         <div class="tab-btn" onclick="switchTab('plan', this)">📅 Планирование</div>
         <div class="tab-btn" onclick="switchTab('titles', this)">🏷️ Титулы<span id="custom-title-count-badge" class="tab-count-badge" style="display:none;"></span></div>
         <div class="tab-btn" onclick="switchTab('quests', this)">🎲 Квесты</div>
+    </div>
+
+    <!-- Выход (T10-07): серверная сессия, не часть навигации — минимальный отдельный контрол -->
+    <div style="text-align:right; padding:4px 12px; font-size:12px; color:#999;">
+        <span onclick="handleTeacherLogout()" style="cursor:pointer;">🚪 Выход</span>
     </div>
 
     <!-- Под-табы для проверки -->
@@ -295,6 +300,7 @@
     <script src="js/teacher-students.js"></script>
     <script src="js/teacher-titles.js"></script>
     <script src="js/teacher-quests.js"></script>
+    <script src="js/teacher-auth.js"></script>
     <script src="js/teacher-app.js"></script>
 </body>
 </html>

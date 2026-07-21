@@ -1,6 +1,5 @@
 // teacher-core.js — состояние, helpers, auth/tab-навигация, Supabase bootstrap-глобал (R02, механический вынос)
         // SUPABASE_URL/KEY и CLOUDINARY_* вынесены в shared.js (F4). Здесь только teacher-специфичное.
-        const PASS = 'sasha2024';
 
         // Загружает PDF в Cloudinary и подставляет получившуюся ссылку в указанное поле
         async function handlePdfUpload(event, targetInputId) {
@@ -66,11 +65,58 @@
         // Дни недели по номеру day_of_week (1–7), как в weekly_plan_items и assignments.
         const DAY_NAMES = ['', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
 
-        function checkPass() {
-            if (document.getElementById('pass').value === PASS) {
-                sessionStorage.setItem('auth', '1');
-                showApp();
-            } else document.getElementById('err').style.display = 'block';
+        // Вход через серверную identity (T10-05/07): пароль уходит только в teacher-auth Edge по
+        // HTTPS, клиент его не хранит и не сравнивает сам. Синхронная блокировка кнопки ДО await —
+        // тот же паттерн double-click protection, что и submitReview/toggleQuestActive.
+        let teacherLoginBusy = false;
+
+        async function submitTeacherLogin() {
+            if (teacherLoginBusy) return;
+            const passInput = document.getElementById('pass');
+            const err = document.getElementById('err');
+            const password = passInput.value;
+            const btn = document.querySelector('#login-screen button');
+
+            teacherLoginBusy = true;
+            err.style.display = 'none';
+            if (btn) btn.disabled = true;
+            try {
+                await teacherLogin(password);
+                passInput.value = '';
+                await showApp();
+            } catch (e) {
+                err.innerText = teacherAuthErrorMessage(e.code);
+                err.style.display = 'block';
+            } finally {
+                teacherLoginBusy = false;
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // Generic-сообщения (SPEC §3.3): не подсказываем, что именно не так с попыткой входа,
+        // кроме различимых для пользователя случаев (лимит, сеть).
+        function teacherAuthErrorMessage(code) {
+            switch (code) {
+                case 'rate_limited': return 'Слишком много попыток. Попробуйте позже.';
+                case 'network_error': return 'Нет соединения. Проверьте интернет и попробуйте снова.';
+                default: return 'Неверно!';
+            }
+        }
+
+        // Вызывается адаптером сессии (teacher-auth.js) при неудачном фоновом refresh (истечение
+        // 12h-семьи, обнаруженный reuse, kill-switch teacher_token_version) — возвращает на экран
+        // логина с понятным сообщением вместо тихого зависания на сломанных запросах.
+        function teacherSessionExpired() {
+            document.getElementById('login-screen').style.display = 'flex';
+            const err = document.getElementById('err');
+            err.innerText = 'Сессия истекла, войдите снова.';
+            err.style.display = 'block';
+        }
+
+        async function handleTeacherLogout() {
+            await teacherLogout();
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('err').style.display = 'none';
         }
 
         async function showApp() {
