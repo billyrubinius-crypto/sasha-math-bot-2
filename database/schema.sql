@@ -4249,3 +4249,173 @@ revoke all on function public.ensure_student_self(text, text) from public, anon;
 revoke all on function public.submit_assignment_self(uuid, text) from public, anon;
 grant execute on function public.ensure_student_self(text, text) to authenticated;
 grant execute on function public.submit_assignment_self(uuid, text) to authenticated;
+
+-- =============================================================================
+-- T10-04B (migration 035): student GAME mutation gateways (public SECURITY DEFINER,
+-- authenticated only). Тонкие claim-based обёртки *_self над существующей экономикой: identity
+-- из JWT-claims (не из аргумента, p_student_id не принимается), require app_role='student', далее
+-- делегируют в одноимённую legacy-функцию. Цены/лимиты/pay-once/ledger/Stage 4 dormant-gate — в
+-- базовых функциях (не переписываются). add_huikons/season points/achievements/settlement остаются
+-- internal. Legacy RPC сохраняются до T10-11. search_path = public, pg_temp (не '' как в 034):
+-- базовые функции ссылаются на public по неполному имени; путь фиксирован, pg_temp последний.
+-- =============================================================================
+create or replace function public.buy_item_self(p_item_code text, p_variant text default null)
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.buy_item(v_tid, p_item_code, p_variant);
+end;
+$function$;
+
+create or replace function public.buy_streak_shield_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.buy_streak_shield(v_tid);
+end;
+$function$;
+
+create or replace function public.equip_item_self(p_slot text, p_item_code text default null)
+ returns void language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  perform public.equip_item(v_tid, p_slot, p_item_code);
+end;
+$function$;
+
+create or replace function public.set_showcase_self(p_position smallint, p_kind text, p_ref_code text)
+ returns void language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  perform public.set_showcase(v_tid, p_position, p_kind, p_ref_code);
+end;
+$function$;
+
+create or replace function public.submit_custom_title_self(p_title_text text)
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.submit_custom_title(v_tid, p_title_text);
+end;
+$function$;
+
+create or replace function public.request_weekly_shield_self(p_assignment_id uuid)
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.request_weekly_shield(v_tid, p_assignment_id);
+end;
+$function$;
+
+create or replace function public.cancel_weekly_shield_self(p_assignment_id uuid)
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.cancel_weekly_shield(v_tid, p_assignment_id);
+end;
+$function$;
+
+create or replace function public.get_daily_quests_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.get_daily_quests(v_tid);
+end;
+$function$;
+
+create or replace function public.replace_life_quest_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.replace_life_quest(v_tid);
+end;
+$function$;
+
+create or replace function public.claim_life_quest_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.claim_life_quest(v_tid);
+end;
+$function$;
+
+revoke all on function public.buy_item_self(text, text) from public, anon;
+revoke all on function public.buy_streak_shield_self() from public, anon;
+revoke all on function public.equip_item_self(text, text) from public, anon;
+revoke all on function public.set_showcase_self(smallint, text, text) from public, anon;
+revoke all on function public.submit_custom_title_self(text) from public, anon;
+revoke all on function public.request_weekly_shield_self(uuid) from public, anon;
+revoke all on function public.cancel_weekly_shield_self(uuid) from public, anon;
+revoke all on function public.get_daily_quests_self() from public, anon;
+revoke all on function public.replace_life_quest_self() from public, anon;
+revoke all on function public.claim_life_quest_self() from public, anon;
+grant execute on function public.buy_item_self(text, text) to authenticated;
+grant execute on function public.buy_streak_shield_self() to authenticated;
+grant execute on function public.equip_item_self(text, text) to authenticated;
+grant execute on function public.set_showcase_self(smallint, text, text) to authenticated;
+grant execute on function public.submit_custom_title_self(text) to authenticated;
+grant execute on function public.request_weekly_shield_self(uuid) to authenticated;
+grant execute on function public.cancel_weekly_shield_self(uuid) to authenticated;
+grant execute on function public.get_daily_quests_self() to authenticated;
+grant execute on function public.replace_life_quest_self() to authenticated;
+grant execute on function public.claim_life_quest_self() to authenticated;

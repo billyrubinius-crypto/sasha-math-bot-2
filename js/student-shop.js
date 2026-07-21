@@ -217,9 +217,15 @@
 
         async function setShowcase(position, kind, refCode) {
             try {
-                const { error } = await db.rpc('set_showcase', {
-                    p_student_id: currentUser.id, p_position: position, p_kind: kind, p_ref_code: refCode
-                });
+                // secure path (JWT активен) — через claim-based gateway set_showcase_self без
+                // p_student_id (identity из claim; T10-04B). Legacy fallback — прежний RPC.
+                const { error } = studentSecurePathActive()
+                    ? await db.rpc('set_showcase_self', {
+                        p_position: position, p_kind: kind, p_ref_code: refCode
+                    })
+                    : await db.rpc('set_showcase', {
+                        p_student_id: currentUser.id, p_position: position, p_kind: kind, p_ref_code: refCode
+                    });
                 if (error) throw error;
                 await loadShowcase();
             } catch (e) {
@@ -271,7 +277,11 @@
             const btn = document.getElementById('btn-buy-shield');
             btn.disabled = true;
             try {
-                const { data, error } = await db.rpc('buy_streak_shield', { p_student_id: currentUser.id });
+                // secure path — gateway buy_streak_shield_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC. Лимит/цена/списание — в базовой функции.
+                const { data, error } = studentSecurePathActive()
+                    ? await db.rpc('buy_streak_shield_self')
+                    : await db.rpc('buy_streak_shield', { p_student_id: currentUser.id });
                 if (error) throw error;
                 // Обновляем баланс и счётчик щитов по факту покупки
                 document.getElementById('val-huikons').innerText = data.balance;
@@ -543,9 +553,13 @@
         async function buyShopItem(itemCode, variant, btn) {
             if (btn) btn.disabled = true;
             try {
-                const { data, error } = await db.rpc('buy_item', {
-                    p_student_id: currentUser.id, p_item_code: itemCode, p_variant: variant
-                });
+                // secure path — gateway buy_item_self без p_student_id (T10-04B); legacy fallback —
+                // прежний RPC. Цена/бандл/pay-once/списание — в базовой buy_item.
+                const { data, error } = studentSecurePathActive()
+                    ? await db.rpc('buy_item_self', { p_item_code: itemCode, p_variant: variant })
+                    : await db.rpc('buy_item', {
+                        p_student_id: currentUser.id, p_item_code: itemCode, p_variant: variant
+                    });
                 if (error) throw error;
                 // Синхронизируем баланс на профиле, если он уже отрисован
                 const vh = document.getElementById('val-huikons');
@@ -602,10 +616,14 @@
             btn.disabled = true;
             document.getElementById('custom-title-error').textContent = '';
             try {
-                const { data, error } = await db.rpc('submit_custom_title', {
-                    p_student_id: currentUser.id,
-                    p_title_text: title
-                });
+                // secure path — gateway submit_custom_title_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC. Валидация/цена/pay-once — в базовой функции.
+                const { data, error } = studentSecurePathActive()
+                    ? await db.rpc('submit_custom_title_self', { p_title_text: title })
+                    : await db.rpc('submit_custom_title', {
+                        p_student_id: currentUser.id,
+                        p_title_text: title
+                    });
                 if (error) throw error;
                 const balance = document.getElementById('val-huikons');
                 if (balance && data && data.balance != null) balance.innerText = data.balance;
@@ -624,9 +642,13 @@
         async function equipShopItem(slot, itemCode, btn) {
             if (btn) btn.disabled = true;
             try {
-                const { error } = await db.rpc('equip_item', {
-                    p_student_id: currentUser.id, p_slot: slot, p_item_code: itemCode
-                });
+                // secure path — gateway equip_item_self без p_student_id (T10-04B); legacy fallback —
+                // прежний RPC. Проверка владения — в базовой equip_item.
+                const { error } = studentSecurePathActive()
+                    ? await db.rpc('equip_item_self', { p_slot: slot, p_item_code: itemCode })
+                    : await db.rpc('equip_item', {
+                        p_student_id: currentUser.id, p_slot: slot, p_item_code: itemCode
+                    });
                 if (error) throw error;
                 await loadShop();
             } catch (e) {

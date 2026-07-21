@@ -157,9 +157,13 @@
             weekShieldBusy = true;
             btn.disabled = true;
             try {
-                const { error } = await db.rpc('request_weekly_shield', {
-                    p_student_id: currentUser.id, p_assignment_id: assignmentId
-                });
+                // secure path — gateway request_weekly_shield_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC. Owner/окно/лимит — в базовой функции.
+                const { error } = studentSecurePathActive()
+                    ? await db.rpc('request_weekly_shield_self', { p_assignment_id: assignmentId })
+                    : await db.rpc('request_weekly_shield', {
+                        p_student_id: currentUser.id, p_assignment_id: assignmentId
+                    });
                 if (error) throw error;
                 await loadWeekBlock();
             } catch (e) {
@@ -173,9 +177,13 @@
             weekShieldBusy = true;
             btn.disabled = true;
             try {
-                const { error } = await db.rpc('cancel_weekly_shield', {
-                    p_student_id: currentUser.id, p_assignment_id: assignmentId
-                });
+                // secure path — gateway cancel_weekly_shield_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC.
+                const { error } = studentSecurePathActive()
+                    ? await db.rpc('cancel_weekly_shield_self', { p_assignment_id: assignmentId })
+                    : await db.rpc('cancel_weekly_shield', {
+                        p_student_id: currentUser.id, p_assignment_id: assignmentId
+                    });
                 if (error) throw error;
                 await loadWeekBlock();
             } catch (e) {

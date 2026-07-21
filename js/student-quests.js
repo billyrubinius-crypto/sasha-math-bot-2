@@ -10,7 +10,11 @@
         async function loadTodayQuests() {
             const content = document.getElementById('today-quests-content');
             try {
-                const { data, error } = await db.rpc('get_daily_quests', { p_student_id: currentUser.id });
+                // secure path — gateway get_daily_quests_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC. Dormant-gate/генерация — в базовой функции.
+                const { data, error } = studentSecurePathActive()
+                    ? await db.rpc('get_daily_quests_self')
+                    : await db.rpc('get_daily_quests', { p_student_id: currentUser.id });
                 if (error) throw error;
                 renderTodayQuests(data);
             } catch (e) {
@@ -137,7 +141,11 @@
             questActionBusy = true;
             setLifeControlsDisabled(true);
             try {
-                const { data, error } = await db.rpc('claim_life_quest', { p_student_id: currentUser.id });
+                // secure path — gateway claim_life_quest_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC. pay-once life=3 + combo — в базовой функции.
+                const { data, error } = studentSecurePathActive()
+                    ? await db.rpc('claim_life_quest_self')
+                    : await db.rpc('claim_life_quest', { p_student_id: currentUser.id });
                 if (error) throw error;
                 renderTodayQuests(data);
             } catch (e) {
@@ -153,7 +161,11 @@
             questActionBusy = true;
             setLifeControlsDisabled(true);
             try {
-                const { data, error } = await db.rpc('replace_life_quest', { p_student_id: currentUser.id });
+                // secure path — gateway replace_life_quest_self без p_student_id (T10-04B);
+                // legacy fallback — прежний RPC. Лимит замен/окно — в базовой функции.
+                const { data, error } = studentSecurePathActive()
+                    ? await db.rpc('replace_life_quest_self')
+                    : await db.rpc('replace_life_quest', { p_student_id: currentUser.id });
                 if (error) throw error;
                 renderTodayQuests(data);
             } catch (e) {
