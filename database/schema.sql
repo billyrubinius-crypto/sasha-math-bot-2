@@ -4947,3 +4947,64 @@ $function$;
 
 revoke all on function public.activate_due_assignments_self() from public, anon;
 grant execute on function public.activate_due_assignments_self() to authenticated;
+
+-- =============================================================================
+-- T10-08A (migration 042): Core RLS — identity/assignments/деньги/пробники. Строгий RLS без
+-- anon-compat (боты не на dev). Public policy-хелперы jwt_app_role/jwt_student_id (SECURITY DEFINER,
+-- обёртки над private.current_*, видны политикам под anon/authenticated). Student SELECT own [+
+-- teacher SELECT где нужно review]; ledgers/payment/parent/legacy deny-client (RLS on, без политик,
+-- revoke all). Writes revoked от anon/authenticated (идут через definer-gateway'и/service). Game
+-- scope — T10-08B. auth_mode=legacy. student_payments RLS уже был on (migration 032/шапка).
+-- =============================================================================
+create or replace function public.jwt_app_role()
+ returns text language sql stable security definer set search_path = ''
+as $function$ select private.current_app_role() $function$;
+create or replace function public.jwt_student_id()
+ returns bigint language sql stable security definer set search_path = ''
+as $function$ select private.current_telegram_id() $function$;
+revoke all on function public.jwt_app_role() from public;
+revoke all on function public.jwt_student_id() from public;
+grant execute on function public.jwt_app_role() to anon, authenticated;
+grant execute on function public.jwt_student_id() to anon, authenticated;
+
+create index if not exists idx_balance_history_student on public.balance_history (student_id);
+
+alter table public.students enable row level security;
+create policy students_select_own     on public.students for select to authenticated
+  using (telegram_id = public.jwt_student_id());
+create policy students_select_teacher on public.students for select to authenticated
+  using (public.jwt_app_role() = 'teacher');
+revoke insert, update, delete on public.students from anon, authenticated;
+
+alter table public.assignments enable row level security;
+create policy assignments_select_own     on public.assignments for select to authenticated
+  using (student_id = public.jwt_student_id());
+create policy assignments_select_teacher on public.assignments for select to authenticated
+  using (public.jwt_app_role() = 'teacher');
+revoke insert, update, delete on public.assignments from anon, authenticated;
+
+alter table public.balance_history enable row level security;
+create policy balance_history_select_own on public.balance_history for select to authenticated
+  using (student_id = public.jwt_student_id());
+revoke insert, update, delete on public.balance_history from anon, authenticated;
+
+alter table public.weekly_mock_exams enable row level security;
+create policy weekly_mock_exams_select_own     on public.weekly_mock_exams for select to authenticated
+  using (student_id = public.jwt_student_id());
+create policy weekly_mock_exams_select_teacher on public.weekly_mock_exams for select to authenticated
+  using (public.jwt_app_role() = 'teacher');
+revoke insert, update, delete on public.weekly_mock_exams from anon, authenticated;
+
+alter table public.mock_exam_results enable row level security;
+create policy mock_exam_results_select_own on public.mock_exam_results for select to authenticated
+  using (student_id = public.jwt_student_id());
+revoke insert, update, delete on public.mock_exam_results from anon, authenticated;
+
+alter table public.mock_exam_reward_log enable row level security;
+revoke all on public.mock_exam_reward_log from anon, authenticated;
+alter table public.parent_links enable row level security;
+revoke all on public.parent_links from anon, authenticated;
+alter table public.homework_submissions enable row level security;
+revoke all on public.homework_submissions from anon, authenticated;
+alter table public.student_payments enable row level security;
+revoke all on public.student_payments from anon, authenticated;
