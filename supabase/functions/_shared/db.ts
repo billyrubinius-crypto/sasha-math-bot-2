@@ -326,6 +326,72 @@ export function parentFetchCurrentWeek(studentId: number): Promise<unknown> {
   return callRpc<unknown>("get_student_current_week", { p_student_id: studentId });
 }
 
+// --- Sheets sync API: narrow service-role операции помощников (T10-10C) ----------------------
+// Тот же принцип, что у student/parent-bot-api: generic-хелперы наружу не отдаются. Здесь
+// зафиксированы РОВНО те четыре операции, которые выполняет Apps Script по своей спецификации:
+// найти ученика по username, обновить организационную группу, upsert-ить дату оплаты и результат
+// пробника. huikons/rating/season points/inventory/assignment approvals/security config
+// недостижимы: ни одна функция ниже их не читает и не формирует, а payload собирается здесь,
+// а не приходит от Apps Script.
+
+// Ученика НИКОГДА не создаём — только ищем (контракт «ученик ещё не входил» => null).
+export async function sheetsFindStudentByUsername(username: string): Promise<number | null> {
+  const rows = await serviceRestGet<{ telegram_id: number }[]>("students", {
+    telegram_username: `ilike.${username}`,
+    select: "telegram_id",
+    limit: "1",
+  });
+  return rows.length ? rows[0].telegram_id : null;
+}
+
+// Единственное организационное поле, которое помощник может менять в students.
+export async function sheetsUpdateStudentGroup(
+  telegramId: number,
+  groupName: string | null,
+): Promise<void> {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) throw new AuthError("server_misconfigured", 500);
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/students?telegram_id=eq.${encodeURIComponent(String(telegramId))}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ group_name: groupName }),
+    },
+  );
+  if (!res.ok) throw new AuthError("db_error", 500);
+}
+
+// student_payments.student_id — PK, поэтому merge-duplicates даёт идемпотентный upsert (как сейчас).
+export function sheetsUpsertPayment(telegramId: number, paymentDate: string | null): Promise<void> {
+  return serviceRestUpsert("student_payments", "student_id", {
+    student_id: telegramId,
+    payment_date: paymentDate,
+  });
+}
+
+// mock_exam_results имеет unique (student_id, exam_name) — повторная синхронизация одного пробника
+// обновляет строку, а не плодит дубль. exam_date не передаётся, если помощник его не заполнил,
+// поэтому ранее сохранённая дата не затирается.
+export function sheetsUpsertMockExam(
+  telegramId: number,
+  examName: string,
+  score: string,
+  examDate?: string,
+): Promise<void> {
+  const payload: Record<string, unknown> = {
+    student_id: telegramId,
+    exam_name: examName,
+    score,
+  };
+  if (examDate) payload.exam_date = examDate;
+  return serviceRestUpsert("mock_exam_results", "student_id,exam_name", payload);
+}
+
 export function securityAudit(
   eventType: string,
   appRole: string | null,
