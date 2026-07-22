@@ -125,6 +125,138 @@ export async function assignmentOwnedBy(telegramId: number, assignmentId: string
   return Array.isArray(rows) && rows.length === 1;
 }
 
+// --- Student bot API: narrow service-role reads/write (T10-10A) ------------------------------
+// Generic PostgREST helpers under service_role, НЕ экспортируются — вызывающий код (student-bot-api)
+// видит только именованные функции ниже с зафиксированным table/select/filter. Это и есть жёсткий
+// allowlist операций: секрет бота не может открыть произвольную таблицу/колонку, только то, что
+// main.py уже читал/писал напрямую до T10-10A.
+
+async function serviceRestGet<T>(path: string, params: Record<string, string>): Promise<T> {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) throw new AuthError("server_misconfigured", 500);
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}?${qs}`, {
+    headers: { "apikey": SERVICE_ROLE_KEY, "Authorization": `Bearer ${SERVICE_ROLE_KEY}` },
+  });
+  if (!res.ok) throw new AuthError("db_error", 500);
+  return (await res.json()) as T;
+}
+
+async function serviceRestUpsert(
+  path: string,
+  onConflict: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) throw new AuthError("server_misconfigured", 500);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}?on_conflict=${encodeURIComponent(onConflict)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SERVICE_ROLE_KEY,
+      "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
+      "Prefer": "resolution=merge-duplicates",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new AuthError("db_error", 500);
+}
+
+// Ровно тот же select/filter, что раньше был в main.py fetch_active_assignments() напрямую.
+export interface ActiveAssignmentRow {
+  student_id: number;
+  type: string;
+  scheduled_date: string | null;
+  week_label: string | null;
+  status: string;
+  approval_status: string | null;
+  activation_status: string;
+  revision_deadline_at: string | null;
+}
+export function fetchActiveAssignmentsForBot(): Promise<ActiveAssignmentRow[]> {
+  return serviceRestGet<ActiveAssignmentRow[]>("assignments", {
+    activation_status: "in.(active,scheduled)",
+    select: "student_id,type,scheduled_date,week_label,status,approval_status," +
+      "activation_status,revision_deadline_at",
+  });
+}
+
+export async function fetchNotificationLastSent(key: string): Promise<string | null> {
+  const rows = await serviceRestGet<{ last_sent_date: string | null }[]>("bot_notification_state", {
+    notification_key: `eq.${key}`,
+    select: "last_sent_date",
+  });
+  return rows[0]?.last_sent_date ?? null;
+}
+
+export function markNotificationSent(key: string, sentDate: string): Promise<void> {
+  return serviceRestUpsert("bot_notification_state", "notification_key", {
+    notification_key: key,
+    last_sent_date: sentDate,
+  });
+}
+
+// season_id проверен на положительное целое до вызова — идёт в LIKE-фильтр напрямую.
+export async function fetchAlreadyNotifiedLeagueKeys(seasonId: number): Promise<string[]> {
+  const rows = await serviceRestGet<{ notification_key: string }[]>("bot_notification_state", {
+    notification_key: `like.league_result:${seasonId}:*`,
+    select: "notification_key",
+  });
+  return rows.map((r) => r.notification_key);
+}
+
+export async function fetchLatestClosedSeasonId(): Promise<number | null> {
+  const rows = await serviceRestGet<{ id: number }[]>("seasons", {
+    end_date: "not.is.null",
+    order: "id.desc",
+    limit: "1",
+    select: "id",
+  });
+  return rows[0]?.id ?? null;
+}
+
+export interface LeagueMembershipRow {
+  student_id: number;
+  tier: number;
+  place: number | null;
+  movement: string | null;
+}
+export function fetchLeagueMemberships(seasonId: number): Promise<LeagueMembershipRow[]> {
+  return serviceRestGet<LeagueMembershipRow[]>("league_memberships", {
+    season_id: `eq.${seasonId}`,
+    select: "student_id,tier,place,movement",
+  });
+}
+
+export interface LeagueTierRow {
+  tier: number;
+  name: string;
+}
+export function fetchLeagueTiers(): Promise<LeagueTierRow[]> {
+  return serviceRestGet<LeagueTierRow[]>("league_tiers", { select: "tier,name" });
+}
+
+export interface LeagueMovementRow {
+  student_id: number;
+  from_tier: number;
+  to_tier: number;
+  kind: string;
+}
+export function fetchLeagueMovements(seasonId: number): Promise<LeagueMovementRow[]> {
+  return serviceRestGet<LeagueMovementRow[]>("league_movements", {
+    season_id: `eq.${seasonId}`,
+    select: "student_id,from_tier,to_tier,kind",
+  });
+}
+
+export async function fetchLeagueCrownStudentId(seasonId: number): Promise<number | null> {
+  const rows = await serviceRestGet<{ student_id: number }[]>("league_season_awards", {
+    award_code: "eq.legend_crown",
+    earned_season_id: `eq.${seasonId}`,
+    select: "student_id",
+    limit: "1",
+  });
+  return rows[0]?.student_id ?? null;
+}
+
 export function securityAudit(
   eventType: string,
   appRole: string | null,

@@ -16,15 +16,25 @@ API_TOKEN = os.environ['STUDENT_BOT_TOKEN']
 # Ссылка на мини-апп (GitHub Pages) — Bot 2.0 dev-форк, не прод
 WEBAPP_URL = "https://billyrubinius-crypto.github.io/sasha-math-bot-2/"
 
-# Supabase — Bot 2.0 dev-проект (sasha-math-bot-2-dev), НЕ прод. См. bot2/BOT2_CONTEXT.md.
-# Тот же публичный REST-доступ, что и у parent_bot.py; рассылка только читает assignments, ничего не пишет
-SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co'
-SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b'
-SUPABASE_HEADERS = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': f'Bearer {SUPABASE_KEY}',
-    'Content-Type': 'application/json'
-}
+# T10-10A: прямой Data API/publishable key убран. Вся связь с Supabase идёт через узкий
+# server-to-server Edge Function student-bot-api — жёсткий allowlist действий, отдельный
+# бот-секрет (не publishable key, не service-role). URL/секрет только из окружения.
+STUDENT_BOT_API_URL = os.environ['STUDENT_BOT_API_URL']
+STUDENT_BOT_API_SECRET = os.environ['STUDENT_BOT_API_SECRET']
+
+
+def call_bot_api(action: str, **kwargs):
+    """Единая точка входа в student-bot-api (T10-10A). Секрет уходит только в заголовок
+    X-Bot-Secret — не в query/URL, не в лог. Ошибки (неверный секрет, неизвестное действие,
+    недоступность Supabase) всплывают через raise_for_status() и обрабатываются вызывающим
+    кодом ровно так же, как раньше обрабатывались ошибки прямого REST (см. scheduler_loop)."""
+    resp = requests.post(
+        STUDENT_BOT_API_URL,
+        headers={'Content-Type': 'application/json', 'X-Bot-Secret': STUDENT_BOT_API_SECRET},
+        json={'action': action, **kwargs}
+    )
+    resp.raise_for_status()
+    return resp.json().get('data', {})
 
 # МСК = UTC+3 круглый год — тот же приём, что и getTodayMSK() в index.html/teacher.html
 MSK = timezone(timedelta(hours=3))
@@ -52,18 +62,11 @@ def fetch_active_assignments() -> list:
     при заходе ученика (checkAndActivateAssignments()), а не сама по себе — is_effectively_active()
     ниже досчитывает то же правило, не дожидаясь, пока ученик откроет приложение.
     week_label и revision_deadline_at добавлены в W08: нужны, чтобы отличить возвращённую daily с
-    открытым окном исправления (SPEC §11) и weekly текущей недели от прочих строк, без второго запроса."""
-    resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/assignments',
-        headers=SUPABASE_HEADERS,
-        params={
-            'activation_status': 'in.(active,scheduled)',
-            'select': 'student_id,type,scheduled_date,week_label,status,approval_status,'
-                      'activation_status,revision_deadline_at'
-        }
-    )
-    resp.raise_for_status()
-    return resp.json()
+    открытым окном исправления (SPEC §11) и weekly текущей недели от прочих строк, без второго запроса.
+
+    T10-10A: раньше — прямой GET к Data API; теперь тот же набор строк и полей отдаёт
+    student-bot-api (action=active_assignments), сервер сам фиксирует table/select/filter."""
+    return call_bot_api('active_assignments')
 
 
 def is_effectively_active(row: dict, today: str) -> bool:
@@ -246,28 +249,19 @@ async def send_evening_reminder():
 def fetch_last_sent(key: str):
     """Дата последней успешной отправки уведомления key, сохранённая в Supabase — переживает
     рестарт/передеплой процесса, в отличие от переменной в памяти (было причиной повторной
-    отправки одной и той же рассылки при каждом передеплое после времени срабатывания)."""
-    resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/bot_notification_state',
-        headers=SUPABASE_HEADERS,
-        params={'notification_key': f'eq.{key}', 'select': 'last_sent_date'}
-    )
-    resp.raise_for_status()
-    rows = resp.json()
-    if not rows or not rows[0]['last_sent_date']:
+    отправки одной и той же рассылки при каждом передеплое после времени срабатывания).
+
+    T10-10A: student-bot-api сам ограничивает key тремя планировщик-маркерами."""
+    last_sent_date = call_bot_api('notification_last_sent', key=key).get('last_sent_date')
+    if not last_sent_date:
         return None
-    return datetime.strptime(rows[0]['last_sent_date'], '%Y-%m-%d').date()
+    return datetime.strptime(last_sent_date, '%Y-%m-%d').date()
 
 
 def mark_sent(key: str, sent_date):
-    headers = {**SUPABASE_HEADERS, 'Prefer': 'resolution=merge-duplicates'}
-    resp = requests.post(
-        f'{SUPABASE_URL}/rest/v1/bot_notification_state',
-        headers=headers,
-        params={'on_conflict': 'notification_key'},
-        json={'notification_key': key, 'last_sent_date': sent_date.isoformat()}
-    )
-    resp.raise_for_status()
+    """T10-10A: запись идёт через student-bot-api (action=notification_mark_sent) — сервер
+    проверяет формат key (три маркера планировщика или league_result:<season>:<student>)."""
+    call_bot_api('notification_mark_sent', key=key, sent_date=sent_date.isoformat())
 
 
 def league_result_key(season_id, student_id) -> str:
@@ -277,26 +271,16 @@ def league_result_key(season_id, student_id) -> str:
 def fetch_latest_closed_season():
     """Последний закрытый сезон (id), если он вообще есть — по возрастанию id, не по дате
     (несколько сезонов теоретически могут закрыться в один календарный день)."""
-    resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/seasons',
-        headers=SUPABASE_HEADERS,
-        params={'end_date': 'not.is.null', 'order': 'id.desc', 'limit': 1, 'select': 'id'}
-    )
-    resp.raise_for_status()
-    rows = resp.json()
-    return rows[0]['id'] if rows else None
+    return call_bot_api('latest_closed_season').get('season_id')
 
 
 def fetch_already_notified_student_ids(season_id) -> set:
     """Кто уже получил итог этого сезона — читаем существующий bot_notification_state одним
-    запросом (не по одному ключу на ученика), переживает рестарт/передеплой процесса."""
-    resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/bot_notification_state',
-        headers=SUPABASE_HEADERS,
-        params={'notification_key': f'like.{league_result_key(season_id, "*")}', 'select': 'notification_key'}
-    )
-    resp.raise_for_status()
-    return {int(row['notification_key'].rsplit(':', 1)[1]) for row in resp.json()}
+    запросом (не по одному ключу на ученика), переживает рестарт/передеплой процесса.
+
+    T10-10A: student-bot-api сам достаёт числовой student_id из ключа league_result:<season>:<id>
+    (тот же разбор, что раньше делал rsplit здесь) — main.py получает уже готовый список."""
+    return set(call_bot_api('notification_already_sent_ids', season_id=season_id).get('student_ids', []))
 
 
 async def send_league_result_notifications():
@@ -313,13 +297,7 @@ async def send_league_result_notifications():
     if season_id is None:
         return
 
-    resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/league_memberships',
-        headers=SUPABASE_HEADERS,
-        params={'season_id': f'eq.{season_id}', 'select': 'student_id,tier,place,movement'}
-    )
-    resp.raise_for_status()
-    memberships = resp.json()
+    memberships = call_bot_api('league_memberships', season_id=season_id).get('memberships', [])
     if not memberships:
         return  # legacy сезон без лиговых данных (закрыт до применения L01) — уведомлять нечего
 
@@ -328,28 +306,12 @@ async def send_league_result_notifications():
     if not pending:
         return
 
-    tiers_resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/league_tiers', headers=SUPABASE_HEADERS, params={'select': 'tier,name'}
-    )
-    tiers_resp.raise_for_status()
-    tier_name = {row['tier']: row['name'] for row in tiers_resp.json()}
+    tier_name = {row['tier']: row['name'] for row in call_bot_api('league_tiers').get('tiers', [])}
 
-    moves_resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/league_movements',
-        headers=SUPABASE_HEADERS,
-        params={'season_id': f'eq.{season_id}', 'select': 'student_id,from_tier,to_tier,kind'}
-    )
-    moves_resp.raise_for_status()
-    move_by_student = {row['student_id']: row for row in moves_resp.json()}
+    moves = call_bot_api('league_movements', season_id=season_id).get('movements', [])
+    move_by_student = {row['student_id']: row for row in moves}
 
-    crown_resp = requests.get(
-        f'{SUPABASE_URL}/rest/v1/league_season_awards',
-        headers=SUPABASE_HEADERS,
-        params={'award_code': 'eq.legend_crown', 'earned_season_id': f'eq.{season_id}', 'select': 'student_id'}
-    )
-    crown_resp.raise_for_status()
-    crown_rows = crown_resp.json()
-    crown_student_id = crown_rows[0]['student_id'] if crown_rows else None
+    crown_student_id = call_bot_api('league_crown_student', season_id=season_id).get('student_id')
 
     today = datetime.now(MSK).date()
     for m in pending:
