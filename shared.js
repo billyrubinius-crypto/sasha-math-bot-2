@@ -11,9 +11,57 @@
 const SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b';
 
-// Cloudinary — один аккаунт на обе страницы (ученик грузит фото ДЗ, учитель — PDF заданий)
-const CLOUDINARY_CLOUD_NAME = 'ddrn3vxm0';
-const CLOUDINARY_UPLOAD_PRESET = 'sasha-math-dz';
+// Cloudinary — один аккаунт на обе страницы (ученик грузит фото ДЗ, учитель — PDF заданий).
+// T10-09: unsigned preset удалён. Клиент НИКОГДА не отправляет upload_preset и не выбирает
+// folder/public_id/resource_type — всё это приходит подписанным из Edge Function sign-upload
+// (cloud_name тоже отдаёт сервер, поэтому отдельная константа больше не нужна).
+const SIGN_UPLOAD_URL = SUPABASE_URL + '/functions/v1/sign-upload';
+
+// Загружает файл в Cloudinary через серверную подпись и возвращает secure_url.
+//   kind         — 'student_photo' | 'teacher_pdf' (политику сервер проверяет по роли в JWT);
+//   accessToken  — JWT текущего actor, живёт только в памяти адаптера сессии;
+//   assignmentId — только для student_photo (сервер проверяет владение заданием).
+async function uploadSignedToCloudinary(file, kind, accessToken, assignmentId) {
+    if (!accessToken) throw new Error('Нет активной сессии — открой приложение заново');
+
+    const signRes = await fetch(SIGN_UPLOAD_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+        body: JSON.stringify({
+            kind: kind,
+            filename: file.name,
+            bytes: file.size,
+            assignment_id: assignmentId || undefined
+        })
+    });
+    const sign = await signRes.json().catch(() => null);
+    if (!signRes.ok || !sign || !sign.signature) {
+        if (sign && sign.error === 'file_too_large') throw new Error('Файл слишком большой');
+        if (sign && sign.error === 'format_not_allowed') throw new Error('Недопустимый тип файла');
+        throw new Error('Загрузка не разрешена');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('api_key', sign.api_key);
+    formData.append('signature', sign.signature);
+    // Подписанные сервером параметры уходят как есть — изменение любого ломает подпись.
+    Object.keys(sign.params).forEach(k => formData.append(k, sign.params[k]));
+
+    const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${sign.cloud_name}/${sign.resource_type}/upload`,
+        { method: 'POST', body: formData }
+    );
+    if (!res.ok) throw new Error('Ошибка загрузки в Cloudinary');
+    const data = await res.json();
+
+    // Принимаем только ссылку своего аккаунта Cloudinary — чужой URL дальше в базу не пойдёт.
+    if (typeof data.secure_url !== 'string' ||
+        !data.secure_url.startsWith(`https://res.cloudinary.com/${sign.cloud_name}/`)) {
+        throw new Error('Некорректная ссылка загрузки');
+    }
+    return data.secure_url;
+}
 
 // Экранирует пользовательский текст перед вставкой через innerHTML (имена, названия заданий,
 // комментарии, названия групп и т.п. — всё, что вводит человек, а не сам код)

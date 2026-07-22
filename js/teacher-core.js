@@ -21,20 +21,10 @@
             }
         }
 
+        // T10-09: unsigned preset убран. Подпись выдаёт Edge Function sign-upload по учительскому
+        // JWT; folder (sasha-math-tasks), public_id и allowed_formats=pdf задаёт сервер.
         async function uploadPdfToCloudinary(file) {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-            formData.append('folder', 'sasha-math-tasks');
-
-            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!res.ok) throw new Error('Ошибка загрузки в Cloudinary');
-            const data = await res.json();
-            return data.secure_url;
+            return uploadSignedToCloudinary(file, 'teacher_pdf', teacherAccessToken());
         }
 
         let db, currentSubmissionId = null, selectedPenalty = -20, studentsList = [];

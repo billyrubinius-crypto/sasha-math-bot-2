@@ -25,6 +25,12 @@ function studentSecurePathActive() {
     return _secureActive;
 }
 
+// Текущий JWT для прямых вызовов Edge Function (sign-upload, T10-09). Токен остаётся в памяти
+// модуля: возвращается только вызывающему коду страницы, не логируется и не сохраняется.
+function studentAccessToken() {
+    return _studentToken;
+}
+
 function _decodeJwtPayload(jwt) {
     try {
         const part = jwt.split('.')[1];

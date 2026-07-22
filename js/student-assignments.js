@@ -233,20 +233,10 @@
             btn.disabled = false;
         }
 
-        async function uploadToCloudinary(file) {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-            formData.append('folder', 'sasha-math-dz');
-            
-            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (!res.ok) throw new Error('Ошибка загрузки в Cloudinary');
-            const data = await res.json();
-            return data.secure_url;
+        // T10-09: unsigned preset убран. Подпись выдаёт Edge Function sign-upload по студенческому
+        // JWT и только для СВОЕГО задания — folder/public_id/формат/размер задаёт сервер.
+        async function uploadToCloudinary(file, assignmentId) {
+            return uploadSignedToCloudinary(file, 'student_photo', studentAccessToken(), assignmentId);
         }
 
         async function uploadDZ() {
@@ -320,7 +310,7 @@
                 const photoUrls = [];
                 for (let i = 0; i < selectedFiles.length; i++) {
                     status.innerText = ` Загрузка фото (${i + 1}/${selectedFiles.length})...`;
-                    const url = await uploadToCloudinary(selectedFiles[i]);
+                    const url = await uploadToCloudinary(selectedFiles[i], assignmentId);
                     photoUrls.push(url);
                 }
                 

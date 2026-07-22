@@ -109,6 +109,22 @@ export function teacherSessionRotate(
   });
 }
 
+// --- Upload authorization (T10-09) ------------------------------------------------------------
+// assignments.student_id — это telegram_id (FK на students.telegram_id), поэтому владение
+// проверяется одним точечным запросом. Чужая/несуществующая строка даёт одинаковый ответ false.
+export async function assignmentOwnedBy(telegramId: number, assignmentId: string): Promise<boolean> {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) throw new AuthError("server_misconfigured", 500);
+  const url = `${SUPABASE_URL}/rest/v1/assignments` +
+    `?id=eq.${encodeURIComponent(assignmentId)}` +
+    `&student_id=eq.${encodeURIComponent(String(telegramId))}&select=id&limit=1`;
+  const res = await fetch(url, {
+    headers: { "apikey": SERVICE_ROLE_KEY, "Authorization": `Bearer ${SERVICE_ROLE_KEY}` },
+  });
+  if (!res.ok) throw new AuthError("db_error", 500);
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length === 1;
+}
+
 export function securityAudit(
   eventType: string,
   appRole: string | null,

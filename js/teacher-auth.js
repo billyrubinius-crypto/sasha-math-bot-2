@@ -13,6 +13,12 @@ const TEACHER_JWT_REFRESH_DELAY_MS = 55 * 60 * 1000; // JWT живёт 60 мин
 let _teacherToken = null; // access JWT, только в памяти модуля
 let _teacherRefreshTimer = null;
 
+// Текущий JWT для прямых вызовов Edge Function (sign-upload, T10-09). Как и у ученика, токен
+// остаётся в памяти модуля — не сохраняется и не логируется.
+function teacherAccessToken() {
+    return _teacherToken;
+}
+
 class TeacherAuthError extends Error {
     constructor(code) { super(code); this.code = code; }
 }

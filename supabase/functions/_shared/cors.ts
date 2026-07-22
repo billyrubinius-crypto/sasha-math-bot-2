@@ -13,7 +13,8 @@ export function corsHeaders(origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": originAllowed(origin) ? origin! : "null",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type",
+    // authorization нужен функциям, которые принимают уже выпущенный JWT (sign-upload, T10-09).
+    "Access-Control-Allow-Headers": "content-type, authorization",
     "Access-Control-Max-Age": "600",
     "Vary": "Origin",
   };
