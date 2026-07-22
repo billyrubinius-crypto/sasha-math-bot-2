@@ -1,8 +1,17 @@
 // student-assignments.js — задания: активация, actionable, активные/загрузка/архив (R01)
         // --- АКТИВАЦИЯ ЗАДАНИЙ (АВТОПИЛОТ) ---
         async function checkAndActivateAssignments() {
+            // secure path (JWT активен) — через gateway activate_due_assignments_self (T10-06E):
+            // identity из claim, без прямого client update(assignments). Legacy fallback — прежний
+            // прямой select+update.
+            if (studentSecurePathActive()) {
+                const { error } = await db.rpc('activate_due_assignments_self');
+                if (error) log('Ошибка активации: ' + error.message);
+                return;
+            }
+
             const todayMSK = getTodayMSK();
-            
+
             // Ищем запланированные задания для текущего пользователя, срок которых настал
             const { data: toActivate, error } = await db
                 .from('assignments')

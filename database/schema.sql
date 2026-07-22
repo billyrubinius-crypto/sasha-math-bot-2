@@ -4921,3 +4921,29 @@ $function$;
 
 revoke all on function public.claim_collection_bonus_self(bigint) from public, anon;
 grant execute on function public.claim_collection_bonus_self(bigint) to authenticated;
+
+-- =============================================================================
+-- T10-06E (migration 041): activate_due_assignments_self — student self-gateway для активации
+-- своих scheduled-заданий, чей scheduled_date наступил (МСК). Заменяет прямой client update
+-- assignments.activation_status в checkAndActivateAssignments (единственный оставшийся ungatewated
+-- write в secure path). app_role='student', identity из claim, без p_student_id.
+-- =============================================================================
+create or replace function public.activate_due_assignments_self()
+ returns void language plpgsql security definer set search_path = ''
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  update public.assignments
+     set activation_status = 'active'
+   where student_id = v_tid and activation_status = 'scheduled'
+     and scheduled_date <= (now() at time zone 'Europe/Moscow')::date;
+end;
+$function$;
+
+revoke all on function public.activate_due_assignments_self() from public, anon;
+grant execute on function public.activate_due_assignments_self() to authenticated;
