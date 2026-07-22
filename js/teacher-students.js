@@ -41,7 +41,8 @@
             btn.disabled = true;
             box.innerHTML = '<p style="font-size:13px; color:#666;">Загрузка превью…</p>';
             try {
-                const { data, error } = await db.rpc('preview_league_close');
+                // definer self-обёртка (T10-08B): teacher/student, без раскрытия telegram_username.
+                const { data, error } = await db.rpc('preview_league_close_self');
                 if (error) throw error;
 
                 if (!data || !data.length) {

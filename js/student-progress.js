@@ -128,7 +128,9 @@
                 // NULL или будущая дата = экономика ещё старая. Ошибку чтения флага трактуем как «до cutover».
                 let cutoverActive = false;
                 try {
-                    const { data: cfg } = await db.from('economy_config').select('cutover_at').maybeSingle();
+                    // economy_config закрыт RLS (deny-client); читаем флаги только через узкий
+                    // read-RPC get_economy_flags (T10-08B).
+                    const { data: cfg } = await db.rpc('get_economy_flags');
                     cutoverActive = !!(cfg && cfg.cutover_at) && Date.now() >= Date.parse(cfg.cutover_at);
                 } catch (e) { cutoverActive = false; }
 
@@ -174,7 +176,8 @@
             const badge = document.getElementById('rank-badge');
             const progress = document.getElementById('rank-progress');
             try {
-                const { data, error } = await db.rpc('get_student_rank_title', { p_student_id: currentUser.id });
+                // claim-based self-обёртка (T10-08B): identity из JWT, без p_student_id.
+                const { data, error } = await db.rpc('get_student_rank_title_self');
                 if (error) throw error;
 
                 badge.textContent = `🎓 ${data.title}`;
@@ -526,15 +529,12 @@
         // созданий предотвращает частичный уникальный индекс idx_seasons_one_active (миграция
         // 005): при конфликте просто перечитываем уже созданную кем-то строку.
         async function getCurrentSeasonId() {
-            const { data } = await db.from('seasons').select('id').is('end_date', null).order('id', { ascending: false }).limit(1);
-            if (data && data.length) return data[0].id;
-
-            const { data: inserted, error } = await db.from('seasons').insert({ start_date: getTodayMSK() }).select('id').single();
-            if (error) {
-                const { data: retry } = await db.from('seasons').select('id').is('end_date', null).order('id', { ascending: false }).limit(1);
-                return retry && retry.length ? retry[0].id : null;
-            }
-            return inserted.id;
+            // Ленивое создание сезона теперь на сервере (T10-08B): seasons закрыт RLS от прямой
+            // записи. ensure_current_season (definer) возвращает открытый сезон, создаёт при
+            // отсутствии; гонку ловит partial-unique idx_seasons_one_active.
+            const { data, error } = await db.rpc('ensure_current_season');
+            if (error) return null;
+            return data ?? null;
         }
 
         // --- ЛИГИ (L03) ---
@@ -577,9 +577,11 @@
             const box = document.getElementById('league-content');
             box.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
             try {
+                // claim-based self-обёртки (T10-08B): identity из JWT; preview — leaderboard
+                // (student+teacher), definer, без раскрытия telegram_username.
                 const [{ data: snap, error: snapErr }, { data: preview, error: prevErr }] = await Promise.all([
-                    db.rpc('get_student_league_snapshot', { p_student_id: currentUser.id }),
-                    db.rpc('preview_league_close')
+                    db.rpc('get_student_league_snapshot_self'),
+                    db.rpc('preview_league_close_self')
                 ]);
                 if (snapErr) throw snapErr;
                 if (prevErr) throw prevErr;

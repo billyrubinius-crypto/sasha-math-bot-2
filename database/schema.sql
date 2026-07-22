@@ -5008,3 +5008,144 @@ alter table public.homework_submissions enable row level security;
 revoke all on public.homework_submissions from anon, authenticated;
 alter table public.student_payments enable row level security;
 revoke all on public.student_payments from anon, authenticated;
+
+-- =============================================================================
+-- T10-08B (migration 043): Game RLS. Все оставшиеся business-таблицы (закрывает поверхность).
+-- Узкие definer read-RPC (get_economy_flags, ensure_current_season, *_self обёртки league/rank/
+-- preview с claim-guard; inner revoked). RLS: student-own (inventory/shields/league/quests/life
+-- history), catalog (shop/bundles/seasons/life-templates), teacher (plans/titles), deny-client
+-- (ledgers/config/league-internal/bot). Writes revoked у anon/authenticated (gateway'и/service).
+-- =============================================================================
+create or replace function public.get_economy_flags()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+begin
+  if private.current_app_role() not in ('student','teacher') then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  return (select json_build_object('cutover_at', cutover_at, 'stage4_started_at', stage4_started_at)
+            from public.economy_config limit 1);
+end;
+$function$;
+
+create or replace function public.ensure_current_season()
+ returns bigint language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_id bigint;
+begin
+  if private.current_app_role() not in ('student','teacher') then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  select id into v_id from public.seasons where end_date is null order by id desc limit 1;
+  if v_id is not null then return v_id; end if;
+  begin
+    insert into public.seasons (start_date) values ((now() at time zone 'Europe/Moscow')::date) returning id into v_id;
+    return v_id;
+  exception when unique_violation then
+    select id into v_id from public.seasons where end_date is null order by id desc limit 1;
+    return v_id;
+  end;
+end;
+$function$;
+
+create or replace function public.get_student_league_snapshot_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.get_student_league_snapshot(v_tid);
+end;
+$function$;
+
+create or replace function public.get_student_rank_title_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.get_student_rank_title(v_tid);
+end;
+$function$;
+
+create or replace function public.preview_league_close_self()
+ returns table(student_id bigint, tier integer, tier_name text, cohort_index integer,
+   points integer, place integer, active_in_cohort integer, projected_movement text, projected_tier integer)
+ language plpgsql security definer set search_path = public, pg_temp
+as $function$
+begin
+  if private.current_app_role() not in ('student','teacher') then raise exception 'forbidden' using errcode = '42501'; end if;
+  return query select * from public.preview_league_close();
+end;
+$function$;
+
+revoke all on function public.get_student_league_snapshot(bigint) from public, anon, authenticated;
+revoke all on function public.get_student_rank_title(bigint) from public, anon, authenticated;
+revoke all on function public.preview_league_close() from public, anon, authenticated;
+revoke all on function public.get_economy_flags() from public, anon;
+revoke all on function public.ensure_current_season() from public, anon;
+revoke all on function public.get_student_league_snapshot_self() from public, anon;
+revoke all on function public.get_student_rank_title_self() from public, anon;
+revoke all on function public.preview_league_close_self() from public, anon;
+grant execute on function public.get_economy_flags() to authenticated;
+grant execute on function public.ensure_current_season() to authenticated;
+grant execute on function public.get_student_league_snapshot_self() to authenticated;
+grant execute on function public.get_student_rank_title_self() to authenticated;
+grant execute on function public.preview_league_close_self() to authenticated;
+
+-- student-own SELECT
+do $$ declare t text; begin
+  foreach t in array array['student_items','student_equipment','student_showcase','student_achievements',
+    'season_results','student_week_results','weekly_shield_uses','streak_shield_uses','league_memberships',
+    'league_movements','league_season_awards','student_daily_quests'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t||'_select_own', t);
+    execute format('create policy %I on public.%I for select to authenticated using (student_id = public.jwt_student_id())', t||'_select_own', t);
+    execute format('revoke insert, update, delete on public.%I from anon, authenticated', t);
+  end loop; end $$;
+
+alter table public.student_daily_quest_options enable row level security;
+drop policy if exists student_daily_quest_options_select_own on public.student_daily_quest_options;
+create policy student_daily_quest_options_select_own on public.student_daily_quest_options for select to authenticated
+  using (daily_quest_id in (select id from public.student_daily_quests where student_id = public.jwt_student_id()));
+revoke insert, update, delete on public.student_daily_quest_options from anon, authenticated;
+
+alter table public.student_custom_titles enable row level security;
+drop policy if exists student_custom_titles_select_own on public.student_custom_titles;
+drop policy if exists student_custom_titles_select_teacher on public.student_custom_titles;
+create policy student_custom_titles_select_own on public.student_custom_titles for select to authenticated
+  using (student_id = public.jwt_student_id());
+create policy student_custom_titles_select_teacher on public.student_custom_titles for select to authenticated
+  using (public.jwt_app_role() = 'teacher');
+revoke insert, update, delete on public.student_custom_titles from anon, authenticated;
+
+do $$ declare t text; begin
+  foreach t in array array['shop_items','season_bundles','seasons'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t||'_select_auth', t);
+    execute format('create policy %I on public.%I for select to authenticated using (true)', t||'_select_auth', t);
+    execute format('revoke insert, update, delete on public.%I from anon, authenticated', t);
+  end loop; end $$;
+
+alter table public.life_quest_templates enable row level security;
+drop policy if exists life_quest_templates_select on public.life_quest_templates;
+create policy life_quest_templates_select on public.life_quest_templates for select to authenticated
+  using (active or public.jwt_app_role() = 'teacher');
+revoke insert, update, delete on public.life_quest_templates from anon, authenticated;
+
+do $$ declare t text; begin
+  foreach t in array array['weekly_plans','weekly_plan_items'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t||'_select_teacher', t);
+    execute format('create policy %I on public.%I for select to authenticated using (public.jwt_app_role() = ''teacher'')', t||'_select_teacher', t);
+    execute format('revoke insert, update, delete on public.%I from anon, authenticated', t);
+  end loop; end $$;
+
+do $$ declare t text; begin
+  foreach t in array array['assignment_reward_log','daily_quest_reward_log','weekly_reward_log','season_points_log',
+    'economy_config','league_tiers','league_cohorts','student_league_state','bot_notification_state'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke all on public.%I from anon, authenticated', t);
+  end loop; end $$;
