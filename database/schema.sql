@@ -5149,3 +5149,119 @@ do $$ declare t text; begin
     execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon, authenticated', t);
   end loop; end $$;
+
+-- =============================================================================
+-- T10-10B (migration 044): одноразовые приглашения родителя.
+-- Привязка по открытому telegram_id ученика заменена на криптографически случайный одноразовый
+-- токен. В БД хранится только SHA-256 hash токена; поглощение атомарно (UPDATE ... WHERE
+-- consumed_at is null), все неуспешные ветки дают одинаковый ответ 'invalid'.
+-- =============================================================================
+
+create table if not exists public.parent_invites (
+  id                    uuid        primary key default gen_random_uuid(),
+  student_id            bigint      not null references public.students (telegram_id),
+  token_hash            text        not null unique,          -- hex SHA-256; сам токен НЕ хранится
+  created_at            timestamptz not null default now(),
+  expires_at            timestamptz not null,
+  consumed_at           timestamptz,
+  consumed_by_parent_id bigint,
+  constraint parent_invites_consumed_pair
+    check ((consumed_at is null) = (consumed_by_parent_id is null))
+);
+
+create index if not exists idx_parent_invites_student on public.parent_invites (student_id);
+
+alter table public.parent_invites enable row level security;
+revoke all on public.parent_invites from anon, authenticated;
+
+-- Ученик выпускает приглашение: student_id из JWT-claim, наружу отдаётся плейнтекст токена,
+-- в таблицу — только его hash. Потолок 5 живых приглашений на ученика.
+create or replace function public.create_parent_invite_self()
+ returns text
+ language plpgsql
+ security definer
+ set search_path = ''
+as $function$
+declare
+  v_tid    bigint;
+  v_token  text;
+  v_active integer;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501';
+  end if;
+
+  select count(*) into v_active
+    from public.parent_invites
+   where student_id = v_tid and consumed_at is null and expires_at > now();
+  if v_active >= 5 then
+    raise exception 'too many active invites' using errcode = '22023';
+  end if;
+
+  v_token := replace(gen_random_uuid()::text, '-', '')
+          || substr(replace(gen_random_uuid()::text, '-', ''), 1, 16);
+
+  insert into public.parent_invites (student_id, token_hash, expires_at)
+  values (v_tid,
+          encode(sha256(convert_to(v_token, 'UTF8')), 'hex'),
+          now() + interval '24 hours');
+
+  return v_token;
+end;
+$function$;
+
+revoke all on function public.create_parent_invite_self() from public, anon;
+grant execute on function public.create_parent_invite_self() to authenticated;
+
+-- Родительский бот поглощает приглашение (только service_role, через parent-bot-api).
+-- Принимает уже посчитанный hash: плейнтекст токена до Postgres не доходит.
+create or replace function public.consume_parent_invite(p_token_hash text, p_parent_id bigint)
+ returns json
+ language plpgsql
+ security definer
+ set search_path = ''
+as $function$
+declare
+  v_student_id bigint;
+  v_name       text;
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$'
+     or p_parent_id is null or p_parent_id <= 0 then
+    return json_build_object('status', 'invalid');
+  end if;
+
+  update public.parent_invites
+     set consumed_at = now(),
+         consumed_by_parent_id = p_parent_id
+   where token_hash = p_token_hash
+     and consumed_at is null
+     and expires_at > now()
+  returning student_id into v_student_id;
+
+  if v_student_id is null then
+    select student_id into v_student_id
+      from public.parent_invites
+     where token_hash = p_token_hash
+       and consumed_by_parent_id = p_parent_id;
+
+    if v_student_id is null then
+      return json_build_object('status', 'invalid');
+    end if;
+  end if;
+
+  insert into public.parent_links (parent_telegram_id, student_id)
+  values (p_parent_id, v_student_id)
+  on conflict (parent_telegram_id, student_id) do nothing;
+
+  select name into v_name from public.students where telegram_id = v_student_id;
+
+  return json_build_object('status', 'ok', 'name', v_name);
+end;
+$function$;
+
+revoke all on function public.consume_parent_invite(text, bigint) from public, anon, authenticated;
+grant execute on function public.consume_parent_invite(text, bigint) to service_role;

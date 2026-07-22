@@ -3,6 +3,7 @@ import html
 import io
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -22,18 +23,23 @@ load_dotenv()
 # Токен бота для родителей (отдельный от основного бота учеников) — берётся из .env, не хранится в коде
 API_TOKEN = os.environ['PARENT_BOT_TOKEN']
 
-# Bot 2.0 dev-проект (sasha-math-bot-2-dev), НЕ прод. См. bot2/BOT2_CONTEXT.md.
-SUPABASE_URL = 'https://ewwmsoecabfdldccrjfc.supabase.co'
-SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b'
-SUPABASE_HEADERS = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': f'Bearer {SUPABASE_KEY}',
-    'Content-Type': 'application/json'
-}
+# T10-10B: прямой Data API/publishable key убран. Вся связь с Supabase идёт через узкий
+# server-to-server Edge Function parent-bot-api: у него свой секрет (не общий с ботом учеников),
+# он проверяет parent_links на каждом чтении прогресса и отдаёт только родительские поля.
+PARENT_BOT_API_URL = os.environ['PARENT_BOT_API_URL']
+PARENT_BOT_API_SECRET = os.environ['PARENT_BOT_API_SECRET']
 
 TYPE_LABELS = {'daily': '📅 Ежедневные', 'weekly': '🔥 Еженедельные', 'individual': '🎯 Индивидуальные'}
 
 NETWORK_ERROR_TEXT = "⚠️ Сервер временно недоступен. Попробуйте ещё раз чуть позже."
+
+# T10-10B: одна формулировка на ВСЕ неуспешные приглашения (нет такого, просрочено, уже
+# использовано, подделано, битый формат) — текст не должен подсказывать, что именно не так.
+INVALID_INVITE_TEXT = ("⚠️ Ссылка недействительна или уже использована. "
+                       "Попроси ребёнка прислать новую ссылку из приложения.")
+
+# Формат одноразового токена (migration 044): Telegram start-payload — [A-Za-z0-9_-] до 64 символов.
+INVITE_TOKEN_RE = re.compile(r'^[A-Za-z0-9_-]{20,64}$')
 
 logging.basicConfig(level=logging.INFO)
 
@@ -46,81 +52,44 @@ dp = Dispatcher()
 http_client = httpx.AsyncClient(timeout=10.0)
 
 
-async def get_student(student_id: int):
-    resp = await http_client.get(
-        f'{SUPABASE_URL}/rest/v1/students',
-        headers=SUPABASE_HEADERS,
-        params={'telegram_id': f'eq.{student_id}', 'select': 'telegram_id,name,group_name'}
-    )
-    resp.raise_for_status()
-    rows = resp.json()
-    return rows[0] if rows else None
-
-
-async def link_parent(parent_id: int, student_id: int):
-    headers = {**SUPABASE_HEADERS, 'Prefer': 'resolution=ignore-duplicates'}
+async def call_parent_api(action: str, **kwargs) -> dict:
+    """Единая точка входа в parent-bot-api (T10-10B). Секрет уходит только в заголовок
+    X-Parent-Bot-Secret — не в query/URL, не в лог. Сетевые ошибки и отказы сервера всплывают
+    через raise_for_status() как httpx.HTTPError — то есть обрабатываются теми же except-ветками,
+    что и раньше (NETWORK_ERROR_TEXT), поведение при недоступности сервера не меняется."""
     resp = await http_client.post(
-        f'{SUPABASE_URL}/rest/v1/parent_links',
-        headers=headers,
-        params={'on_conflict': 'parent_telegram_id,student_id'},
-        json={'parent_telegram_id': parent_id, 'student_id': student_id}
+        PARENT_BOT_API_URL,
+        headers={'Content-Type': 'application/json', 'X-Parent-Bot-Secret': PARENT_BOT_API_SECRET},
+        json={'action': action, **kwargs}
     )
     resp.raise_for_status()
+    return resp.json().get('data', {})
+
+
+async def link_parent(parent_id: int, token: str) -> dict:
+    """Поглощение одноразового приглашения — единственная запись во всём боте (T10-10B).
+    Принимает ТОЛЬКО токен из ссылки: telegram_id ученика в неё больше не входит, поэтому знание
+    ID ребёнка доступа не даёт. Токен нигде не логируется. Повтор той же ссылки ТЕМ ЖЕ родителем
+    идемпотентен; чужой, просроченный, уже использованный и битый токен неотличимы по ответу.
+    Возвращает {'linked': bool, 'name': str|None}."""
+    return await call_parent_api('link', parent_id=parent_id, token=token)
 
 
 async def get_linked_students(parent_id: int):
-    resp = await http_client.get(
-        f'{SUPABASE_URL}/rest/v1/parent_links',
-        headers=SUPABASE_HEADERS,
-        params={'parent_telegram_id': f'eq.{parent_id}', 'select': 'student_id,students(name,group_name)'}
-    )
-    resp.raise_for_status()
-    return resp.json()
+    """Подключённые дети этого родителя: [{'student_id': int, 'name': str|None}].
+    T10-10B: сервер отдаёт плоский список (раньше был embedded-join students(name,group_name);
+    group_name нигде не отображалась и больше не запрашивается)."""
+    return (await call_parent_api('linked_students', parent_id=parent_id)).get('students', [])
 
 
-async def get_progress(student_id: int):
-    resp = await http_client.post(
-        f'{SUPABASE_URL}/rest/v1/rpc/get_student_progress',
-        headers=SUPABASE_HEADERS,
-        json={'p_student_id': student_id}
-    )
-    resp.raise_for_status()
-    return resp.json()
+async def get_student_report(parent_id: int, student_id: int) -> dict:
+    """Прогресс + траектория пробников (U05A/U05B) + недельный блок (W07) одним вызовом.
 
-
-async def get_mock_exams(student_id: int):
-    resp = await http_client.get(
-        f'{SUPABASE_URL}/rest/v1/mock_exam_results',
-        headers=SUPABASE_HEADERS,
-        params={'student_id': f'eq.{student_id}', 'select': 'exam_name,score,exam_date,created_at', 'order': 'created_at.asc'}
-    )
-    resp.raise_for_status()
-    return resp.json()
-
-
-# --- Текущая неделя (W07 correction): единый read-only контракт живёт в Supabase.
-# Бот только получает готовые N/A/S/E, статусы дней и weekly и форматирует их для Telegram.
-async def get_current_week(student_id: int) -> dict:
-    resp = await http_client.post(
-        f'{SUPABASE_URL}/rest/v1/rpc/get_student_current_week',
-        headers=SUPABASE_HEADERS,
-        json={'p_student_id': student_id}
-    )
-    resp.raise_for_status()
-    return resp.json()
-
-
-# U05B — единственный источник траектории пробников: get_mock_exam_trajectory (U05A), читает
-# только weekly_mock_exams. avg/range/trend/delta считает сервер; здесь их не пересчитываем
-# (SPEC_STAGE4 §7). Legacy mock_exam_results (до P02A, get_mock_exams ниже) этой RPC не задета.
-async def get_mock_exam_trajectory(student_id: int) -> dict:
-    resp = await http_client.post(
-        f'{SUPABASE_URL}/rest/v1/rpc/get_mock_exam_trajectory',
-        headers=SUPABASE_HEADERS,
-        json={'p_student_id': student_id}
-    )
-    resp.raise_for_status()
-    return resp.json()
+    T10-10B: сервер проверяет parent_links ДО чтения — родитель не может получить чужого ребёнка,
+    даже подделав student_id (раньше callback_data уходил в RPC без проверки связки). Отказ —
+    HTTP 403, он же httpx.HTTPError у вызывающего кода. week приходит null, если недельный блок
+    недоступен: прежнее правило «сбой недели не ломает /progress» теперь держит сервер."""
+    return await call_parent_api('progress', parent_id=parent_id, student_id=student_id)
 
 
 def format_date_ru(value: str | None) -> str:
@@ -303,24 +272,34 @@ def render_mock_chart(trajectory: dict):
     return buf
 
 
-async def send_student_progress(message: types.Message, student_id: int, student_name: str):
+async def send_student_progress(message: types.Message, parent_id: int, student_id: int,
+                                student_name: str | None = None) -> str:
+    """T10-10B: parent_id обязателен — сервер проверяет по нему связку parent_links.
+    student_name необязателен: сервер возвращает имя сам (после проверки доступа).
+
+    Возвращает статус: 'ok' | 'forbidden' (нет связки/чужой ученик) | 'network'. Сообщения об
+    ошибке отправляет вызывающий — у /progress и у выбора кнопкой они разные (как и раньше)."""
     try:
-        progress = await get_progress(student_id)
-        trajectory = await get_mock_exam_trajectory(student_id)
+        report = await get_student_report(parent_id, student_id)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 403:
+            return 'forbidden'
+        logging.warning(f"Не удалось загрузить прогресс {student_id}: {e}")
+        return 'network'
     except httpx.HTTPError as e:
         logging.warning(f"Не удалось загрузить прогресс {student_id}: {e}")
-        await message.answer(NETWORK_ERROR_TEXT)
-        return
+        return 'network'
 
-    text = format_progress_message(student_name, progress, trajectory)
+    trajectory = report.get('trajectory') or {}
+    name = student_name or report.get('name') or 'Ученик'
+    text = format_progress_message(name, report.get('progress') or [], trajectory)
 
-    # Блок текущей недели (W07) — необязательное дополнение: сбой её загрузки не должен
-    # ломать старый /progress (карточка требует "старый /progress работает").
-    try:
-        week = await get_current_week(student_id)
+    # Блок текущей недели (W07) — необязательное дополнение: его недоступность не должна
+    # ломать старый /progress (карточка требует "старый /progress работает"). Сервер в этом
+    # случае присылает week = null.
+    week = report.get('week')
+    if week:
         text += "\n" + format_week_block(week)
-    except httpx.HTTPError as e:
-        logging.warning(f"Не удалось загрузить недельный блок {student_id}: {e}")
 
     await message.answer(text, parse_mode="HTML")
 
@@ -329,36 +308,38 @@ async def send_student_progress(message: types.Message, student_id: int, student
         photo = types.BufferedInputFile(chart.read(), filename="progress.png")
         await message.answer_photo(photo)
 
+    return 'ok'
+
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    """Обработчик /start — как обычный запуск, так и переход по ссылке-приглашению (/start <telegram_id ученика>)"""
+    """Обработчик /start — обычный запуск либо переход по одноразовой ссылке-приглашению
+    (/start <token>). Прежний формат /start <telegram_id ученика> больше НЕ поддерживается."""
 
     args = message.text.split(maxsplit=1)
     payload = args[1].strip() if len(args) > 1 else None
 
-    if payload and payload.isdigit():
-        student_id = int(payload)
-        try:
-            student = await get_student(student_id)
-        except httpx.HTTPError as e:
-            logging.warning(f"Не удалось проверить ученика {student_id}: {e}")
-            await message.answer(NETWORK_ERROR_TEXT)
-            return
-
-        if not student:
-            await message.answer("⚠️ Ученик с такой ссылкой не найден. Попроси прислать актуальную ссылку из приложения.")
+    if payload:
+        # Битый формат (в том числе старая ссылка ?start=<telegram_id>) даёт ТОТ ЖЕ отказ, что и
+        # чужой/просроченный/использованный токен — по ответу их различить нельзя.
+        if not INVITE_TOKEN_RE.match(payload):
+            await message.answer(INVALID_INVITE_TEXT)
             return
 
         try:
-            await link_parent(message.from_user.id, student_id)
+            result = await link_parent(message.from_user.id, payload)
         except httpx.HTTPError as e:
-            logging.warning(f"Не удалось привязать родителя {message.from_user.id} к ученику {student_id}: {e}")
+            # Токен в лог не попадает — только ID родителя из update.
+            logging.warning(f"Не удалось обработать приглашение для родителя {message.from_user.id}: {e}")
             await message.answer(NETWORK_ERROR_TEXT)
+            return
+
+        if not result.get('linked'):
+            await message.answer(INVALID_INVITE_TEXT)
             return
 
         await message.answer(
-            f"✅ Вы успешно подключены к результатам ученика <b>{student['name']}</b>!\n\n"
+            f"✅ Вы успешно подключены к результатам ученика <b>{result.get('name')}</b>!\n\n"
             "Команда /progress — посмотреть текущие результаты.",
             parse_mode="HTML"
         )
@@ -388,13 +369,15 @@ async def cmd_progress(message: types.Message):
 
     if len(linked) == 1:
         entry = linked[0]
-        student_name = entry['students']['name'] if entry.get('students') else 'Ученик'
-        await send_student_progress(message, entry['student_id'], student_name)
+        status = await send_student_progress(message, message.from_user.id, entry['student_id'],
+                                             entry.get('name') or 'Ученик')
+        if status != 'ok':
+            await message.answer(NETWORK_ERROR_TEXT)
         return
 
     buttons = [
         [types.InlineKeyboardButton(
-            text=e['students']['name'] if e.get('students') else f"Ученик {e['student_id']}",
+            text=e.get('name') or f"Ученик {e['student_id']}",
             callback_data=f"progress_{e['student_id']}"
         )]
         for e in linked
@@ -405,19 +388,19 @@ async def cmd_progress(message: types.Message):
 
 @dp.callback_query(F.data.startswith("progress_"))
 async def on_progress_pick(callback: types.CallbackQuery):
+    # T10-10B: student_id из callback_data больше не даёт доступа сам по себе — сервер сверяет его
+    # с parent_links по ID нажавшего родителя (callback.from_user.id, из Telegram-update).
+    # Подделанный/чужой ID => 403 => та же ветка, что и «ученик не найден».
     student_id = int(callback.data.split("_", 1)[1])
-    try:
-        student = await get_student(student_id)
-    except httpx.HTTPError as e:
-        logging.warning(f"Не удалось получить ученика {student_id}: {e}")
+    status = await send_student_progress(callback.message, callback.from_user.id, student_id)
+
+    if status == 'forbidden':
+        await callback.answer("Ученик не найден", show_alert=True)
+        return
+    if status == 'network':
         await callback.answer("Сервер временно недоступен, попробуйте ещё раз", show_alert=True)
         return
 
-    if not student:
-        await callback.answer("Ученик не найден", show_alert=True)
-        return
-
-    await send_student_progress(callback.message, student_id, student['name'])
     await callback.answer()
 
 

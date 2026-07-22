@@ -257,6 +257,75 @@ export async function fetchLeagueCrownStudentId(seasonId: number): Promise<numbe
   return rows[0]?.student_id ?? null;
 }
 
+// --- Parent bot API: narrow service-role reads + единственная запись link (T10-10B) -----------
+// Тот же принцип, что и у student-bot-api: generic-хелперы наружу не отдаются, только именованные
+// функции с зафиксированными table/select/filter. RLS на parent_links/students/mock_exam_results
+// закрыт для клиента (миграция 042) — читает только этот service-role путь, и только после
+// проверки parent_links в самой функции.
+
+// Имя ученика для экрана привязки. Возвращает null, если ученика нет (одинаковый ответ для
+// несуществующего и «ещё не заходил» — существование чужих ID наружу не раскрывается сверх того,
+// что уже даёт пригласительная ссылка).
+export async function parentFetchStudentName(studentId: number): Promise<string | null> {
+  const rows = await serviceRestGet<{ name: string | null }[]>("students", {
+    telegram_id: `eq.${studentId}`,
+    select: "name",
+    limit: "1",
+  });
+  return rows.length ? (rows[0].name ?? null) : null;
+}
+
+// Единственная запись parent-bot-api — и она целиком внутри SQL-функции (migration 044):
+// атомарное поглощение одноразового приглашения + идемпотентная вставка parent_links.
+// Сюда передаётся УЖЕ посчитанный SHA-256 hash: плейнтекст токена в Postgres не уходит.
+// Ответ: {status:'ok', name} либо {status:'invalid'} — student_id наружу не возвращается.
+export interface ConsumeInviteResult {
+  status: "ok" | "invalid";
+  name?: string | null;
+}
+export function parentConsumeInvite(
+  tokenHash: string,
+  parentId: number,
+): Promise<ConsumeInviteResult> {
+  return callRpc<ConsumeInviteResult>("consume_parent_invite", {
+    p_token_hash: tokenHash,
+    p_parent_id: parentId,
+  });
+}
+
+export function parentFetchLinkedStudents(parentId: number): Promise<unknown> {
+  return serviceRestGet<unknown>("parent_links", {
+    parent_telegram_id: `eq.${parentId}`,
+    select: "student_id,students(name)",
+  });
+}
+
+// Гейт приватности: связка родитель→ученик существует. Все чтения прогресса идут только после неё.
+export async function parentLinkExists(parentId: number, studentId: number): Promise<boolean> {
+  const rows = await serviceRestGet<{ student_id: number }[]>("parent_links", {
+    parent_telegram_id: `eq.${parentId}`,
+    student_id: `eq.${studentId}`,
+    select: "student_id",
+    limit: "1",
+  });
+  return rows.length === 1;
+}
+
+// Три существующие read-RPC родительского UX. Они SECURITY INVOKER: под RLS (клиент) отдали бы
+// только свои строки, но здесь вызываются service_role (BYPASSRLS) — поэтому доступ к чужому
+// ребёнку отсекает parentLinkExists ВЫШЕ по стеку, а не сама RPC.
+export function parentFetchProgress(studentId: number): Promise<unknown> {
+  return callRpc<unknown>("get_student_progress", { p_student_id: studentId });
+}
+
+export function parentFetchTrajectory(studentId: number): Promise<unknown> {
+  return callRpc<unknown>("get_mock_exam_trajectory", { p_student_id: studentId });
+}
+
+export function parentFetchCurrentWeek(studentId: number): Promise<unknown> {
+  return callRpc<unknown>("get_student_current_week", { p_student_id: studentId });
+}
+
 export function securityAudit(
   eventType: string,
   appRole: string | null,

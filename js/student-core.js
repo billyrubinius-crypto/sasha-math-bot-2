@@ -18,10 +18,28 @@
             return new Date(Date.UTC(y, m - 1, d, hh, mm) - 3 * 60 * 60 * 1000);
         }
 
-        // Бессрочная реферальная ссылка-приглашение для родителей/родственников — код в ссылке это просто telegram_id ученика
-        function inviteParent() {
+        // Одноразовое приглашение для родителей/родственников (T10-10B, миграция 044).
+        // Раньше в ссылке лежал telegram_id ученика — знание ID давало доступ к результатам.
+        // Теперь сервер выдаёт случайный токен: он живёт 24 часа, срабатывает ровно один раз и
+        // ничего не сообщает о самом ученике. Ссылку нужно генерировать заново на каждого родителя.
+        async function inviteParent() {
             if (!currentUser) return;
-            const inviteLink = `https://t.me/${PARENT_BOT_USERNAME}?start=${currentUser.id}`;
+
+            let token = null;
+            try {
+                const { data, error } = await db.rpc('create_parent_invite_self');
+                if (error) throw error;
+                token = data;
+            } catch (e) {
+                log('inviteParent: ' + (e.message || e));
+            }
+
+            if (!token) {
+                alert('Не удалось создать приглашение. Попробуй ещё раз чуть позже.');
+                return;
+            }
+
+            const inviteLink = `https://t.me/${PARENT_BOT_USERNAME}?start=${token}`;
             const shareText = 'Подключись к моим результатам в Sasha Math!';
             const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`;
             window.Telegram.WebApp.openTelegramLink(shareUrl);
