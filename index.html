@@ -17,12 +17,26 @@
             <div class="avatar-container" id="user-avatar-container"></div>
             <div class="profile-identity">
                 <h2 class="user-name" id="user-name">Загрузка...</h2>
-                <div class="group-badge" id="group-badge" style="display:none;"></div>
-                <div class="rank-badge" id="rank-badge" style="display:none;"></div>
+                <div class="profile-meta-list">
+                    <div class="profile-meta-row" id="profile-group-row" style="display:none;">
+                        <span class="profile-meta-label">Группа</span>
+                        <span class="group-badge profile-meta-value" id="group-badge"></span>
+                    </div>
+                    <div class="profile-meta-row" id="profile-rank-row" style="display:none;">
+                        <span class="profile-meta-label">Звание</span>
+                        <span class="rank-badge profile-meta-value" id="rank-badge"></span>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="profile-title" id="profile-title" style="display:none;"></div>
         <div class="rank-progress" id="rank-progress" style="display:none;"></div>
+        <div class="profile-title-card" id="profile-title-row" style="display:none;">
+            <span class="profile-title-icon" aria-hidden="true">🏷️</span>
+            <div class="profile-title-copy">
+                <div class="profile-title-label">Титул профиля</div>
+                <div class="profile-title" id="profile-title"></div>
+            </div>
+        </div>
 
         <div class="study-stats stats-grid">
             <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>

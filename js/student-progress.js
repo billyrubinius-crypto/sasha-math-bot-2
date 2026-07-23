@@ -71,9 +71,15 @@
         function applyProfileCosmetics(eq) {
             renderNick(document.getElementById('user-name'), currentUser.first_name || '', eq, '');
             const titleEl = document.getElementById('profile-title');
+            const titleRow = document.getElementById('profile-title-row');
             const title = equippedTitleText(eq.title);
-            if (title) { titleEl.textContent = title; titleEl.style.display = 'block'; }
-            else { titleEl.style.display = 'none'; titleEl.textContent = ''; }
+            if (title) {
+                titleEl.textContent = title;
+                titleRow.style.display = 'flex';
+            } else {
+                titleRow.style.display = 'none';
+                titleEl.textContent = '';
+            }
             applyAvatarFrame(document.getElementById('user-avatar-container'), eq);
             const scr = document.getElementById('screen-profile');
             BG_CLASSES.forEach(c => scr.classList.remove(c));
@@ -114,7 +120,7 @@
 
                 // Отображение группы
                 const groupBadge = document.getElementById('group-badge');
-                groupBadge.style.display = 'inline-block';
+                document.getElementById('profile-group-row').style.display = 'grid';
                 if (data.group_name) {
                     groupBadge.innerText = data.group_name;
                     groupBadge.classList.add('assigned');
@@ -174,14 +180,15 @@
         // экипированного custom title (#profile-title), рендерится в свой собственный элемент.
         async function loadRankTitle() {
             const badge = document.getElementById('rank-badge');
+            const row = document.getElementById('profile-rank-row');
             const progress = document.getElementById('rank-progress');
             try {
                 // claim-based self-обёртка (T10-08B): identity из JWT, без p_student_id.
                 const { data, error } = await db.rpc('get_student_rank_title_self');
                 if (error) throw error;
 
-                badge.textContent = `🎓 ${data.title}`;
-                badge.style.display = 'inline-block';
+                badge.textContent = data.title;
+                row.style.display = 'grid';
 
                 let text;
                 if (data.next_title) {
@@ -200,7 +207,7 @@
                 progress.textContent = text;
                 progress.style.display = 'block';
             } catch (e) {
-                badge.style.display = 'none';
+                row.style.display = 'none';
                 progress.style.display = 'none';
                 log('❌ Звание: ' + (e.message || e));
             }
@@ -364,24 +371,60 @@
                         'dz_upload_daily': 'Загрузка ежедневного ДЗ',
                         'dz_upload_weekly': 'Загрузка еженедельного ДЗ',
                         'dz_upload_individual': 'Загрузка индивидуального задания',
+                        'daily_approved': 'Ежедневное задание принято ✅',
                         'streak_day_1': 'Серия 1 день 🔥',
                         'streak_day_2': 'Серия 2 дня 🔥',
                         'streak_day_3': 'Серия 3+ дней 🔥',
                         'weekly_approved': 'Еженедельное принято ✅',
                         'individual_approved': 'Индивидуальное принято ✅',
+                        'bonus_return': 'Бонус за возвращённое задание',
                         'weekly_reward': 'Награда за неделю 🥯',
                         'mock_exam_weekly': 'Пробник недели',
                         'mock_exam_record': 'Личный рекорд на пробнике',
+                        'mock_exam_season': 'Очки сезона за пробник',
+                        'daily_quest_life': 'Жизненное испытание дня',
+                        'daily_quest_math': 'Математическое испытание дня',
                         'daily_quest_life_1': 'Испытание дня 1',
                         'daily_quest_life_2': 'Испытание дня 2',
-                        'daily_quest_combo': 'Бонус за два испытания'
+                        'daily_quest_combo': 'Бонус за два испытания',
+                        'legacy_opening_balance': 'Начальный баланс',
+                        'legacy_opening_balance_rollback': 'Корректировка начального баланса',
+                        'buy_streak_shield': 'Покупка щита недели',
+                        'buy_color_red': 'Покупка алого цвета ника',
+                        'buy_color_orange': 'Покупка оранжевого цвета ника',
+                        'buy_color_green': 'Покупка изумрудного цвета ника',
+                        'buy_color_teal': 'Покупка морского цвета ника',
+                        'buy_color_blue': 'Покупка небесного цвета ника',
+                        'buy_color_indigo': 'Покупка цвета ника «Индиго»',
+                        'buy_color_pink': 'Покупка малинового цвета ника',
+                        'buy_color_brown': 'Покупка шоколадного цвета ника',
+                        'buy_status_emoji_change': 'Покупка смены эмодзи-статуса',
+                        'buy_crown': 'Покупка короны',
+                        'buy_golden_nick': 'Покупка золотого ника',
+                        'buy_title_yaschenko': 'Покупка титула «Ященко»',
+                        'buy_title_custom': 'Покупка персонального титула',
+                        'buy_frame_fire100': 'Покупка рамки «100 дней огня»',
+                        'buy_frame_notebook': 'Покупка рамки «Тетрадная клетка»',
+                        'buy_bg_grid': 'Покупка фона «Миллиметровка»',
+                        'buy_title_groza': 'Покупка титула «Гроза параметров»',
+                        'buy_frame_legend_1': 'Покупка рамки «Сезон первый»',
+                        'buy_frame_pulsar': 'Покупка рамки «Пульсар»',
+                        'buy_bg_space': 'Покупка фона «Космос»',
+                        'buy_title_elon': 'Покупка титула «Илон Маск»',
+                        'buy_frame_legend_2': 'Покупка рамки «Золотая осень»',
+                        'buy_frame_winter': 'Покупка рамки «Зимняя»',
+                        'buy_bg_aurora': 'Покупка фона «Северное сияние»',
+                        'buy_title_sanchez': 'Покупка титула «Санчез»',
+                        'buy_frame_legend_3': 'Покупка рамки «Зимний апекс»',
+                        'buy_frame_orbit': 'Покупка рамки «Орбита»',
+                        'buy_bg_draft': 'Покупка фона «Черновик гения»',
+                        'buy_title_derivative': 'Покупка титула «Держу производную»',
+                        'buy_frame_legend_4': 'Покупка рамки «Предэкзаменационная»'
                     };
-                  // Специальная логика для штрафов
+                    // Никогда не показываем внутренние коды причины пользователю.
                     let displayReason = reasonMap[item.reason];
                     if (!displayReason && item.reason && item.reason.startsWith('penalty:')) {
-                        // Берем текст после "penalty: "
-                        const penaltyText = item.reason.replace('penalty: ', '');
-                        displayReason = `⚠️ Штраф: ${penaltyText}`;
+                        displayReason = '⚠️ Штраф';
                     }
                     // Недельные достижения и призы сезона (W09/W10): единый читаемый ярлык
                     if (!displayReason && item.reason && item.reason.startsWith('achievement_')) {
@@ -390,8 +433,14 @@
                     if (!displayReason && item.reason && item.reason.startsWith('season_place_')) {
                         displayReason = 'Приз за место в сезоне 🏆';
                     }
+                    if (!displayReason && item.reason && item.reason.startsWith('streak_day_')) {
+                        displayReason = 'Награда за серию дней 🔥';
+                    }
+                    if (!displayReason && item.reason && item.reason.startsWith('buy_')) {
+                        displayReason = 'Покупка в магазине';
+                    }
                     if (!displayReason) {
-                        displayReason = item.reason || 'Начисление';
+                        displayReason = isPositive ? 'Начисление бубликов' : 'Списание бубликов';
                     }
                     const li = document.createElement('li');
                     li.className = 'history-item';

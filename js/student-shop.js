@@ -404,33 +404,14 @@
         function shopPreview(item) {
             const p = document.createElement('div');
             p.className = 'shop-preview';
-            p.classList.add(`shop-preview-${item.slot || item.item_kind || 'item'}`);
-            p.dataset.itemCode = item.item_code || '';
             if (item.slot === 'name_color') {
                 if (item.render_payload === 'gold') {
                     p.style.background = 'linear-gradient(135deg,#f9d423,#e6a817)';
                 } else if (/^#[0-9a-fA-F]{6}$/.test(item.render_payload || '')) {
-                    p.style.background = item.render_payload;   // валидный hex — иначе не трогаем
+                    p.style.background = item.render_payload;
                 }
                 p.style.color = '#fff';
                 p.textContent = 'Aa';
-            } else if (item.slot === 'background') {
-                const backgrounds = {
-                    bg_grid: 'linear-gradient(135deg,#202b4d 25%,#32456d 25%,#32456d 50%,#202b4d 50%,#202b4d 75%,#32456d 75%)',
-                    bg_space: 'radial-gradient(circle at 30% 25%,#fff 0 1px,transparent 2px), linear-gradient(135deg,#17152f,#35255c)',
-                    bg_aurora: 'linear-gradient(135deg,#174b52,#4f2e6c 55%,#d07b48)',
-                    bg_draft: 'linear-gradient(135deg,#e7e2d6,#b8c5cc)'
-                };
-                p.style.background = backgrounds[item.item_code] || 'linear-gradient(135deg,#475569,#94a3b8)';
-                p.innerHTML = '<span class="shop-preview-avatar">●</span>';
-            } else if (item.slot === 'frame') {
-                p.innerHTML = '<span class="shop-preview-avatar shop-preview-frame">🙂</span>';
-            } else if (item.slot === 'crown') {
-                p.innerHTML = '<span class="shop-preview-crown">♛</span><span class="shop-preview-avatar">🙂</span>';
-            } else if (item.slot === 'title') {
-                p.innerHTML = '<span class="shop-preview-title-mark">Aa</span><span class="shop-preview-title-line"></span>';
-            } else if (item.slot === 'status_emoji') {
-                p.textContent = (item.render_payload || '').split(/\s+/).filter(Boolean)[0] || '🙂';
             } else {
                 const icons = { crown: '👑', title: '🏷️', frame: '🖼️', background: '🎨', status_emoji: '😀' };
                 p.textContent = item.item_kind === 'shield' ? '🛡️' : (icons[item.slot] || '🥯');

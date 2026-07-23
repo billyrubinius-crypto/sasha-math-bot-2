@@ -3953,8 +3953,8 @@ begin
   if v_name = '' or char_length(v_name) > 300 then
     raise exception 'Текст задания обязателен (до 300 символов)';
   end if;
-  if v_desc = '' or char_length(v_desc) > 1000 then
-    raise exception 'Описание обязательно (до 1000 символов)';
+  if char_length(v_desc) > 1000 then
+    raise exception 'Описание должно содержать не более 1000 символов';
   end if;
   if v_cat = '' or char_length(v_cat) > 100 then
     raise exception 'Категория обязательна (до 100 символов)';

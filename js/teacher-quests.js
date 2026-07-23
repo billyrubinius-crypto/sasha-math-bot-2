@@ -160,8 +160,8 @@
             const weightRaw = document.getElementById('quest-weight').value;
             const weight = Number(weightRaw);
 
-            if (!code || !name || !description || !category || !Number.isInteger(weight)) {
-                errorEl.textContent = 'Заполните все поля: код, текст, описание, категория, целый вес';
+            if (!code || !name || !category || !Number.isInteger(weight)) {
+                errorEl.textContent = 'Заполните обязательные поля: код, текст, категория, целый вес';
                 errorEl.style.display = 'block';
                 return;
             }
