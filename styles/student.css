@@ -20,7 +20,7 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Профиль */
-        .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-top: 10px; }
+        .profile-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; padding-top: 8px; }
         .avatar-container {
             width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
             background: var(--tg-secondary); overflow: hidden; position: relative;
@@ -31,11 +31,13 @@
             width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
             font-size: 16px; font-weight: bold; color: var(--tg-link); background: rgba(36,129,204,0.1);
         }
-        .user-name { font-size: 16px; font-weight: 700; margin: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .profile-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+        .user-name { font-size: 18px; line-height: 1.18; font-weight: 800; margin: 0; text-align: left; overflow-wrap: anywhere; min-width: 0; }
         .group-badge {
-            display: inline-block; flex-shrink: 0; margin-left: auto;
+            display: inline-block; flex-shrink: 1; max-width: 100%;
             background: var(--tg-secondary); color: var(--tg-hint);
-            padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;
+            padding: 4px 9px; border-radius: 8px; font-size: 11px; font-weight: 700; line-height: 1.2;
+            overflow-wrap: anywhere;
         }
         .group-badge.assigned { background: rgba(36,129,204,0.12); color: var(--tg-link); }
         .streak-badge {
@@ -61,7 +63,7 @@
         .shield-buy-btn:disabled { opacity: 0.5; cursor: default; }
 
         /* Единый рабочий блок: неделя сверху, действия сейчас ниже */
-        .week-block { background: var(--tg-secondary); border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .week-block { background: var(--tg-secondary); border-radius: 16px; padding: 15px; margin-bottom: 16px; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
         .week-block-head, .now-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .week-block-title, .now-title { font-weight: 800; font-size: 15px; }
         .week-progress { font-size: 20px; font-weight: 800; color: var(--tg-link); white-space: nowrap; }
@@ -102,7 +104,7 @@
         .summary-empty { text-align: center; padding: 12px 4px 4px; color: var(--tg-hint); font-size: 13px; }
 
         /* Сегодня: math + life квесты Stage 4 (U04) */
-        .today-block { background: var(--tg-secondary); border-radius: 8px; padding: 16px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .today-block { background: var(--tg-secondary); border-radius: 16px; padding: 15px; margin-bottom: 16px; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
         .today-block-title { font-weight: 800; font-size: 15px; }
         .quest-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(128,128,128,0.14); }
         .quest-row:last-child { border-bottom: none; }
@@ -122,16 +124,16 @@
         .quest-replace-btn:disabled { opacity: 0.4; cursor: default; }
 
         /* График пробников */
-        .mock-chart-section { background: var(--tg-secondary); border-radius: 16px; padding: 18px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .mock-chart-section { background: var(--tg-secondary); border-radius: 16px; padding: 15px; margin-bottom: 16px; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
         .chart-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
         .chart-empty { text-align: center; padding: 20px 10px; opacity: 0.6; font-size: 14px; }
         .exam-info-box { margin-top: 10px; text-align: center; font-size: 13px; padding: 8px; background: var(--tg-bg); border-radius: 10px; min-height: 18px; }
         .chart-disclaimer { margin-top: 6px; text-align: center; font-size: 11px; color: var(--tg-hint); }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
-        .stat-card { background: var(--tg-secondary); border-radius: 16px; padding: 18px 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .stat-val { font-size: 26px; font-weight: 800; color: var(--tg-link); margin-bottom: 6px; }
-        .stat-label { font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        .stat-card { background: var(--tg-secondary); border-radius: 16px; padding: 13px 10px; text-align: left; box-shadow: 0 3px 12px rgba(0,0,0,0.07); }
+        .stat-val { font-size: 24px; font-weight: 850; color: var(--tg-link); margin-bottom: 3px; }
+        .stat-label { font-size: 11px; opacity: 0.7; letter-spacing: 0.2px; }
 
         /* История баланса */
         .history-section { margin-top: 20px; }
@@ -167,24 +169,24 @@
         .collections-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
         .collection-block { margin-bottom: 16px; }
         .collection-season-title { font-size: 13px; font-weight: 700; color: var(--tg-hint); margin-bottom: 8px; }
-        .coll-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .coll-tile { text-align: center; }
-        .coll-tile.locked { opacity: 0.4; filter: grayscale(1); }
-        .coll-name { font-size: 10px; color: var(--tg-hint); margin-top: 4px; line-height: 1.2; }
+        .coll-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+        .coll-tile { min-width: 0; text-align: center; }
+        .coll-tile.locked .shop-preview { opacity: 0.42; filter: grayscale(1); }
+        .coll-name { min-height: 27px; font-size: 11px; color: var(--tg-text); margin-top: 5px; line-height: 1.22; overflow-wrap: anywhere; }
         @media (max-width: 380px) { .coll-grid { grid-template-columns: repeat(3, 1fr); } }
 
         /* Витрина профиля (S7) */
-        .showcase-section { margin-top: 20px; margin-bottom: 20px; }
+        .showcase-section { margin-top: 16px; margin-bottom: 16px; }
         .showcase-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
-        .showcase-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
         .showcase-tile {
-            background: var(--tg-secondary); border-radius: 14px; padding: 12px 6px;
-            text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; min-height: 78px;
+            background: var(--tg-secondary); border-radius: 14px; padding: 9px 5px;
+            text-align: center; box-shadow: 0 3px 12px rgba(0,0,0,0.07); cursor: pointer; min-height: 64px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         .showcase-tile.empty { opacity: 0.5; border: 1.5px dashed var(--tg-hint); box-shadow: none; background: transparent; }
-        .showcase-icon { font-size: 26px; line-height: 1; }
-        .showcase-name { font-size: 10px; font-weight: 600; margin-top: 6px; line-height: 1.2; }
+        .showcase-icon { font-size: 23px; line-height: 1; }
+        .showcase-name { font-size: 10px; font-weight: 650; margin-top: 5px; line-height: 1.2; overflow-wrap: anywhere; }
         .showcase-picker {
             margin-top: 10px; background: var(--tg-secondary); border-radius: 14px; padding: 12px;
             max-height: 240px; overflow-y: auto;
@@ -199,27 +201,37 @@
         .showcase-picker-empty { font-size: 12px; color: var(--tg-hint); text-align: center; padding: 10px; }
 
         /* Магазин «Бубличная» (S2) */
-        .shop-balance { text-align: center; font-size: 15px; font-weight: 700; margin-bottom: 18px; }
-        .shop-section-title { font-size: 16px; font-weight: bold; margin: 18px 0 4px; }
+        .shop-balance { background: linear-gradient(135deg, rgba(255,152,0,.16), rgba(255,193,7,.06)); border: 1px solid rgba(255,152,0,.22); border-radius: 16px; text-align: center; font-size: 16px; font-weight: 800; padding: 12px; margin-bottom: 18px; }
+        .shop-section-title { font-size: 17px; font-weight: 800; margin: 20px 0 5px; }
         .shop-section-note { font-size: 12px; color: var(--tg-hint); margin-bottom: 12px; }
         .shop-item {
-            display: flex; align-items: center; gap: 12px;
-            background: var(--tg-secondary); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 11px;
+            background: var(--tg-secondary); border-radius: 16px; padding: 11px; margin-bottom: 10px;
+            border: 1px solid rgba(128,128,128,0.08); box-shadow: 0 3px 12px rgba(0,0,0,0.07);
         }
         .shop-preview {
-            width: 46px; height: 46px; border-radius: 10px; flex-shrink: 0;
+            width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center; font-size: 24px;
-            background: var(--tg-bg); overflow: hidden;
+            background: var(--tg-bg); overflow: hidden; border: 1px solid rgba(128,128,128,0.12); position: relative;
         }
+        .shop-preview-background { position: relative; }
+        .shop-preview-avatar { width: 27px; height: 27px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.86); color: #263238; font-size: 17px; box-shadow: 0 2px 5px rgba(0,0,0,.22); }
+        .shop-preview-frame { border: 3px solid #ff9800; }
+        .shop-preview[data-item-code*="winter"] .shop-preview-frame { border-color: #8ed1ff; }
+        .shop-preview[data-item-code*="pulsar"] .shop-preview-frame, .shop-preview[data-item-code*="orbit"] .shop-preview-frame { border-color: #a78bfa; box-shadow: 0 0 0 2px rgba(167,139,250,.25), 0 2px 5px rgba(0,0,0,.22); }
+        .shop-preview-crown { position: absolute; transform: translateY(-14px); font-size: 22px; color: #f5b82e; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+        .shop-preview-crown + .shop-preview-avatar { margin-top: 9px; }
+        .shop-preview-title { flex-direction: column; gap: 2px; }
+        .shop-preview-title-mark { font-weight: 850; font-size: 21px; }
+        .shop-preview-title-line { width: 32px; height: 4px; border-radius: 4px; background: var(--tg-link); }
         .shop-body { flex: 1; min-width: 0; }
-        .shop-name { font-weight: 600; font-size: 14px; }
+        .shop-name { font-weight: 750; font-size: 14px; line-height: 1.2; overflow-wrap: anywhere; }
         .shop-desc { font-size: 11px; color: var(--tg-hint); margin-top: 2px; }
         .shop-leaving { color: #ff9800; font-weight: 600; }
         .shop-action { flex-shrink: 0; text-align: right; }
         .shop-buy-btn {
             background: #ff9800; color: white; border: none; border-radius: 10px;
-            padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+            padding: 9px 11px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
         }
         .shop-buy-btn:disabled { opacity: 0.45; cursor: default; }
         .shop-state { font-size: 12px; font-weight: 700; white-space: nowrap; }
@@ -255,6 +267,18 @@
         .custom-title-cancel { background: var(--tg-bg); color: var(--tg-text); }
         .custom-title-submit { background: #ff9800; color: white; }
         .custom-title-submit:disabled { opacity: 0.45; cursor: default; }
+
+        .study-stats { margin-top: 2px; }
+        .study-tools { margin-bottom: 2px; }
+        .study-tools .streak-badge { margin-bottom: 8px; }
+        .study-tools .shield-widget { margin-bottom: 16px; }
+        .rank-badge { align-self: flex-start; max-width: 100%; margin: 0; overflow-wrap: anywhere; }
+        @media (max-width: 380px) {
+            .coll-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .shop-item { grid-template-columns: 50px minmax(0, 1fr); }
+            .shop-preview { width: 48px; height: 48px; }
+            .shop-action { grid-column: 2; text-align: left; }
+        }
 
         /* Домашка */
         .dz-section { background: var(--tg-secondary); border-radius: 20px; padding: 25px; margin-top: 10px; }

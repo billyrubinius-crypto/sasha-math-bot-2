@@ -15,28 +15,18 @@
     <div id="screen-profile" class="screen active">
         <div class="profile-header">
             <div class="avatar-container" id="user-avatar-container"></div>
-            <h2 class="user-name" id="user-name">Загрузка...</h2>
-            <div class="rank-badge" id="rank-badge" style="display:none;"></div>
-            <div class="group-badge" id="group-badge" style="display:none;"></div>
+            <div class="profile-identity">
+                <h2 class="user-name" id="user-name">Загрузка...</h2>
+                <div class="group-badge" id="group-badge" style="display:none;"></div>
+                <div class="rank-badge" id="rank-badge" style="display:none;"></div>
+            </div>
         </div>
         <div class="profile-title" id="profile-title" style="display:none;"></div>
         <div class="rank-progress" id="rank-progress" style="display:none;"></div>
 
-        <div class="showcase-section" id="showcase-section" style="display:none;">
-            <div class="showcase-title">🌟 Витрина</div>
-            <div class="showcase-grid" id="showcase-grid"></div>
-            <div class="showcase-picker" id="showcase-picker" style="display:none;"></div>
-        </div>
-
-        <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
-        <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
-
-        <div class="shield-widget" id="shield-widget" style="display:none;">
-            <div class="shield-info">
-                <span id="shield-count">🛡 0 щитов</span>
-                <span class="shield-hint">Щит недели: +1 к результату недели (запас до 7)</span>
-            </div>
-            <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 90 🥯</button>
+        <div class="study-stats stats-grid">
+            <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
+            <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
         </div>
 
         <!-- Единый рабочий блок: компактная неделя и конкретные действия сейчас -->
@@ -71,9 +61,23 @@
             <div id="today-quests-content"><div class="summary-empty">Загрузка...</div></div>
         </div>
 
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
-            <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
+        <div class="mock-chart-section" id="mock-chart-section">
+            <div class="chart-title">📊 Результаты пробников</div>
+            <div id="mock-chart-container">
+                <div class="chart-empty">Загрузка...</div>
+            </div>
+        </div>
+
+        <div class="study-tools">
+            <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
+            <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
+            <div class="shield-widget" id="shield-widget" style="display:none;">
+                <div class="shield-info">
+                    <span id="shield-count">🛡 0 щитов</span>
+                    <span class="shield-hint">Щит недели: +1 к результату недели (запас до 7)</span>
+                </div>
+                <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 90 🥯</button>
+            </div>
         </div>
 
         <div class="achievements-section" id="achievements-section" style="display:none;">
@@ -86,11 +90,10 @@
             <div id="collections-list"></div>
         </div>
 
-        <div class="mock-chart-section" id="mock-chart-section">
-            <div class="chart-title">📊 Результаты пробников</div>
-            <div id="mock-chart-container">
-                <div class="chart-empty">Загрузка...</div>
-            </div>
+        <div class="showcase-section" id="showcase-section" style="display:none;">
+            <div class="showcase-title">🌟 Витрина</div>
+            <div class="showcase-grid" id="showcase-grid"></div>
+            <div class="showcase-picker" id="showcase-picker" style="display:none;"></div>
         </div>
 
         <div class="history-section" id="season-history-section" style="display:none;">
