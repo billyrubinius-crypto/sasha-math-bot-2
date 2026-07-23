@@ -67,6 +67,7 @@ T10-11 имеет отдельный, более ранний ручной gate:
 
 | Файл | Назначение | Когда |
 |---|---|---|
+| `dev_game_reset.sql` | DEV-only очистка тестовой экономики/квестов + немедленный недельный cutover | Только в dev перед повторным `stage4_cutover.sql`; никогда не в production |
 | `stage4_cutover.sql` | Guarded firing Stage 4 + (в комментарии) product-rollback | Вручную, отдельным шагом после T10 |
 | `t10_anon_closure.sql` | Atomic `legacy` → `enforced`, browser allowlists и default-deny | Dev T10-11; production только внутри T10-12 |
 | `t10_anon_closure_rollback.sql` | Идемпотентный rollback T10-11 в DB mode `legacy` | При первом regression после anon closure |
