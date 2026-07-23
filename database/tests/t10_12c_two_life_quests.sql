@@ -32,15 +32,15 @@ begin
     raise exception 'FAIL T10-12C: стартовый лимит замен не равен 2: %', v_state;
   end if;
 
-  v_state := public.replace_life_quest(v_student, 1);
-  v_state := public.replace_life_quest(v_student, 2);
+  v_state := public.replace_life_quest(v_student, 1::smallint);
+  v_state := public.replace_life_quest(v_student, 2::smallint);
   if (v_state->>'replacements_left')::integer <> 0 then
     raise exception 'FAIL T10-12C: общий лимит замен не исчерпан: %', v_state;
   end if;
 
   v_failed := false;
   begin
-    perform public.replace_life_quest(v_student, 1);
+    perform public.replace_life_quest(v_student, 1::smallint);
   exception when others then
     v_failed := position('лимит замен' in sqlerrm) > 0;
   end;
@@ -49,8 +49,8 @@ begin
   end if;
 
   select huikons into v_before from public.students where telegram_id = v_student;
-  v_state := public.claim_life_quest(v_student, 1);
-  perform public.claim_life_quest(v_student, 1);
+  v_state := public.claim_life_quest(v_student, 1::smallint);
+  perform public.claim_life_quest(v_student, 1::smallint);
   select huikons into v_after from public.students where telegram_id = v_student;
   if v_after - v_before <> 3
      or (select count(*) from public.daily_quest_reward_log
@@ -59,7 +59,7 @@ begin
     raise exception 'FAIL T10-12C: slot 1 не pay-once';
   end if;
 
-  v_state := public.claim_life_quest(v_student, 2);
+  v_state := public.claim_life_quest(v_student, 2::smallint);
   select huikons into v_after from public.students where telegram_id = v_student;
   if v_after - v_before <> 8
      or (select count(*) from public.daily_quest_reward_log
