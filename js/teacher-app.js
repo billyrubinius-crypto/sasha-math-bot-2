@@ -31,12 +31,6 @@
             const daysUntilNextMonday = (1 + 7 - todayWeekday) % 7 || 7;
             document.getElementById('activation-date').value = addDaysToDate(todayMSKStr, daysUntilNextMonday);
 
-            // Понедельник ТЕКУЩЕЙ недели для формы пробника (P02B) — daysUntilNextMonday
-            // above уже даёт следующий понедельник; текущий = на 7 дней раньше, если сегодня
-            // не сам понедельник (daysUntilNextMonday=7 → сегодня понедельник → 0 назад).
-            document.getElementById('mock-week').value =
-                addDaysToDate(todayMSKStr, daysUntilNextMonday === 7 ? 0 : daysUntilNextMonday - 7);
-
             // === ЗУМ И ПЕРЕТАСКИВАНИЕ ДЛЯ LIGHTBOX ===
             const lbImg = document.getElementById('lb-img');
             const lbWrapper = document.getElementById('lightbox');

@@ -369,7 +369,12 @@
                         'streak_day_3': 'Серия 3+ дней 🔥',
                         'weekly_approved': 'Еженедельное принято ✅',
                         'individual_approved': 'Индивидуальное принято ✅',
-                        'weekly_reward': 'Награда за неделю 🥯'
+                        'weekly_reward': 'Награда за неделю 🥯',
+                        'mock_exam_weekly': 'Пробник недели',
+                        'mock_exam_record': 'Личный рекорд на пробнике',
+                        'daily_quest_life_1': 'Испытание дня 1',
+                        'daily_quest_life_2': 'Испытание дня 2',
+                        'daily_quest_combo': 'Бонус за два испытания'
                     };
                   // Специальная логика для штрафов
                     let displayReason = reasonMap[item.reason];

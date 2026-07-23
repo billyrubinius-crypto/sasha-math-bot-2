@@ -112,26 +112,6 @@
             </div>
 
             <div class="week-planner">
-                <h3 style="margin-top:0">🧮 Пробник недели</h3>
-                <p style="font-size:13px; color:#666; margin-bottom:15px;">Запись результата идёт только через эту форму — бублики и очки сезона начисляет сервер, здесь их не считаем.</p>
-                <div style="position:relative;">
-                    <input type="text" id="mock-username-input" placeholder="Введите username ученика" autocomplete="off"
-                        style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;"
-                        oninput="onMockUsernameInput()"
-                        onblur="setTimeout(() => { document.getElementById('mock-username-suggestions').style.display = 'none'; }, 150)">
-                    <div id="mock-username-suggestions" class="username-suggestions"></div>
-                </div>
-                <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Неделя (понедельник):</label>
-                <input type="date" id="mock-week" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
-                <label style="font-size:12px; color:#666; display:block; margin-bottom:4px;">Результат (0–100):</label>
-                <input type="number" id="mock-score" min="0" max="100" step="1" placeholder="Балл пробника" style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:6px;">
-                <button class="btn-primary" id="btn-submit-mock" onclick="submitMockExam()">Сохранить результат</button>
-                <!-- Траектория выбранного ученика (U05B) — та же RPC get_mock_exam_trajectory,
-                     что и student/parent; без life quests, только пробники (SPEC_STAGE4 §9). -->
-                <div id="mock-trajectory-container"></div>
-            </div>
-
-            <div class="week-planner">
                 <h3 style="margin-top:0">🏁 Сезон</h3>
                 <p style="font-size:13px; color:#666; margin-bottom:15px;">Закрытие сезона: итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон. Лиговые переходы и Корона считаются сервером в той же операции. Делается вручную раз в 2 недели.</p>
                 <button class="btn-secondary" id="btn-preview-season" onclick="previewSeasonClose()">📊 Превью закрытия (лиги)</button>
