@@ -139,7 +139,7 @@ export async function verifyJwtES256(token: string, opts: VerifyOptions = {}): P
   const ok = await crypto.subtle.verify(
     { name: "ECDSA", hash: "SHA-256" },
     key,
-    b64urlDecode(parts[2]),
+    new Uint8Array(b64urlDecode(parts[2])),
     new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
   );
   if (!ok) throw new Error("bad_signature");

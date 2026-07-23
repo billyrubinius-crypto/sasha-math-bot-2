@@ -72,7 +72,7 @@ Deno.test("parseAlreadyNotifiedIds: только числовой суффикс
   assertEquals(parseAlreadyNotifiedIds([], 7), []);
 });
 
-Deno.test("constantTimeSecretEqual: совпадающие и разные секреты, независимо от длины", () => {
+Deno.test("constantTimeSecretEqual: совпадающие и разные секреты, независимо от длины", async () => {
   assert(await constantTimeSecretEqual("same-secret", "same-secret"));
   assert(!(await constantTimeSecretEqual("same-secret", "same-secre")));
   assert(!(await constantTimeSecretEqual("short", "a-much-much-longer-secret-value")));
