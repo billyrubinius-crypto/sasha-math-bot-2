@@ -1,17 +1,14 @@
-// student-quests.js — блок «Сегодня»: math + life квесты Stage 4 (U04)
-        // Все состояния (math_status/combo_status/life_paid/can_replace/generation_active)
-        // приходят готовыми из daily_quest_state (сервер, миграция 027). Клиент их только
-        // отображает: не читает assignments напрямую, не считает eligibility/random/деньги.
+// student-quests.js — блок «Сегодня»: два life-квеста + combo (T10-12C)
+        // Все состояния, общий лимит замен, серия и выплаты приходят готовыми из
+        // daily_quest_state. Клиент только отображает серверную read-модель.
 
-        let questActionBusy = false; // синхронная защита от двойного клика (как weekShieldBusy)
+        let questActionBusy = false; // синхронная защита от двойного клика
 
         const QUEST_LIFE_META_UNAVAILABLE = 'Испытание дня пока недоступно';
 
         async function loadTodayQuests() {
             const content = document.getElementById('today-quests-content');
             try {
-                // secure path — gateway get_daily_quests_self без p_student_id (T10-04B);
-                // legacy fallback — прежний RPC. Dormant-gate/генерация — в базовой функции.
                 const { data, error } = studentSecurePathActive()
                     ? await db.rpc('get_daily_quests_self')
                     : await db.rpc('get_daily_quests', { p_student_id: currentUser.id });
@@ -26,41 +23,23 @@
         function renderTodayQuests(state) {
             const content = document.getElementById('today-quests-content');
             content.innerHTML =
-                buildMathRow(state) +
-                buildLifeRow(state) +
+                buildLifeRow(state, 1) +
+                buildLifeRow(state, 2) +
                 buildComboRow(state);
+            renderQuestStreak(state.streak_current);
         }
 
-        function buildMathRow(state) {
-            const metaByStatus = {
-                unavailable:    'Сегодня недоступно',
-                active:         'Ждёт решения — открой «Домашку»',
-                waiting_review: 'Отправлено, ждёт проверки учителя',
-                completed:      'Выполнено'
-            };
-            const meta = metaByStatus[state.math_status] || metaByStatus.unavailable;
-            const badge = state.math_status === 'completed'
-                ? '<span class="quest-badge quest-badge-paid">+3 🥯</span>'
-                : '';
-            return `
-                <div class="quest-row">
-                    <div class="quest-row-icon">🧮</div>
-                    <div class="quest-row-main">
-                        <span class="quest-row-title">Математика</span>
-                        <span class="quest-row-meta">${esc(meta)}</span>
-                    </div>
-                    <div class="quest-row-trailing">${badge}</div>
-                </div>
-            `;
-        }
+        function buildLifeRow(state, slot) {
+            const life = state[`life_${slot}`];
+            const paid = !!state[`life_${slot}_paid`];
+            const canReplace = !!state[`can_replace_${slot}`];
 
-        function buildLifeRow(state) {
-            if (!state.life) {
+            if (!life) {
                 return `
                     <div class="quest-row">
                         <div class="quest-row-icon">🎲</div>
                         <div class="quest-row-main">
-                            <span class="quest-row-title">Челлендж дня</span>
+                            <span class="quest-row-title">Челлендж ${slot}</span>
                             <span class="quest-row-meta">${esc(QUEST_LIFE_META_UNAVAILABLE)}</span>
                         </div>
                         <div class="quest-row-trailing"></div>
@@ -68,13 +47,13 @@
                 `;
             }
 
-            if (state.life_paid) {
+            if (paid) {
                 return `
                     <div class="quest-row">
                         <div class="quest-row-icon">🎲</div>
                         <div class="quest-row-main">
-                            <span class="quest-row-title">${esc(state.life.name)}</span>
-                            ${state.life.description ? `<span class="quest-row-meta">${esc(state.life.description)}</span>` : ''}
+                            <span class="quest-row-title">${esc(life.name)}</span>
+                            ${life.description ? `<span class="quest-row-meta">${esc(life.description)}</span>` : ''}
                         </div>
                         <div class="quest-row-trailing"><span class="quest-badge quest-badge-paid">+3 🥯</span></div>
                     </div>
@@ -82,7 +61,7 @@
             }
 
             const claimDisabled = !state.generation_active;
-            const replaceDisabled = !state.can_replace;
+            const replaceDisabled = !canReplace;
             const pausedNote = !state.generation_active
                 ? '<span class="quest-row-note">Действия временно недоступны</span>'
                 : '';
@@ -91,62 +70,67 @@
                 <div class="quest-row">
                     <div class="quest-row-icon">🎲</div>
                     <div class="quest-row-main">
-                        <span class="quest-row-title">${esc(state.life.name)}</span>
-                        ${state.life.description ? `<span class="quest-row-meta">${esc(state.life.description)}</span>` : ''}
+                        <span class="quest-row-title">${esc(life.name)}</span>
+                        ${life.description ? `<span class="quest-row-meta">${esc(life.description)}</span>` : ''}
                         ${pausedNote}
                     </div>
-                    <div class="quest-row-trailing" id="life-row-trailing">
-                        <button class="quest-claim-btn" onclick="claimTodayLife()" ${claimDisabled ? 'disabled' : ''}>Выполнил честно</button>
-                        <button class="quest-replace-btn" onclick="replaceTodayLife()"
-                            title="Осталось замен: ${state.replacements_left}" ${replaceDisabled ? 'disabled' : ''}>🔁</button>
+                    <div class="quest-row-trailing life-row-trailing">
+                        <button class="quest-claim-btn" onclick="claimTodayLife(${slot})"
+                            ${claimDisabled ? 'disabled' : ''}>Выполнил честно</button>
+                        <button class="quest-replace-btn" onclick="replaceTodayLife(${slot})"
+                            title="Осталось замен на сегодня: ${state.replacements_left}"
+                            ${replaceDisabled ? 'disabled' : ''}>🔁</button>
                     </div>
                 </div>
             `;
         }
 
         function buildComboRow(state) {
-            const metaByStatus = {
-                locked:         'Открывается после обоих квестов',
-                waiting_review: 'Челлендж выполнен — бонус ждёт проверки задания',
-                completed:      'Начислено'
-            };
-            const badgeClassByStatus = {
-                locked: 'quest-badge-locked',
-                waiting_review: 'quest-badge-wait',
-                completed: 'quest-badge-paid'
-            };
-            const status = state.combo_status || 'locked';
-            const meta = metaByStatus[status] || metaByStatus.locked;
-            const badgeClass = badgeClassByStatus[status] || badgeClassByStatus.locked;
+            const completed = state.combo_status === 'completed';
             return `
                 <div class="quest-row">
                     <div class="quest-row-icon">🎁</div>
                     <div class="quest-row-main">
                         <span class="quest-row-title">Бонус за оба</span>
-                        <span class="quest-row-meta">${esc(meta)}</span>
+                        <span class="quest-row-meta">${completed ? 'Начислено' : 'Открывается после двух квестов'}</span>
                     </div>
-                    <div class="quest-row-trailing"><span class="quest-badge ${badgeClass}">+2 🥯</span></div>
+                    <div class="quest-row-trailing">
+                        <span class="quest-badge ${completed ? 'quest-badge-paid' : 'quest-badge-locked'}">+2 🥯</span>
+                    </div>
                 </div>
             `;
         }
 
-        function setLifeControlsDisabled(disabled) {
-            const trailing = document.getElementById('life-row-trailing');
-            if (!trailing) return;
-            trailing.querySelectorAll('button').forEach(b => { b.disabled = disabled; });
+        function renderQuestStreak(streakValue) {
+            const streak = Number(streakValue) || 0;
+            const streakEl = document.getElementById('streak-display');
+            document.getElementById('streak-progress').style.display = 'none';
+            if (streak > 0) {
+                streakEl.style.display = 'inline-block';
+                streakEl.innerText = `🔥 ${streak} дней подряд`;
+            } else {
+                streakEl.style.display = 'none';
+            }
         }
 
-        async function claimTodayLife() {
-            if (questActionBusy) return; // синхронная защита от двойного клика
+        function setLifeControlsDisabled(disabled) {
+            document.querySelectorAll('.life-row-trailing button')
+                .forEach(button => { button.disabled = disabled; });
+        }
+
+        async function claimTodayLife(slot) {
+            if (questActionBusy) return;
             questActionBusy = true;
             setLifeControlsDisabled(true);
             try {
-                // secure path — gateway claim_life_quest_self без p_student_id (T10-04B);
-                // legacy fallback — прежний RPC. pay-once life=3 + combo — в базовой функции.
                 const { data, error } = studentSecurePathActive()
-                    ? await db.rpc('claim_life_quest_self')
-                    : await db.rpc('claim_life_quest', { p_student_id: currentUser.id });
+                    ? await db.rpc('claim_life_quest_self', { p_slot: slot })
+                    : await db.rpc('claim_life_quest', {
+                        p_student_id: currentUser.id,
+                        p_slot: slot
+                });
                 if (error) throw error;
+                await loadProfile();
                 renderTodayQuests(data);
             } catch (e) {
                 alert('Не удалось подтвердить выполнение: ' + (e.message || e));
@@ -156,16 +140,17 @@
             }
         }
 
-        async function replaceTodayLife() {
+        async function replaceTodayLife(slot) {
             if (questActionBusy) return;
             questActionBusy = true;
             setLifeControlsDisabled(true);
             try {
-                // secure path — gateway replace_life_quest_self без p_student_id (T10-04B);
-                // legacy fallback — прежний RPC. Лимит замен/окно — в базовой функции.
                 const { data, error } = studentSecurePathActive()
-                    ? await db.rpc('replace_life_quest_self')
-                    : await db.rpc('replace_life_quest', { p_student_id: currentUser.id });
+                    ? await db.rpc('replace_life_quest_self', { p_slot: slot })
+                    : await db.rpc('replace_life_quest', {
+                        p_student_id: currentUser.id,
+                        p_slot: slot
+                    });
                 if (error) throw error;
                 renderTodayQuests(data);
             } catch (e) {

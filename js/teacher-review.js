@@ -297,8 +297,8 @@
                 // review_assignment_self (T10-06A/07): status-переход + recalc недели + серверный
                 // reward-гейт (cutover/Stage 4) — одной транзакцией. Owner/тип/scheduled_date и
                 // cutover/stage4-флаги теперь читает и проверяет сервер, не клиент; двойной approve
-                // не даёт второй серверной награды (идемпотентность внутри record_approved_assignment/
-                // settle_daily_math сохранена).
+                // не даёт второй серверной награды (идемпотентность внутри
+                // record_approved_assignment; с T10-12C daily math не является отдельным квестом).
                 const { error } = await db.rpc('review_assignment_self', {
                     p_assignment_id: currentSubmissionId,
                     p_status: status,
