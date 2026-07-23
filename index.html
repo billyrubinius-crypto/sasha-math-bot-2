@@ -80,6 +80,12 @@
             </div>
         </div>
 
+        <div class="showcase-section" id="showcase-section" style="display:none;">
+            <div class="showcase-title">🌟 Витрина</div>
+            <div class="showcase-grid" id="showcase-grid"></div>
+            <div class="showcase-picker" id="showcase-picker" style="display:none;"></div>
+        </div>
+
         <div class="achievements-section" id="achievements-section" style="display:none;">
             <div class="achievements-title">🏆 Достижения</div>
             <div class="ach-grid" id="ach-grid"></div>
@@ -88,12 +94,6 @@
         <div class="collections-section" id="collections-section" style="display:none;">
             <div class="collections-title">📦 Коллекции</div>
             <div id="collections-list"></div>
-        </div>
-
-        <div class="showcase-section" id="showcase-section" style="display:none;">
-            <div class="showcase-title">🌟 Витрина</div>
-            <div class="showcase-grid" id="showcase-grid"></div>
-            <div class="showcase-picker" id="showcase-picker" style="display:none;"></div>
         </div>
 
         <div class="history-section" id="season-history-section" style="display:none;">
@@ -112,23 +112,23 @@
     <!-- ЭКРАН 2: ДОМАШКА -->
     <div id="screen-homework" class="screen">
         <div class="tabs-hw">
-            <button class="tab-btn active" onclick="switchHwTab('upload')" style="font-size: 16px; font-weight: 700;">✏️ Решить домашку</button>
-            <button class="tab-btn" onclick="switchHwTab('archive')" style="font-size: 16px; font-weight: 700;">🤓 Мои работы</button>
+            <button class="tab-btn active" onclick="switchHwTab('upload')">✏️ Решить домашку</button>
+            <button class="tab-btn" onclick="switchHwTab('archive')">🤓 Мои работы</button>
         </div>
 
         <!-- Вкладка загрузки -->
         <div id="hw-upload" class="hw-view active">
             <div class="dz-section">
-                <div class="dz-title" style="font-size: 24px; margin-bottom: 10px;">✏️ Решить домашку</div>
+                <div class="dz-title" style="margin-bottom: 10px;">✏️ Решить домашку</div>
                 
                 <!-- Инструкция -->
-                <p style="text-align:center; font-size:13px; color:var(--tg-hint); margin-bottom:20px; line-height:1.4;">
+                <p style="text-align:center; font-size:var(--text-small); color:var(--tg-hint); margin-bottom:20px; line-height:1.4;">
                     Выбери задание ниже, перейди по ссылке, реши его и вернись сюда, чтобы загрузить фото решения.
                 </p>
 
                 <!-- Выбор задания -->
                 <div class="input-group">
-                    <label style="font-size:18px; font-weight:800; color:var(--tg-text); margin-bottom:5px;">Какое ДЗ решаешь?</label>
+                    <label style="font-weight:800; color:var(--tg-text); margin-bottom:5px;">Какое ДЗ решаешь?</label>
                     <select id="assignment-select" onchange="showAssignmentDetails()">
                         <option value="">Выбери задание из списка...</option>
                     </select>
@@ -136,10 +136,10 @@
 
                 <!-- Карточка с деталями выбранного задания -->
                 <div id="assignment-details" style="display:none; background:var(--tg-bg); border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid rgba(128,128,128,0.2);">
-                    <div style="font-weight:bold; margin-bottom:8px; font-size:15px;" id="detail-title"></div>
-                    <div id="detail-count" style="display:none; font-size:13px; color:var(--tg-hint); margin-bottom:8px;"></div>
-                    <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:14px; display:inline-block; word-break:break-all;">🔗 Открыть условие задачи</a>
-                    <div id="detail-feedback" style="display:none; margin-top:10px; padding:10px; background:rgba(220,53,69,0.1); border-radius:8px; font-size:13px; color:#721c24;"></div>
+                    <div style="font-weight:700; margin-bottom:8px; font-size:var(--text-body);" id="detail-title"></div>
+                    <div id="detail-count" style="display:none; font-size:var(--text-small); color:var(--tg-hint); margin-bottom:8px;"></div>
+                    <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:var(--text-body); display:inline-block; word-break:break-all;">🔗 Открыть условие задачи</a>
+                    <div id="detail-feedback" style="display:none; margin-top:10px; padding:10px; background:rgba(220,53,69,0.1); border-radius:8px; font-size:var(--text-small); color:#721c24;"></div>
                 </div>
 
                 <!-- Загрузка фото -->
@@ -150,11 +150,11 @@
                 </div>
                 <input type="file" id="file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
 
-                <button class="primary" id="btn-upload-dz" onclick="uploadDZ()" disabled style="font-size: 16px; padding: 16px;">📤 Загрузить ДЗ для проверки</button>
+                <button class="primary" id="btn-upload-dz" onclick="uploadDZ()" disabled style="padding:16px;">📤 Загрузить ДЗ для проверки</button>
                 <div id="dz-status" class="dz-status"></div>
             </div>
             
-            <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 13px;">
+            <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: var(--text-small);">
                 Бублики начисляются после проверки учителем.<br>
                 Размер награды зависит от типа задания.
             </div>
@@ -170,10 +170,10 @@
 
     <!-- ЭКРАН 3: ЛИДЕРБОРД -->
     <div id="screen-leaderboard" class="screen">
-        <h2 style="text-align: center; margin-bottom: 12px; font-size: 22px;">🏆 Лиги</h2>
+        <h2 style="text-align:center; margin-bottom:12px;">🏆 Лиги</h2>
         <div class="tabs-hw">
-            <button class="tab-btn active" id="lb-tab-league" onclick="switchLbMode('league')" style="font-size: 15px; font-weight: 700;">🏅 Моя лига</button>
-            <button class="tab-btn" id="lb-tab-global" onclick="switchLbMode('global')" style="font-size: 15px; font-weight: 700;">🌍 Общий топ</button>
+            <button class="tab-btn active" id="lb-tab-league" onclick="switchLbMode('league')">🏅 Моя лига</button>
+            <button class="tab-btn" id="lb-tab-global" onclick="switchLbMode('global')">🌍 Общий топ</button>
         </div>
 
         <!-- Режим: моя лига -->
@@ -185,7 +185,7 @@
 
         <!-- Режим: общий сезонный топ (топ-3 получают 100/60/30 бубликов) -->
         <div id="lb-mode-global" class="lb-mode">
-            <div id="lb-season-label" style="text-align:center; opacity:0.6; font-size:13px; margin-bottom:16px;"></div>
+            <div id="lb-season-label" style="text-align:center; opacity:0.6; font-size:var(--text-small); margin-bottom:16px;"></div>
             <ul class="leaderboard-list" id="lb-list">
                 <li style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</li>
             </ul>
@@ -194,7 +194,7 @@
 
     <!-- ЭКРАН: МАГАЗИН (S2) -->
     <div id="screen-shop" class="screen">
-        <h2 style="text-align: center; margin-bottom: 4px; font-size: 22px;">🥯 Бубличная</h2>
+        <h2 style="text-align:center; margin-bottom:4px;">🥯 Бубличная</h2>
         <div class="shop-balance" id="shop-balance"></div>
         <div id="shop-content">
             <div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>
@@ -203,7 +203,7 @@
 
     <!-- ЭКРАН 4: ЕЩЁ -->
     <div id="screen-more" class="screen">
-        <h2 style="text-align: center; margin-bottom: 20px; font-size: 22px;">⚙️ Ещё</h2>
+        <h2 style="text-align:center; margin-bottom:20px;">⚙️ Ещё</h2>
 
         <div class="faq-section">
             <div class="faq-title">❓ Частые вопросы</div>
@@ -286,8 +286,8 @@
     <!-- Персональный титул (S8): первая отправка платная, retry после отказа бесплатен -->
     <div id="custom-title-modal" onclick="if (event.target === this) closeCustomTitleModal()">
         <div class="custom-title-dialog">
-            <div style="font-size:18px; font-weight:700;">Персональный титул</div>
-            <div id="custom-title-help" style="font-size:12px; color:var(--tg-hint); margin-top:5px;"></div>
+            <div style="font-size:var(--text-section); font-weight:800;">Персональный титул</div>
+            <div id="custom-title-help" style="font-size:var(--text-small); color:var(--tg-hint); margin-top:5px;"></div>
             <input id="custom-title-input" class="custom-title-input" type="text" autocomplete="off"
                 placeholder="Например: Гроза логарифмов" oninput="updateCustomTitleForm()">
             <div class="custom-title-meta">
