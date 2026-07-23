@@ -374,6 +374,27 @@ export function sheetsUpsertPayment(telegramId: number, paymentDate: string | nu
   });
 }
 
+// Canonical-путь пробника (T10-10C2, migration 045). Зовёт ту же серверную логику, что и панель
+// учителя: награды pay-once, season points компенсирующей дельтой, зеркало в mock_exam_results
+// делает сама RPC — поэтому отдельная архивная запись здесь НЕ нужна (иначе дубль в архиве).
+// week_start считает SQL из даты пробника, Edge её не вычисляет.
+export interface ServiceMockExamResult {
+  week_start: string;
+  result: unknown;
+}
+export function sheetsRecordWeeklyMockExam(
+  telegramId: number,
+  examDate: string,
+  score: number,
+): Promise<ServiceMockExamResult> {
+  return callRpc<ServiceMockExamResult>("record_weekly_mock_exam_service", {
+    p_student_id: telegramId,
+    p_exam_date: examDate,
+    p_score: score,
+  });
+}
+
+// Архивный путь: значение непригодно для графика (нет даты, балл не целый или вне 0-100).
 // mock_exam_results имеет unique (student_id, exam_name) — повторная синхронизация одного пробника
 // обновляет строку, а не плодит дубль. exam_date не передаётся, если помощник его не заполнил,
 // поэтому ранее сохранённая дата не затирается.

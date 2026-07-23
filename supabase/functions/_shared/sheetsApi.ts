@@ -65,6 +65,8 @@ export function assertScore(value: unknown): string {
 
 // Дата пробника необязательна. undefined => поле вообще не уйдёт в upsert, поэтому ранее
 // сохранённый exam_date НЕ затирается (требование GOOGLE_SHEETS_SPEC/README).
+// ВАЖНО: пустая ячейка (undefined) — это не ошибка, а маршрут «только архив» (см. classifyMockExam);
+// а вот заполненная, но нечитаемая дата — именно ошибка помощника, и она бросается.
 export function assertExamDate(value: unknown): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   try {
@@ -72,4 +74,21 @@ export function assertExamDate(value: unknown): string | undefined {
   } catch {
     throw new Error("bad_exam_date");
   }
+}
+
+// --- Маршрутизация пробника (T10-10C2) --------------------------------------------------------
+// Canonical-таблица weekly_mock_exams требует ЦЕЛЫЙ балл 0-100 и дату (из неё считается неделя).
+// Всё, что этим требованиям не отвечает, не является ошибкой помощника: в таблице встречаются
+// пометки вроде «не писал» и незаполненные даты. Такие значения сохраняются в архивной
+// mock_exam_results, как и раньше, а помощник получает причину — молча ничего не теряется.
+export type MockExamRoute =
+  | { canonical: true; score: number; examDate: string }
+  | { canonical: false; reason: "no_exam_date" | "score_not_number" | "score_out_of_range" };
+
+export function classifyMockExam(score: string, examDate: string | undefined): MockExamRoute {
+  if (!examDate) return { canonical: false, reason: "no_exam_date" };
+  if (!/^-?\d{1,3}$/.test(score)) return { canonical: false, reason: "score_not_number" };
+  const value = Number(score);
+  if (value < 0 || value > 100) return { canonical: false, reason: "score_out_of_range" };
+  return { canonical: true, score: value, examDate };
 }

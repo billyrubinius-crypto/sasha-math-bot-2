@@ -8,7 +8,9 @@
 //   student_lookup    — найти ученика по telegram_username (НИКОГДА не создаёт: нет ученика => null,
 //                       это и есть статус «🟡 Ожидает первого входа» в таблице);
 //   student_sync      — организационная группа + upsert даты оплаты в student_payments;
-//   mock_exam_upsert  — upsert результата пробника (unique student_id+exam_name => без дублей).
+//   mock_exam_upsert  — результат пробника: пригодный (целый балл 0-100 + дата) уходит в canonical
+//                       weekly_mock_exams через ту же серверную логику, что панель учителя
+//                       (T10-10C2); непригодный — в архивную mock_exam_results с причиной.
 //
 // Чего сделать НЕЛЬЗЯ ни при каких аргументах: менять huikons/rating/season points/inventory,
 // approvals заданий, security config, создавать учеников, читать что-либо кроме telegram_id по
@@ -23,6 +25,7 @@ import {
   rateLimitHit,
   rateLimitPeek,
   sheetsFindStudentByUsername,
+  sheetsRecordWeeklyMockExam,
   sheetsUpdateStudentGroup,
   sheetsUpsertMockExam,
   sheetsUpsertPayment,
@@ -34,6 +37,7 @@ import {
   assertPaymentDate,
   assertScore,
   assertTelegramId,
+  classifyMockExam,
   normalizeUsername,
 } from "../_shared/sheetsApi.ts";
 
@@ -139,6 +143,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         break;
       }
 
+      // T10-10C2: маршрут выбирает СЕРВЕР. Пригодное значение (целый балл 0-100 + дата) идёт в
+      // canonical weekly_mock_exams через ту же логику, что панель учителя (награды pay-once,
+      // season points дельтой, зеркало в архив делает сама RPC). Непригодное — только в архив,
+      // с причиной для помощника. Клиент week_start не передаёт и маршрут не выбирает.
       case "mock_exam_upsert": {
         let telegramId: number, examName: string, score: string, examDate: string | undefined;
         try {
@@ -149,8 +157,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
         } catch (e) {
           throw fieldError(e);
         }
-        await sheetsUpsertMockExam(telegramId, examName, score, examDate);
-        data = { ok: true };
+
+        const route = classifyMockExam(score, examDate);
+        if (route.canonical) {
+          const res = await sheetsRecordWeeklyMockExam(telegramId, route.examDate, route.score);
+          data = { ok: true, route: "canonical", week_start: res?.week_start ?? null };
+        } else {
+          await sheetsUpsertMockExam(telegramId, examName, score, examDate);
+          data = { ok: true, route: "archive", reason: route.reason };
+        }
         break;
       }
 

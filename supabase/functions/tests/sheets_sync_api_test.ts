@@ -10,6 +10,7 @@ import {
   assertPaymentDate,
   assertScore,
   assertTelegramId,
+  classifyMockExam,
   normalizeUsername,
 } from "../_shared/sheetsApi.ts";
 
@@ -77,4 +78,26 @@ Deno.test("assertExamDate: пустая дата => undefined (не затира
   assertEquals(assertExamDate(undefined), undefined);
   assertThrows(() => assertExamDate("22.07.2026"), Error, "bad_exam_date");
   assertThrows(() => assertExamDate("2026-13-01"), Error, "bad_exam_date");
+});
+
+// --- T10-10C2: маршрутизация пробника ----------------------------------------------------------
+Deno.test("classifyMockExam: пригодный балл с датой идёт в canonical", () => {
+  const r = classifyMockExam("78", "2026-07-01");
+  assertEquals(r, { canonical: true, score: 78, examDate: "2026-07-01" });
+  assertEquals(classifyMockExam("0", "2026-07-01"), { canonical: true, score: 0, examDate: "2026-07-01" });
+  assertEquals(classifyMockExam("100", "2026-07-01"), { canonical: true, score: 100, examDate: "2026-07-01" });
+});
+
+Deno.test("classifyMockExam: без даты — только архив, это НЕ ошибка", () => {
+  assertEquals(classifyMockExam("78", undefined), { canonical: false, reason: "no_exam_date" });
+});
+
+Deno.test("classifyMockExam: нецелый и нечисловой балл — только архив", () => {
+  assertEquals(classifyMockExam("70.5", "2026-07-01"), { canonical: false, reason: "score_not_number" });
+  assertEquals(classifyMockExam("не писал", "2026-07-01"), { canonical: false, reason: "score_not_number" });
+});
+
+Deno.test("classifyMockExam: балл вне 0-100 — только архив, с отдельной причиной", () => {
+  assertEquals(classifyMockExam("101", "2026-07-01"), { canonical: false, reason: "score_out_of_range" });
+  assertEquals(classifyMockExam("-5", "2026-07-01"), { canonical: false, reason: "score_out_of_range" });
 });

@@ -5265,3 +5265,51 @@ $function$;
 
 revoke all on function public.consume_parent_invite(text, bigint) from public, anon, authenticated;
 grant execute on function public.consume_parent_invite(text, bigint) to service_role;
+
+-- =============================================================================
+-- T10-10C2 (migration 045): пробники из Google Sheets в canonical weekly_mock_exams.
+-- Узкий service-gateway поверх существующей record_weekly_mock_exam (миграция 016): новая
+-- экономическая логика не вводится, награды остаются pay-once, season points — компенсирующей
+-- дельтой, зеркало в mock_exam_results делает сама record_weekly_mock_exam.
+-- =============================================================================
+
+create or replace function public.record_weekly_mock_exam_service(
+  p_student_id bigint,
+  p_exam_date  date,
+  p_score      integer
+)
+ returns json
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_week date;
+  v_res  json;
+begin
+  if p_student_id is null or p_student_id <= 0 then
+    raise exception 'student required' using errcode = '22023';
+  end if;
+  if p_exam_date is null then
+    raise exception 'exam date required' using errcode = '22023';
+  end if;
+  if p_score is null or p_score < 0 or p_score > 100 then
+    raise exception 'score out of range' using errcode = '22023';
+  end if;
+
+  v_week := public.week_start_of(p_exam_date);
+  v_res := public.record_weekly_mock_exam(p_student_id, v_week, p_score);
+
+  perform public.security_audit('sheets_record_mock', 'sheets', null, null,
+    json_build_object('student_id', p_student_id, 'week_start', v_week, 'score', p_score,
+                      'base_awarded', v_res -> 'base_awarded',
+                      'record_awarded', v_res -> 'record_awarded')::jsonb);
+
+  return json_build_object('week_start', v_week, 'result', v_res);
+end;
+$function$;
+
+revoke all on function public.record_weekly_mock_exam_service(bigint, date, integer)
+  from public, anon, authenticated;
+grant execute on function public.record_weekly_mock_exam_service(bigint, date, integer)
+  to service_role;
