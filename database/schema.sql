@@ -5313,3 +5313,11 @@ revoke all on function public.record_weekly_mock_exam_service(bigint, date, inte
   from public, anon, authenticated;
 grant execute on function public.record_weekly_mock_exam_service(bigint, date, integer)
   to service_role;
+
+-- =============================================================================
+-- T10-10D (migration 046): схема legacy_import — временный инструмент переезда с боевой базы
+-- (staging-таблицы, migrate_legacy/report/rollback_run). В этот snapshot НЕ включена намеренно:
+-- snapshot описывает схему public, а legacy_import не экспонирована в Data API, не участвует в
+-- бизнес-логике и подлежит удалению после cutover (T10-12). Полное определение и порядок
+-- удаления — в database/migrations/046_t10_legacy_import.sql.
+-- =============================================================================
