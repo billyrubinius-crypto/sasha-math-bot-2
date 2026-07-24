@@ -30,8 +30,16 @@ export interface PrincipalResult {
   token_version: number;
 }
 
-export function upsertStudentPrincipal(telegramId: number): Promise<PrincipalResult> {
-  return callRpc<PrincipalResult>("student_auth_upsert_principal", { p_telegram_id: telegramId });
+export function upsertStudentPrincipal(
+  telegramId: number,
+  name: string | null,
+  telegramUsername: string | null,
+): Promise<PrincipalResult> {
+  return callRpc<PrincipalResult>("student_auth_upsert_principal", {
+    p_telegram_id: telegramId,
+    p_name: name,
+    p_telegram_username: telegramUsername,
+  });
 }
 
 // true = запрос в пределах лимита (инкрементит счётчик окна).

@@ -23,12 +23,18 @@ async function buildInitData(
   return usp.toString();
 }
 
-const validUser = JSON.stringify({ id: 995000001, first_name: "T" });
+const validUser = JSON.stringify({
+  id: 995000001,
+  first_name: "T",
+  username: "registration_user",
+});
 
 Deno.test("valid fixture accepted", async () => {
   const initData = await buildInitData({ user: validUser, auth_date: String(NOW) });
   const r = await validateInitData(initData, BOT, OPTS);
   assertEquals(r.user.id, 995000001);
+  assertEquals(r.user.first_name, "T");
+  assertEquals(r.user.username, "registration_user");
   assertEquals(r.authDate, NOW);
 });
 

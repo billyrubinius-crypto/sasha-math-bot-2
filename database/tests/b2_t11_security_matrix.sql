@@ -140,6 +140,7 @@ insert into b2_t11_results
 with deny(sig) as (
   values
     ('public.student_auth_upsert_principal(bigint)'),
+    ('public.student_auth_upsert_principal(bigint,text,text)'),
     ('public.teacher_auth_upsert_principal(text)'),
     ('public.teacher_session_create(uuid,uuid,text,timestamp with time zone,integer)'),
     ('public.teacher_session_rotate(text,text,integer)'),
@@ -243,6 +244,11 @@ select '06 service_role integration contracts',
          and has_function_privilege(
            'service_role',
            'public.student_auth_upsert_principal(bigint)'::regprocedure,
+           'EXECUTE'
+         )
+         and has_function_privilege(
+           'service_role',
+           'public.student_auth_upsert_principal(bigint,text,text)'::regprocedure,
            'EXECUTE'
          )
          and has_function_privilege(

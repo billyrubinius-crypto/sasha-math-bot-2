@@ -83,7 +83,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       futureSkewSec: INITDATA_FUTURE_SKEW_SEC,
     });
 
-    const { principal_id, token_version } = await upsertStudentPrincipal(user.id);
+    const { principal_id, token_version } = await upsertStudentPrincipal(
+      user.id,
+      user.first_name ?? null,
+      user.username ?? null,
+    );
     const signing = await getSigningKey();
 
     const nowSec = Math.floor(Date.now() / 1000);

@@ -4152,6 +4152,51 @@ begin
 end;
 $function$;
 
+-- T10 registration correction (migration 050): capture signed Telegram metadata
+-- once. Existing non-empty username/name values are never overwritten.
+create or replace function public.student_auth_upsert_principal(
+  p_telegram_id bigint,
+  p_name text,
+  p_telegram_username text)
+ returns json language plpgsql security definer set search_path = ''
+as $function$
+declare v_principal uuid; v_token_version integer;
+begin
+  if p_telegram_id is null or p_telegram_id <= 0 then
+    raise exception 'invalid telegram_id';
+  end if;
+
+  insert into public.students (telegram_id, name, telegram_username)
+    values (
+      p_telegram_id,
+      nullif(btrim(p_name), ''),
+      nullif(btrim(p_telegram_username), '')
+    )
+  on conflict (telegram_id) do update
+    set name = case
+          when public.students.name is null or btrim(public.students.name) = ''
+            then excluded.name
+          else public.students.name
+        end,
+        telegram_username = case
+          when public.students.telegram_username is null
+            or btrim(public.students.telegram_username) = ''
+            then excluded.telegram_username
+          else public.students.telegram_username
+        end;
+
+  insert into private.security_principals (app_role, telegram_id)
+    values ('student', p_telegram_id)
+  on conflict do nothing;
+
+  select id, token_version into v_principal, v_token_version
+    from private.security_principals
+   where app_role = 'student' and telegram_id = p_telegram_id;
+
+  return json_build_object('principal_id', v_principal, 'token_version', v_token_version);
+end;
+$function$;
+
 create or replace function public.security_rate_limit_hit(
   p_bucket text, p_fingerprint text, p_max integer, p_window_seconds integer)
  returns boolean language plpgsql security definer set search_path = ''
@@ -4171,8 +4216,10 @@ end;
 $function$;
 
 revoke all on function public.student_auth_upsert_principal(bigint) from public, anon, authenticated;
+revoke all on function public.student_auth_upsert_principal(bigint, text, text) from public, anon, authenticated;
 revoke all on function public.security_rate_limit_hit(text, text, integer, integer) from public, anon, authenticated;
 grant execute on function public.student_auth_upsert_principal(bigint) to service_role;
+grant execute on function public.student_auth_upsert_principal(bigint, text, text) to service_role;
 grant execute on function public.security_rate_limit_hit(text, text, integer, integer) to service_role;
 
 -- =============================================================================
