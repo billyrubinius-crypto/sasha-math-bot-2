@@ -31,6 +31,11 @@ git -C D:/Sashamath_bot_2 pull --ff-only origin main
 git -C D:/Sashamath_bot_2 switch -c feat/cosmic-academy origin/main
 ```
 
+> **Статус на 2026-07-25:** ветка `feat/cosmic-academy` **уже создана от актуального
+> `origin/main` (`e5f675b`)**, аудит и план закоммичены в неё (`c06c093`). Работа над этапами
+> ведётся в ней. Локальная `main` остаётся на `fb68ea8` и **не изменяется**; `.claude/` и
+> `tools/` остаются untracked и в коммиты не попадают.
+
 ### 0.2. Глобальные запреты на все 9 этапов
 
 1. **Не переводить `js/student-*.js` и `shared.js` в `type="module"`**, не оборачивать в IIFE,
@@ -85,17 +90,30 @@ python -m http.server 8080
 
 ---
 
-## Этап 1. Design tokens, тема Telegram, глобальный фон, AppShell
+## Этап 1. Design tokens, тема Telegram, глобальный фон (включая экипированный), AppShell
 
 ### Цель
-Ввести систему токенов Cosmic Academy, привязать её к Telegram Theme Params, добавить глобальный
-фон и каркас AppShell — **без изменения структуры экранов и без единой правки JS-логики**.
+Ввести систему токенов Cosmic Academy, привязать её к Telegram Theme Params, добавить базовый
+глобальный фон и **перевести экипированный фон слота `background` с экрана профиля на весь
+Mini App** — без изменения структуры экранов и **без единой правки бизнес-логики JS**.
 
 ### Изменяемые файлы
 - `styles/student.css` — основной объём;
-- `index.html` — **только** `<head>` (мета/подключения) и, если выбран вариант Б, одна обёртка;
+- `index.html` — **только** `<head>` (мета/подключения), декоративный слой фона и, если выбран
+  вариант Б, одна обёртка;
 - `js/student-app.js` — **опционально**, только вызовы Telegram-темы (`setHeaderColor`,
-  `setBackgroundColor`, `setBottomBarColor`, подписка на `themeChanged`), больше ничего.
+  `setBackgroundColor`, `setBottomBarColor`, подписка на `themeChanged`), больше ничего;
+- `js/student-progress.js` (файл, содержащий `applyProfileCosmetics`) — **разрешена минимальная
+  правка только визуальной части**: к какому элементу вешаются классы `bg-*`, либо вынос этого
+  применения в отдельную UI-функцию, вызываемую из того же места. **Запрещено** трогать получение
+  equipment (`equipmentQuery`, `buildEquipMap`), серверные запросы, формат данных, проверку
+  whitelist `BG_CLASSES`, логику покупки и логику экипировки;
+- `js/student-shop.js` — **только** добавление вызова той же UI-функции применения фона после
+  успешного `equip`/`unequip`. Сейчас `equipShopItem` после успешного RPC вызывает **только**
+  `await loadShop()`, поэтому фон обновляется не сразу, а лишь при следующем заходе на профиль
+  (`switchTab('profile')` → `loadProfile` → `applyProfileCosmetics`). Добавляется одна строка
+  обновления фона; RPC, ветвление `studentSecurePathActive`, `btn.disabled = true` до `await`,
+  порядок вызовов и обработка ошибок — **без изменений**.
 
 ### Что делать
 1. Расширить блок `:root`: к существующим 7 `--tg-*` и 5 `--text-*` добавить
@@ -107,17 +125,55 @@ python -m http.server 8080
    `color-mix(in srgb, var(--tg-link) X%, transparent)` либо на отдельный токен.
 3. Ввести светлый/тёмный варианты токенов через `@media (prefers-color-scheme: dark)` **и**
    через Telegram-переменные, чтобы приложение выглядело корректно и вне Telegram.
-4. Глобальный фон — **вариант А (рекомендуется)**: слой на `body::before`
-   (`position: fixed; inset: 0; z-index: -1; pointer-events: none`), `body` при этом сохраняет
-   `display: flex; flex-direction: column; min-height: 100vh`.
-   **Вариант Б** (обёртка `<div class="ca-shell">` вокруг пяти экранов) требует переноса
-   `min-height: 100vh` и `padding-bottom` на обёртку и перепроверки §13.4 — выбирать только если
-   вариант А визуально не даёт нужного результата.
-5. **Купленные фоны профиля**: перенести `background-image` из `#screen-profile.bg-*` на
-   `#screen-profile.bg-*::before` (`position:absolute; inset:0; pointer-events:none; z-index:0`),
-   чтобы космический фон приложения и платный фон профиля накладывались, а не конкурировали
-   (§10.3, R3). Классы `bg-grid/bg-space/bg-aurora/bg-draft` и селектор `#screen-profile` —
-   **сохранить дословно**.
+4. **Базовый глобальный фон Cosmic Academy** — минимально рискованный глобальный слой приложения.
+   Конкретную реализацию выбрать **после проверки текущего stacking context** (`body { display:
+   flex; min-height: 100vh }`, `.screen`, `.bottom-nav z-index:100`, `#custom-title-modal
+   z-index:2000` — §13.4). Приоритет:
+   **(а)** отдельный фиксированный декоративный слой (`position: fixed; inset: 0;
+   pointer-events: none; z-index: -1` или самый нижний в стеке) — предпочтительно;
+   **(б)** классы на `body` с псевдоэлементом `body::before` с теми же свойствами.
+   **Сложную AppShell-обёртку без необходимости не добавлять.** Вариант с обёрткой
+   `<div class="ca-shell">` вокруг пяти экранов допустим только если (а) и (б) визуально не дают
+   результата, и требует переноса `min-height: 100vh` и `padding-bottom` на обёртку (§13.4).
+
+5. **Экипированный фон (слот `background`) — на весь Mini App** (§10.3, R3).
+
+   5.1. Добавить **глобальный слой пользовательского фона**: тот же декоративный слой из п. 4
+   несёт классы `bg-grid` / `bg-space` / `bg-aurora` / `bg-draft`. Правила `bg-*` переписываются
+   с `#screen-profile.bg-*` на глобальный слой; **сами имена классов, `BG_CLASSES`, `item_code`
+   и `render_payload` сохраняются дословно**.
+
+   5.2. **Убрать старое применение фона к профилю**: снять навешивание `bg-*` на
+   `#screen-profile` и удалить CSS-правила `#screen-profile.bg-*`. Без этого один и тот же фон
+   отрисуется дважды (§10.3.4) — на профиле он будет плотнее и ярче, чем на остальных экранах.
+
+   5.3. Добавить **защитный overlay** между фоном и контентом (полупрозрачная вуаль/градиент
+   поверх слоя фона, `pointer-events: none`), чтобы текст и карточки оставались читаемыми на всех
+   четырёх фонах в светлой и тёмной теме. Карточки, поля ввода, `#custom-title-modal` и
+   `.bottom-nav` при этом **сохраняют собственные непрозрачные (или достаточно контрастные)
+   поверхности** — фон не должен просвечивать сквозь них.
+
+   5.4. **Применение классов ко всему Mini App**: применяет их одна UI-функция (например
+   `applyAppBackground(eq)`), вызываемая из визуальной части `applyProfileCosmetics`. Функция
+   обязана: снять все `BG_CLASSES`, затем добавить `eq.background.payload` **только** если он
+   прошёл `BG_CLASSES.has(...)` — whitelist сохраняется дословно. Получение equipment, серверные
+   запросы и формат данных не трогаются.
+
+   5.5. **Моментальное обновление после equip/unequip**: в `equipShopItem` (`student-shop.js`)
+   после успешного RPC вызвать применение фона, чтобы предмет менялся сразу, находясь на экране
+   магазина, без перезагрузки Mini App. Логика RPC, `studentSecurePathActive`, `btn.disabled`
+   и `await loadShop()` остаются как есть.
+
+   5.6. **Восстановление после reload**: отдельного механизма не требуется — фон восстанавливается
+   существующим путём `loadProfile()` → `applyProfileCosmetics` → применение фона. Проверить, что
+   на старте фон появляется без «мигания» базового фона дольше, чем длится первая загрузка
+   профиля.
+
+   5.7. **Проверить все пять вкладок**: Профиль, Домашка, Лидеры, Магазин, Ещё — фон виден на
+   каждой и **не сбрасывается** при переключении (`switchTab` трогать нельзя, поэтому слой обязан
+   жить **вне** `.screen`, иначе `display: none` его погасит).
+
+   5.8. При отсутствии экипированного фона используется **базовый фон Cosmic Academy** из п. 4.
 6. Заменить `body { padding-bottom: 75px }` на
    `calc(var(--ca-nav-h) + env(safe-area-inset-bottom, 0px) + 10px)`.
 7. Добавить `@media (prefers-reduced-motion: reduce)` — отключение `fadeIn`, `framePulse`,
@@ -129,9 +185,15 @@ python -m http.server 8080
    они будут задействованы на этапе 3, когда элементам добавят классы.
 
 ### Функции, которые нельзя менять
-`applyProfileCosmetics`, `applyAvatarFrame`, `applyNickColor`, `renderNick`, `buildEquipMap`,
-`equipmentQuery`, `titleText`, `equippedTitleText`, `setupAvatar`, `switchTab`, `switchHwTab`,
-`initStudentSession`, `studentSecurePathActive`, `studentAccessToken`.
+`applyAvatarFrame`, `applyNickColor`, `renderNick`, `buildEquipMap`, `equipmentQuery`, `titleText`,
+`equippedTitleText`, `setupAvatar`, `switchTab`, `switchHwTab`, `initStudentSession`,
+`studentSecurePathActive`, `studentAccessToken`, `buyShopItem`, вся логика `equipShopItem`
+(кроме одной добавленной строки применения фона, п. 5.5).
+
+`applyProfileCosmetics` — **исключение этого этапа**: разрешена минимальная правка **только
+визуальной части** (куда вешаются классы `bg-*`) либо вынос применения фона в отдельную
+UI-функцию. Всё остальное в ней — порядок вызовов, работа с `eq`, `renderNick`, `applyAvatarFrame`,
+титул, инлайновые `style.display` — **без изменений**.
 Из `student-app.js` — весь существующий порядок вызовов (`tg.ready/expand` →
 `initStudentSession` → `checkAndActivateAssignments` → `loadProfile` → `loadActiveAssignments`
 → `loadTodayQuests`); можно только **дописать** вызовы темы после `tg.expand()`.
@@ -141,29 +203,52 @@ python -m http.server 8080
 `screen-more`) и `custom-title-modal`. На этом этапе структура ID не меняется вообще.
 
 ### Динамические классы, которые надо оформить
-`bg-grid`, `bg-space`, `bg-aurora`, `bg-draft` (перенос на псевдоэлемент),
+`bg-grid`, `bg-space`, `bg-aurora`, `bg-draft` (переезжают с `#screen-profile` на глобальный слой),
 9 классов `FRAME_CLASSES` (проверить, что кольца `box-shadow` читаются на новом фоне),
 `nick-gold`, `nick-status`, `nick-crown`, `avatar-img`, `avatar-placeholder`.
 
 ### Критерии готовности
 - [ ] В `styles/student.css` нет ни одного шестнадцатеричного цвета вне блока `:root`
-      (исключение — `#screen-profile.bg-*` градиенты и `frame-*`, если решено оставить их
-      «фирменными»; тогда это явно закомментировано).
+      (исключение — градиенты `bg-*` и `frame-*`: это фирменные цвета платной косметики,
+      см. решение 5 в Приложении Б; исключение явно закомментировано).
 - [ ] Приложение корректно выглядит в светлой и тёмной теме Telegram и в обычном браузере.
-- [ ] Купленный фон профиля виден **поверх** глобального фона на всех четырёх вариантах.
+- [ ] **Каждый из четырёх фонов (`bg-grid`, `bg-space`, `bg-aurora`, `bg-draft`) виден на всех
+      пяти экранах**: Профиль, Домашка, Лидеры, Магазин, Ещё.
+- [ ] **Фон не исчезает при переключении вкладок** (проверить все переходы, включая возврат на
+      профиль).
+- [ ] **На профиле нет двойного рисунка** — плотность сетки/линейки и яркость фона на профиле
+      совпадают с остальными четырьмя экранами.
+- [ ] **Карточки и текст читаются на каждом фоне** — в светлой и тёмной теме, включая
+      `.bottom-nav`, поля ввода и `#custom-title-modal`.
+- [ ] **Снятие фона (unequip) возвращает базовый Cosmic Academy background.**
+- [ ] **Смена темы Telegram не удаляет экипированный фон** (переключить тему при открытом
+      Mini App).
+- [ ] **Reload восстанавливает экипированный фон** (полная перезагрузка Mini App).
+- [ ] **Equip и unequip обновляют фон сразу** — находясь на экране магазина, без перезагрузки.
 - [ ] Золотой ник (`nick-gold`) и все 9 рамок отображаются как до правки.
 - [ ] Нижняя панель не заходит под `safe-area` (проверить в Telegram на iOS или эмуляцией
       `env()` через DevTools).
-- [ ] `git diff` не затрагивает `js/student-core.js`, `-assignments`, `-week`, `-progress`,
-      `-shop`, `-quests`, `-auth`, `shared.js`, `supabase/`, `database/`.
+- [ ] `git diff` по `js/student-progress.js` и `js/student-shop.js` содержит **только** правки
+      применения фона (визуальная часть `applyProfileCosmetics` / новая UI-функция и один вызов
+      в `equipShopItem`); `js/student-core.js`, `-assignments`, `-week`, `-quests`, `-auth`,
+      `shared.js`, `supabase/`, `database/` не затронуты вообще.
 
 ### Команды проверки
 ```bash
 git -C D:/Sashamath_bot_2 --no-pager diff --stat
 ```
 ```bash
-git -C D:/Sashamath_bot_2 --no-pager diff --name-only | grep -E '^(js/student-(core|assignments|week|progress|shop|quests|auth)\.js|shared\.js|supabase/|database/)' && echo "STOP: затронуты запрещённые файлы" || echo "OK: запрещённые файлы не тронуты"
+git -C D:/Sashamath_bot_2 --no-pager diff --name-only | grep -E '^(js/student-(core|assignments|week|quests|auth)\.js|shared\.js|supabase/|database/)' && echo "STOP: затронуты запрещённые файлы" || echo "OK: запрещённые файлы не тронуты"
 ```
+```bash
+git -C D:/Sashamath_bot_2 --no-pager diff -- js/student-progress.js js/student-shop.js | grep -n -E '^[-+].*(equipmentQuery|buildEquipMap|BG_CLASSES|equip_item|equip_item_self|studentSecurePathActive|btn.disabled|0-9a-fA-F)'
+```
+> Ожидаемый вывод: пусто (получение equipment, whitelist, RPC и защита от двойного клика
+> не изменены).
+```bash
+grep -n -E 'BG_CLASSES|screen-profile' js/student-progress.js styles/student.css
+```
+> `#screen-profile.bg-*` в CSS больше быть не должно; `BG_CLASSES` остаётся дословно.
 ```bash
 grep -n -E '#[0-9a-fA-F]{6}' styles/student.css | grep -v -E '^\s*[0-9]+:\s*--' | head -50
 ```
@@ -172,11 +257,20 @@ python -m http.server 8080
 ```
 
 ### Риски
-- **R3** — фон профиля vs глобальный фон (ID-специфичность). Смягчение: псевдоэлемент, п. 5.
+- **R3 (переформулирован)** — **перенос пользовательского фона на глобальный слой**: фон пропадает
+  на части экранов, срывается при `switchTab`, рисуется дважды на профиле (если не снять старое
+  применение) или делает контент нечитаемым. Смягчение: слой живёт вне `.screen`, старое
+  применение к `#screen-profile` удалено, добавлен защитный overlay, проверены все пять вкладок
+  и reload.
 - **R4** — новое правило `color` на потомках `#user-name` убьёт золотой ник. Смягчение: не
   задавать `color`/`-webkit-text-fill-color` глубже `#user-name` / `.lb-name-line`.
 - **R6** — не удалять инлайновые `style.display` из JS; вместо этого продублировать в CSS.
-- Вариант Б (обёртка AppShell) ломает `body { display:flex; min-height:100vh }` — §13.4.
+- Правка `applyProfileCosmetics` шире визуальной части (например, «оптимизация» получения `eq`)
+  — прямое нарушение границ этапа.
+- Слой фона, вставленный внутрь `.screen` или получивший `z-index` выше `.bottom-nav` (100) /
+  `#custom-title-modal` (2000), перекроет навигацию или модалку.
+- Вариант с обёрткой AppShell ломает `body { display:flex; min-height:100vh }` — §13.4; поэтому
+  он и не является приоритетным.
 - `setBackgroundColor`/`setHeaderColor` доступны не во всех версиях Telegram — оборачивать в
   `tg.isVersionAtLeast('6.1')` и `try/catch`, иначе старый клиент упадёт на старте.
 
@@ -199,8 +293,8 @@ feat(ui): design tokens, Telegram theme and global background (Cosmic Academy st
 - `styles/student.css` — стили `.ca-icon`, `.bottom-nav`, `.nav-btn`, `.nav-icon`;
 - **точечно** `js/student-progress.js` — **только** добавление поля `svg` в `ACHIEVEMENTS_META`
   (поле `icon` не удалять);
-- **точечно** `js/student-week.js` — **только** если решено заменить `WEEK_DAY_MARKS`; по
-  умолчанию **не менять**, маркеры дня остаются символами.
+- `js/student-week.js` — **не изменяется**. Решение принято: `WEEK_DAY_MARKS` остаются
+  существующими символами, на SVG в рамках этапа 2 **не заменяются**.
 
 ### Что делать
 1. Инлайновый SVG-спрайт (`<symbol id="ca-i-profile" viewBox="0 0 24 24">…`), использование через
@@ -219,9 +313,10 @@ feat(ui): design tokens, Telegram theme and global background (Cosmic Academy st
    `h2` экранов, `.chart-title`, `.showcase-title`, `.achievements-title`, `.collections-title`,
    `.history-title` ×2 (заодно починить отсутствующую иконку у «История изменений»),
    `.profile-title-icon`, `.upload-icon`, `#detail-link`, `.faq-title`, `.more-link-btn` ×2.
-6. **Оставить эмодзи** там, где это контент, а не иконка (§12.3): 🥯 как валюту в текстах,
-   `WEEK_DAY_MARKS`, `reasonMap`, эмодзи-статусы ника, эмодзи-чипы магазина, 🥇🥈🥉 медали,
-   иконки достижений (там добавляется поле `svg`, а `icon` остаётся).
+6. **Оставить эмодзи и символы** там, где это контент, а не иконка (§12.3): 🥯 как валюту в
+   текстах, **`WEEK_DAY_MARKS` (решение: оставить существующие символы)**, `reasonMap`,
+   эмодзи-статусы ника, эмодзи-чипы магазина, 🥇🥈🥉 медали, иконки достижений (там добавляется
+   поле `svg`, а `icon` остаётся).
 
 ### Функции, которые нельзя менять
 `switchTab`, `switchHwTab`, `switchLbMode`, `renderWeekStrip`, `renderQuestStreak`,
@@ -489,13 +584,14 @@ feat(ui): redesign quests, mock exam chart, shields, showcase and history (Cosmi
 4. `.upload-text` и `.upload-icon` — **обязательные потомки `#upload-area`**: `handleFileSelect`
    и `uploadDZ` делают `area.querySelector('.upload-text')` / `.upload-icon` и правят
    `innerText` / `style.display`.
-5. **Решить с пользователем §13.6-1 (R15).** Сейчас `loadMyHomework` ставит
+5. **Починить §13.6-1 (R15) — решение принято.** Сейчас `loadMyHomework` ставит
    `status-${hw.status}`, то есть `status-submitted` / `status-checked`, а в CSS есть только
    `status-pending/approved/rejected` — цветная полоска статуса **не работает вообще**.
-   Варианты: (а) добавить в CSS `.status-submitted` / `.status-checked` (минимальная правка,
-   поведение «как задумано изначально» — но это визуальное изменение существующего экрана);
-   (б) оставить как есть и не показывать полоску. **Выбор — за пользователем; по умолчанию
-   вариант (б), т.к. любое «исправление» меняет то, что ученики видят сегодня.**
+   На этом этапе в `styles/student.css` **добавляются стили фактически создаваемых классов**
+   `.my-hw-item.status-submitted` и `.my-hw-item.status-checked`.
+   **Значения данных и бизнес-логику не менять**: `hw.status`, фильтр `.neq('status','assigned')`,
+   `approval_status` и построение классов в JS остаются как есть. Существующие правила
+   `.status-pending/approved/rejected` **не удалять** (конституция проекта).
    Классы `badge-pending/approved/rejected` работают корректно и остаются.
 
 ### Функции, которые нельзя менять
@@ -550,7 +646,9 @@ for c in file-item has-file my-hw-item hw-header hw-variant hw-pages hw-date hw-
 - Замена `<select>` на кастомный компонент → ломается `select.value = String(assignmentId)`
   в `openNowAssignment` и весь путь «Сделать сейчас» → «Домашка». **Кастомный дропдаун на этом
   этапе не делать.**
-- **R15** — «починка» `.status-*` меняет существующее поведение архива.
+- **R15** — починка `.status-*` меняет внешний вид архива (полоска статуса появляется там, где
+  её сегодня нет). Это принятое решение; риск ограничен тем, чтобы правка осталась
+  **чисто CSS-ной** и не затронула значения `hw.status` / `approval_status`.
 
 ### Рекомендуемый коммит
 ```
@@ -657,11 +755,33 @@ feat(ui): redesign leagues and global leaderboard (Cosmic Academy stage 6)
   `renderShopItem`, `openCustomTitleModal`, `updateCustomTitleForm`.
 
 ### Что делать
-1. **Перед изменением `shopPreview` — обязательный вопрос пользователю (R13).**
-   В истории уже есть `bb89030 style(shop): redraw cosmetic previews`, откаченный коммитом
-   `a26a98a revert(shop): restore emoji previews`. Причина отката в репозитории не зафиксирована.
-   Не приступать к переработке превью, пока пользователь не скажет, что тогда не устроило.
-   Пока ответа нет — ограничиться размерами/фоном/рамкой `.shop-preview`, оставив эмодзи.
+1. **`shopPreview` перерисовывается заново — R13 больше не блокирует этап (повышенный риск).**
+   В истории есть `bb89030 style(shop): redraw cosmetic previews`, откаченный коммитом
+   `a26a98a revert(shop): restore emoji previews`. Порядок работы:
+   - **перед реализацией изучить diff откаченного решения** (`git show bb89030`,
+     `git show a26a98a`);
+   - **не восстанавливать старый коммит целиком** — `git revert`/`cherry-pick` запрещены;
+   - **не повторять выявленные в нём проблемные решения** (§11.1 аудита): перевод превью на
+     строковый `innerHTML` вместо DOM-пути; сопоставление фонов по `item_code` с ключами
+     `bg_grid`/`bg_space`/… вместо фактических `bg-grid`/`bg-space`/…; вытаскивание текста титула
+     регуляркой из `item.name`; захардкоженные в JS градиенты фонов, дублирующие классы `bg-*`;
+   - выполнить **новый `shopPreview` по требованиям Cosmic Academy** (п. 1.1).
+
+   **1.1. Превью по фактическим слотам:**
+
+   | Слот | Превью |
+   |---|---|
+   | `name_color` | пример ника **настоящим цветом**; `gold` — золотым градиентом |
+   | `frame` | компактный демонстрационный аватар с **реальной рамкой** через безопасное сопоставление `render_payload` (`FRAME_CLASSES.has(...)`) |
+   | `background` | **настоящая миниатюра** фона: `bg-grid`, `bg-space`, `bg-aurora`, `bg-draft` (через `BG_CLASSES.has(...)`, теми же CSS-классами, что и глобальный фон этапа 1) |
+   | `title` | компактный пример титула |
+   | `crown` | единый знак короны |
+   | `status_emoji` | **настоящий emoji товара** (`render_payload`, как сейчас) |
+   | `shield` (`item_kind`) | единый знак щита |
+
+   **1.2. Обязательно сохранить:** безопасный DOM-путь через `createElement` и `textContent`;
+   whitelist (`FRAME_CLASSES`, `BG_CLASSES`, `/^#[0-9a-fA-F]{6}$/`); `render_payload`; `item_code`;
+   слоты; `item_kind`; RPC; покупку; экипировку; снятие; состояния баланса и доступности.
 2. `.shop-item` — grid `58px / 1fr / auto`, на ≤380 px схлопывается в 2 колонки с переносом
    `.shop-action` (§13, §17). Пересмотреть под единый гибкий шаблон без второго breakpoint.
 3. `.shop-preview` используется в трёх контекстах (§11) — ввести модификаторы размера
@@ -705,6 +825,14 @@ service, shield, cosmetic owned/equipped/condition), проверка
 - [ ] Модалка титула: счётчик символов, превью ««…»», блокировка кнопки при <3 и >24, отмена по
       клику на фон, платный/бесплатный (retry) режим текста.
 - [ ] На 360 px карточка товара не ломается: превью + название + цена + кнопка.
+- [ ] Превью показывает **сам предмет**: цвет ника (включая золотой градиент), реальную рамку на
+      демонстрационном аватаре, реальную миниатюру каждого из четырёх фонов, пример титула, знак
+      короны, настоящий emoji статуса, знак щита.
+- [ ] Превью одинаково корректно выглядит в трёх контекстах: `.shop-item`, `.coll-tile`
+      (в т. ч. `.locked` — grayscale), `.showcase-tile`.
+- [ ] В `shopPreview` нет `innerHTML` — только `createElement` + `textContent` + `classList`.
+- [ ] Товар с некорректным `render_payload` не ломает карточку и не попадает в `classList`
+      (проверка whitelist на месте).
 
 ### Команды проверки
 ```bash
@@ -720,9 +848,20 @@ for c in shop-section-title shop-section-note shop-item shop-preview shop-body s
 ```bash
 grep -n '#custom-title-modal' styles/student.css
 ```
+```bash
+git -C D:/Sashamath_bot_2 --no-pager show bb89030 -- js/student-shop.js styles/student.css
+```
+> Изучить перед правкой `shopPreview`; **не применять** этот патч и не повторять его решения.
+```bash
+awk '/function shopPreview/,/^        }$/' js/student-shop.js | grep -n -E 'innerHTML|FRAME_CLASSES|BG_CLASSES|0-9a-fA-F'
+```
+> Ожидаемо: `innerHTML` отсутствует, whitelist-проверки присутствуют.
 
 ### Риски
-- **R13** — повтор откаченного решения по превью косметики. **Блокирующий вопрос пользователю.**
+- **R13 (повышенный, не блокирующий)** — новый `shopPreview` повторяет проблемные решения
+  откаченного `bb89030`. Смягчение: изучить diff перед стартом, сохранить DOM-путь и whitelist,
+  сопоставлять фоны/рамки по `render_payload` (а не по `item_code` с чужими разделителями),
+  не восстанавливать откаченный коммит.
 - **R9** — кнопки покупки без `btn.disabled = true` до `await` → двойные списания.
 - **R11** — `renderShopItem` читает `ACHIEVEMENTS_META` для подписи условия; изменение метаданных
   на этапе 2/4 отражается здесь.
@@ -764,9 +903,10 @@ feat(ui): redesign shop, cosmetic previews and custom title modal (Cosmic Academ
    на токены на этапах 1–7.
 5. Добавить `@media (min-width: 480px)` с `max-width` контейнера — сейчас в Telegram Desktop
    всё растягивается на полную ширину окна.
-6. Пересмотреть `<meta name="viewport" … maximum-scale=1.0, user-scalable=no>` — блокировка
-   масштабирования вредит доступности. **Изменение поведения зума нужно согласовать с
-   пользователем**, по умолчанию оставить как есть.
+6. `<meta name="viewport" … maximum-scale=1.0, user-scalable=no>` — блокировка масштабирования
+   вредит доступности, но **решение о снятии `user-scalable=no` принимается здесь, на этапе 8,
+   после проверки фактического поведения Telegram WebView** (жесты, двойной тап, зум, скролл
+   внутри Mini App). До этого момента метатег остаётся как есть. **Этапы 1–7 этот вопрос не блокирует.**
 
 ### Функции, которые нельзя менять
 `inviteParent` (создание одноразового токена `create_parent_invite_self`, формирование ссылки,
@@ -927,31 +1067,47 @@ test(ui): Cosmic Academy regression pass and UI contract checks (stage 9)
 
 | Этап | Файлы | JS-логика | Ключевой риск | Коммит |
 |---|---|---|---|---|
-| 1. Токены, тема, фон, AppShell | CSS, head, (app.js) | нет | R3 фон профиля, R4 золотой ник | `feat(ui): design tokens…` |
+| 1. Токены, тема, глобальный фон (вкл. экипированный), AppShell | CSS, head, (app.js), визуальная часть `applyProfileCosmetics` + 1 вызов в `equipShopItem` | нет (только применение классов фона) | R3 перенос пользовательского фона на глобальный слой, R4 золотой ник | `feat(ui): design tokens…` |
 | 2. SVG-иконки и навигация | HTML, CSS, +поле в META | нет | R2 порядок кнопок, R11 META | `feat(ui): SVG icon sprite…` |
 | 3. Профиль, неделя, «Сделать сейчас» | HTML, CSS, week.js, assignments.js | только шаблоны | R6 display, потеря `data-assignment-id` | `feat(ui): redesign profile header…` |
 | 4. Квесты, пробники, витрина, истории | HTML, CSS, quests.js, progress.js, shop.js | только шаблоны | R5 `exam-info-box`, R7 бонус коллекции | `feat(ui): redesign quests…` |
-| 5. Домашка и архив | HTML, CSS, assignments.js | только шаблоны | select→кастом ломает `openNowAssignment`, R15 | `feat(ui): redesign homework…` |
+| 5. Домашка и архив | HTML, CSS, assignments.js | только шаблоны | select→кастом ломает `openNowAssignment`, R15 (чиним `status-*` в CSS) | `feat(ui): redesign homework…` |
 | 6. Лиги и общий топ | HTML, CSS, progress.js | 1 хелпер | R8 XSS, N+1, R12 имена | `feat(ui): redesign leagues…` |
-| 7. Магазин и модалка титула | HTML, CSS, shop.js | только шаблоны | **R13 — блокирующий вопрос** | `feat(ui): redesign shop…` |
+| 7. Магазин и модалка титула | HTML, CSS, shop.js | только шаблоны | R13 — **повышенный** (изучить diff `bb89030`, не повторять его решений) | `feat(ui): redesign shop…` |
 | 8. FAQ, состояния, адаптивность | HTML, CSS, все student-*.js (заглушки) | нет | изменение продуктовых текстов | `feat(ui): unify FAQ…` |
 | 9. Регрессия | scripts/, docs/ | нет | регрессии на краевых данных | `test(ui): Cosmic Academy regression…` |
 
-## Приложение Б. Открытые вопросы к пользователю
+## Приложение Б. Принятые решения по ранее открытым вопросам
 
-Эти вопросы **не блокируют этапы 1–6**, но должны быть решены до соответствующих этапов:
+Открытых вопросов, блокирующих какой-либо этап, **не осталось**. Зафиксированные решения:
 
-1. **(до этапа 7, блокирующий)** Что именно не устроило в откаченном редизайне превью косметики
-   (`bb89030` → `a26a98a`)? Без ответа `shopPreview` не переделывать.
-2. **(до этапа 5)** `.my-hw-item.status-*` не работает с момента написания (§13.6-1). Чинить
-   (добавить `status-submitted`/`status-checked`) или оставить как есть?
-3. **(до этапа 1)** Вариант глобального фона: A — слой `body::before` (рекомендуется) или
-   B — обёртка `.ca-shell` вокруг экранов?
-4. **(до этапа 8)** Снимать ли `maximum-scale=1.0, user-scalable=no` из viewport?
-5. **(до этапа 2)** Заменять ли `WEEK_DAY_MARKS` (символы состояний дня) на SVG? По умолчанию —
-   нет, оставляем символы.
-6. **(до этапа 1)** Оставить ли `frame-*` и `#screen-profile.bg-*` с их фирменными хардкод-цветами
-   вне системы токенов (они — платный контент магазина)?
+1. **Глобальный фон (этап 1).** Использовать **минимально рискованный глобальный слой
+   приложения**. Конкретную реализацию выбрать **после проверки текущего stacking context**.
+   Приоритет — отдельный фиксированный декоративный слой либо классы на `body` с
+   псевдоэлементом. **Сложную AppShell-обёртку без необходимости не добавлять.**
+   Экипированный фон слота `background` применяется к **всему Mini App**, старое применение к
+   `#screen-profile` снимается (§10.3, этап 1, п. 4–5).
+
+2. **`.my-hw-item.status-*` (этап 5).** Исправить на этапе домашки: добавить стили фактически
+   создаваемых классов `status-submitted` и `status-checked`. Значения данных и бизнес-логику
+   не менять.
+
+3. **Viewport (этап 8).** Решение о снятии `maximum-scale=1.0, user-scalable=no` оставить до
+   этапа 8 — после проверки поведения Telegram WebView. **Этапы 1–7 это не блокирует.**
+
+4. **`WEEK_DAY_MARKS` (этап 2).** Оставить существующие символы. На SVG в рамках этапа 2
+   **не заменять**.
+
+5. **Фирменные цвета платной косметики (этапы 1 и 7).** Рамкам (`frame-*`) и пользовательским
+   фонам (`bg-grid`, `bg-space`, `bg-aurora`, `bg-draft`) **разрешено иметь собственные локальные
+   цвета вне основной системы UI-токенов**: это цвета **содержимого купленных предметов**, а не
+   базового интерфейса. В CSS такие блоки помечаются комментарием, чтобы проверка «нет хардкода
+   вне `:root`» их не считала нарушением.
+
+6. **Превью магазина `shopPreview` (этап 7).** R13 понижен с блокирующего до **повышенного
+   риска**: откаченный редизайн (`bb89030` → `a26a98a`) изучается перед реализацией, целиком не
+   восстанавливается, его проблемные решения не повторяются; выполняется **новый `shopPreview`
+   по требованиям Cosmic Academy** (этап 7, п. 1.1–1.2; §11.1–11.2 аудита).
 
 ---
 
