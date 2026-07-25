@@ -133,6 +133,14 @@
             --ca-touch: 44px;
             --ca-icon-tile: 30px;
 
+            /* Safe area: и браузерный env(), и CSS-переменные Telegram (Bot API 8.0+ проставляет
+               --tg-safe-area-inset-*, WebApp может их не знать) — берём большее из двух источников,
+               чтобы не потерять отступ там, где его знает только один из них. Сама панель ниже
+               прибавляет отступ ОДИН раз (в padding-bottom), а не в height + padding одновременно
+               — см. .bottom-nav и body. */
+            --ca-safe-top: max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px));
+            --ca-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
+
             --ca-transition-fast: 0.15s ease;
             --ca-transition: 0.2s ease;
             --ca-transition-slow: 0.3s ease;
@@ -350,7 +358,17 @@
             --tg-btn-text: var(--ca-tg-button-text);
         }
 
-        *, *::before, *::after { box-sizing: border-box; }
+        /* box-sizing: border-box НЕ глобальный (регрессия исправляющего прохода этапа 1):
+           универсальное правило сжимало компоненты, у которых padding/border были рассчитаны
+           на content-box (.avatar-container.frame-orbit — внутренний аватар терял 6px за счёт
+           padding рамки; .quest-replace-btn — кнопка вместо 34×34 с бордером становилась ровно
+           32×32). border-box нужен только там, где явная ширина 100% + padding/border иначе
+           создают горизонтальное переполнение. */
+        input, select, textarea,
+        .custom-title-dialog, .custom-title-input, .showcase-chip,
+        button.primary, .more-link-btn {
+            box-sizing: border-box;
+        }
 
         /* Канва приложения: следует фону Telegram, поэтому Mini App стыкуется с его шапкой.
            Собственный фон Cosmic Academy рисует #app-bg-layer поверх канвы, но под контентом. */
@@ -359,10 +377,11 @@
         body {
             font-family: var(--font-ui); font-size: var(--text-body); line-height: 1.4;
             margin: 0; padding: 0;
-            padding-top: env(safe-area-inset-top, 0px);
-            /* Нижняя навигация фиксирована: резервируем её высоту, gesture bar и зазор,
-               чтобы последний элемент любого экрана не уходил под панель. */
-            padding-bottom: calc(var(--ca-nav-h) + env(safe-area-inset-bottom, 0px) + var(--ca-space-3));
+            padding-top: var(--ca-safe-top);
+            /* Нижняя навигация фиксирована: резервируем её видимую высоту (--ca-nav-h),
+               safe-area (см. --ca-safe-bottom) и зазор — ровно один раз, тем же слагаемым,
+               что и в .bottom-nav ниже, чтобы safe-area не считалась дважды. */
+            padding-bottom: calc(var(--ca-nav-h) + var(--ca-safe-bottom) + var(--ca-space-3));
             background: transparent; color: var(--tg-text);
             display: flex; flex-direction: column; min-height: 100vh;
             overflow-x: hidden;
@@ -791,9 +810,11 @@
         /* Нижнее меню */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
-            /* высота панели + gesture bar: контент экранов компенсируется padding-bottom у body */
-            height: calc(var(--ca-nav-h) + env(safe-area-inset-bottom, 0px));
-            padding-bottom: env(safe-area-inset-bottom, 0px);
+            /* Видимая контентная высота панели остаётся ровно --ca-nav-h: safe-area добавляется
+               ТОЛЬКО через padding-bottom (доп. пространство под панелью), а не ещё раз в height,
+               иначе gesture bar/вырез съедали бы часть кнопок навигации. */
+            height: calc(var(--ca-nav-h) + var(--ca-safe-bottom));
+            padding-bottom: var(--ca-safe-bottom);
             background: var(--ca-surface); display: flex; border-top: 1px solid var(--ca-border-soft);
             z-index: 100; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
         }

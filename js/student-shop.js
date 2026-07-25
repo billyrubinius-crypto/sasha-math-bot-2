@@ -663,8 +663,13 @@
                 if (error) throw error;
                 // Фон — глобальный слой Mini App, поэтому применяем его сразу после успешной
                 // смены экипировки: находясь в магазине, ученик видит результат без перезагрузки.
-                // Whitelist проверяет сама applyAppBackground (student-progress.js).
-                if (slot === 'background') applyAppBackground(itemCode ? { background: { payload: renderPayload } } : {});
+                // Whitelist проверяет сама applyAppBackground (student-progress.js). При equip без
+                // renderPayload (защита от неожиданного вызова без каталожных данных) текущий фон
+                // не трогаем — иначе applyAppBackground снял бы все bg-* классы и не поставил
+                // новый, фон пропал бы до следующей загрузки профиля.
+                if (slot === 'background' && (!itemCode || renderPayload)) {
+                    applyAppBackground(itemCode ? { background: { payload: renderPayload } } : {});
+                }
                 await loadShop();
             } catch (e) {
                 alert('Не удалось: ' + (e.message || e));

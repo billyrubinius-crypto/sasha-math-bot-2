@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Контрактный чек ученического Mini App (Cosmic Academy, этап 1).
+"""Контрактный чек ученического Mini App (Cosmic Academy, этап 1, исправляющий проход).
 
-Проверяет три инварианта связки index.html <-> js/student-*.js <-> styles/student.css,
+Проверяет четыре инварианта связки index.html <-> js/student-*.js <-> styles/student.css,
 которые в этом проекте ломаются молча (без ошибки в консоли):
 
   1. каждый статический getElementById('x') из js/student-*.js имеет id="x" в index.html
      (единственное разрешённое исключение — динамический exam-info-box, он создаётся
      строкой innerHTML в renderMockChart);
-  2. каждая функция, вызываемая из inline-обработчика index.html, объявлена в
+  2. каждая функция, вызываемая из inline-обработчика (on...="..."), объявлена в
      js/student-*.js или shared.js (все student-скрипты — classic scripts с общей
-     глобальной областью, поэтому inline-обработчики зависят от объявлений верхнего уровня);
+     глобальной областью, поэтому inline-обработчики зависят от объявлений верхнего уровня).
+     Проверяются как статичные обработчики в index.html, так и обработчики, которые
+     js/student-*.js генерирует строками (renderWeekStrip, buildLifeRow, renderMockChart и
+     т.п.) — двойные и одинарные кавычки. Программные присваивания вида
+     `btn.onclick = () => …` этим механизмом не распознаются и не проверяются (это не
+     inline-обработчик в смысле HTML-атрибута, а обычное свойство DOM-элемента);
   3. критичные динамические CSS-классы (создаются только в рантайме) имеют правила в
-     styles/student.css.
+     styles/student.css;
+  4. составные модификаторы вида `.base.modifier` (§6 аудита) имеют правило именно в этом
+     составном виде — самого базового класса недостаточно, если модификатор нигде не
+     оформлен как `.base.modifier`.
 
 Это не универсальный парсер HTML/JS, а небольшой устойчивый чек под текущий проект:
 только стандартная библиотека Python 3, файлы не изменяются.
@@ -88,8 +96,40 @@ CRITICAL_CLASSES = [
     "frame-legend-3", "frame-legend-4", "frame-pulsar", "frame-orbit",
 ]
 
+# Составные модификаторы (§6 аудита): элемент отрисуется с базовым классом, но нужного
+# состояния (сегодня/выбран/раскрыт/заблокирован/…) не будет видно без правила именно в
+# составном виде `.base.modifier`. Проверяются отдельно от CRITICAL_CLASSES, потому что
+# наличие правила на голый `.base` не гарантирует наличие правила на `.base.modifier`.
+COMPOSITE_CLASSES = [
+    ("week-day-chip", "today"),
+    ("week-day-chip", "selected"),
+    ("week-day-detail", "open"),
+    ("week-shield-btn", "apply"),
+    ("week-shield-btn", "remove"),
+    ("streak-dot", "filled"),
+    ("ach-tile", "locked"),
+    ("coll-tile", "locked"),
+    ("showcase-tile", "empty"),
+    ("shop-state", "owned"),
+    ("ladder-step", "achieved"),
+    ("ladder-step", "current"),
+    ("hw-comment", "rejected"),
+]
+
+# Классы-хуки: JS использует их как селектор для поведения (querySelector/querySelectorAll),
+# а не как визуальный модификатор, поэтому отдельное CSS-правило для них не обязательно и
+# его отсутствие — не долг и не нарушение. Ведём список явно, чтобы это было решением, а не
+# забытой проверкой.
+HOOK_CLASSES_NO_CSS = {
+    "life-row-trailing": "JS-хук для setLifeControlsDisabled "
+                          "(querySelectorAll('.life-row-trailing button')); "
+                          "визуальный класс не обязателен",
+}
+
 # Классы, которые JS создаёт уже сейчас, но стилей для них ещё нет — по плану редизайна.
 # Держим их в отдельном списке, чтобы чек не падал и одновременно не забывал о долге.
+# Скрипт сам проверяет, не появилось ли правило в CSS раньше срока (см. check_known_debt) —
+# тогда запись помечается как устранённую, а не остаётся ложным «неисправленным долгом».
 KNOWN_MISSING_CLASSES = {
     "status-submitted": "фактический класс архива работ; CSS добавляется на этапе 5 (R15)",
     "status-checked": "фактический класс архива работ; CSS добавляется на этапе 5 (R15)",
@@ -143,8 +183,38 @@ def check_ids(index_html, js_files):
     return violations
 
 
+INLINE_HANDLER_RE = re.compile(r"""\bon([a-z]+)\s*=\s*(["'])((?:(?!\2)[\s\S])*)\2""")
+CALL_RE = re.compile(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(")
+
+
+def _inline_handler_violations(label, text, declared):
+    """Находит on...="..."/on...='...' в тексте (HTML или JS-шаблон) и проверяет вызовы.
+
+    Одна и та же логика применяется и к index.html, и к строкам, которые js/student-*.js
+    генерирует для renderWeekStrip/buildLifeRow/renderMockChart и т.п. — там inline-обработчики
+    (onclick="selectWeekDay(${index})" и подобные) лежат внутри JS-шаблонных строк, а не в
+    разметке, но ломаются молча точно так же. Присваивания вида `btn.onclick = () => …` не
+    совпадают с этим паттерном (после `=` нет кавычки) и потому не считаются inline-обработчиком —
+    это осознанное ограничение простого чека (§5.1: не пытаемся отличить их надёжнее регексом).
+    """
+    violations = []
+    for match in INLINE_HANDLER_RE.finditer(text):
+        event, quote, code = match.group(1), match.group(2), match.group(3)
+        line = text.count("\n", 0, match.start()) + 1
+        for call in CALL_RE.finditer(code):
+            name = call.group(1)
+            if name in INLINE_IGNORED or name in declared:
+                continue
+            violations.append(
+                "{}:{}: on{}={}...{} вызывает {}() — функция не объявлена "
+                "в js/student-*.js или shared.js".format(label, line, event, quote, quote, name)
+            )
+    return violations
+
+
 def check_inline_handlers(index_html, js_files):
-    """2. функции из inline-обработчиков объявлены в student-скриптах или shared.js."""
+    """2. функции из inline-обработчиков (index.html и JS-шаблоны) объявлены в
+    student-скриптах или shared.js."""
     declared = set()
     for path in list(js_files) + [SHARED]:
         text = read(path)
@@ -154,19 +224,14 @@ def check_inline_handlers(index_html, js_files):
             re.findall(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function|\()", text)
         )
 
-    violations = []
-    for match in re.finditer(r"""\bon([a-z]+)\s*=\s*"([^"]*)\"""", index_html):
-        event, code = match.group(1), match.group(2)
-        line = index_html.count("\n", 0, match.start()) + 1
-        for call in re.finditer(r"(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(", code):
-            name = call.group(1)
-            if name in INLINE_IGNORED or name in declared:
-                continue
-            violations.append(
-                "index.html:{}: on{}=\"...\" вызывает {}() — функция не объявлена "
-                "в js/student-*.js или shared.js".format(line, event, name)
-            )
+    violations = list(_inline_handler_violations("index.html", index_html, declared))
+    for path in js_files:
+        violations.extend(_inline_handler_violations(rel(path), read(path), declared))
     return violations
+
+
+def class_has_rule(cls, css):
+    return bool(re.search(r"\." + re.escape(cls) + r"(?![-\w])", css))
 
 
 def check_dynamic_classes(css_text):
@@ -174,11 +239,33 @@ def check_dynamic_classes(css_text):
     css = strip_css_comments(css_text)
     violations = []
     for cls in CRITICAL_CLASSES:
-        if not re.search(r"\." + re.escape(cls) + r"(?![-\w])", css):
+        if not class_has_rule(cls, css):
             violations.append(
                 "styles/student.css: нет правила для динамического класса .{}".format(cls)
             )
     return violations
+
+
+def check_composite_classes(css_text):
+    """4. составные модификаторы `.base.modifier` (§6 аудита) — правило на голом `.base`
+    не гарантирует, что состояние `.base.modifier` тоже стилизовано."""
+    css = strip_css_comments(css_text)
+    violations = []
+    for base, modifier in COMPOSITE_CLASSES:
+        selector = ".{}.{}".format(base, modifier)
+        if selector not in css:
+            violations.append(
+                "styles/student.css: нет составного правила {}".format(selector)
+            )
+    return violations
+
+
+def check_known_debt(css_text):
+    """Технический долг (KNOWN_MISSING_CLASSES), устранённый раньше срока: если правило уже
+    появилось в CSS, запись должна быть убрана из словаря, а не молча продолжать числиться
+    «неисправленной» — возвращаем список таких кодов для отчёта."""
+    css = strip_css_comments(css_text)
+    return [cls for cls in sorted(KNOWN_MISSING_CLASSES) if class_has_rule(cls, css)]
 
 
 def main():
@@ -200,8 +287,10 @@ def main():
 
     checks = [
         ("1. DOM ID из getElementById", check_ids(index_html, js_files)),
-        ("2. функции inline-обработчиков", check_inline_handlers(index_html, js_files)),
+        ("2. функции inline-обработчиков (index.html + JS-шаблоны)",
+         check_inline_handlers(index_html, js_files)),
         ("3. динамические CSS-классы", check_dynamic_classes(css_text)),
+        ("4. составные CSS-модификаторы (.base.modifier)", check_composite_classes(css_text)),
     ]
 
     total = 0
@@ -214,9 +303,22 @@ def main():
         else:
             print("[OK]   {}".format(title))
 
-    if KNOWN_MISSING_CLASSES:
+    if HOOK_CLASSES_NO_CSS:
+        print("[NOTE] классы-хуки без обязательного CSS (JS-селектор, не визуальный модификатор):")
+        for cls, why in sorted(HOOK_CLASSES_NO_CSS.items()):
+            print("       - .{}: {}".format(cls, why))
+
+    resolved_debt = check_known_debt(css_text)
+    if resolved_debt:
+        print("[NOTE] технический долг устранён раньше срока — уберите запись из "
+              "KNOWN_MISSING_CLASSES в scripts/check_ui_contract.py:")
+        for cls in resolved_debt:
+            print("       - .{}: {}".format(cls, KNOWN_MISSING_CLASSES[cls]))
+
+    remaining_debt = {c: w for c, w in KNOWN_MISSING_CLASSES.items() if c not in resolved_debt}
+    if remaining_debt:
         print("[NOTE] известный технический долг (не считается нарушением):")
-        for cls, why in sorted(KNOWN_MISSING_CLASSES.items()):
+        for cls, why in sorted(remaining_debt.items()):
             print("       - .{}: {}".format(cls, why))
 
     if total:

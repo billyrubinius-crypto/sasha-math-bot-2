@@ -322,6 +322,41 @@ feat(ui): design tokens, Telegram theme and global background (Cosmic Academy st
    `.wd-assigned`, `.status-submitted`, `.status-checked` вынесены в список известного долга,
    чтобы чек не падал и не забывал о них.
 
+### Исправляющий проход этапа 1 (независимый code review, 2026-07-26)
+
+Отдельный коммит `fix(ui): harden Cosmic Academy stage 1 contracts` поверх `472e07a`, без начала
+этапа 2. Изменены только `styles/student.css`, `js/student-shop.js`, `scripts/check_ui_contract.py`.
+
+1. **Safe area.** Добавлены семантические токены `--ca-safe-top`/`--ca-safe-bottom` =
+   `max(env(safe-area-inset-*, 0px), var(--tg-safe-area-inset-*, 0px))` — учитывают и браузерный
+   `env()`, и CSS-переменные, которые проставляет сам Telegram. `body` и `.bottom-nav` переведены
+   на эти токены вместо голого `env()`; видимая контентная высота панели осталась `--ca-nav-h`,
+   safe-area добавляется один раз (в `padding-bottom`, не дублируется в `height` и `padding`).
+2. **box-sizing.** Глобальное `*, *::before, *::after { box-sizing: border-box; }` убрано —
+   оно сжимало `.avatar-container.frame-orbit` (внутренний аватар терял 6px из-за `padding: 3px`
+   рамки) и меняло геометрию других content-box-компонентов. `box-sizing: border-box` применён
+   точечно: `input, select, textarea` (форма) + `.custom-title-dialog`, `.custom-title-input`,
+   `.showcase-chip`, `button.primary`, `.more-link-btn` (единственные компоненты с явным
+   `width: 100%` + padding/border, где иначе возникало горизонтальное переполнение). Проверено в
+   браузере (не в Telegram): `.quest-replace-btn` остаётся 32×32 в обеих версиях CSS — браузеры
+   (Chromium/WebKit) уже применяют `box-sizing: border-box` к `<button>` в UA-стиле по умолчанию,
+   поэтому глобальное правило на эту кнопку никогда не влияло; реальной регрессией был только
+   `.avatar-container.frame-orbit`, и она устранена.
+3. **Мгновенный equip фона.** `equipShopItem` в `js/student-shop.js` вызывал
+   `applyAppBackground` при equip даже без `renderPayload`, что снимало все `bg-*` классы и не
+   ставило новый — фон гас до следующей загрузки профиля. Добавлено условие
+   `slot === 'background' && (!itemCode || renderPayload)`: unequip (`itemCode` пуст) применяет
+   базовый фон как раньше; equip без `renderPayload` не трогает текущий визуальный фон. RPC,
+   `studentSecurePathActive`, `btn.disabled`, `await loadShop()`, `BG_CLASSES` не изменены.
+4. **check_ui_contract.py.** Проверка inline-обработчиков расширена с `index.html` на JS-шаблоны
+   `js/student-*.js` (двойные и одинарные кавычки) — теперь покрывает `selectWeekDay`,
+   `showExamInfo`, `claimTodayLife`, `replaceTodayLife`. Добавлена проверка №4: составные
+   модификаторы `.base.modifier` из §6 аудита (`.week-day-chip.today` и ещё 12) — наличия голого
+   базового класса недостаточно. Добавлен явный список `HOOK_CLASSES_NO_CSS` (`life-row-trailing`)
+   — JS-хук, CSS не требуется. `check_known_debt` теперь сам обнаруживает, когда запись из
+   `KNOWN_MISSING_CLASSES` устранена в CSS раньше срока, и выводит отдельную заметку вместо того,
+   чтобы молча продолжать числить её долгом.
+
 ---
 
 ## Этап 2. SVG-иконки и нижняя навигация
