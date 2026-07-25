@@ -2,7 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- viewport-fit=cover — чтобы работали env(safe-area-inset-*) (нижняя gesture bar, вырезы).
+         maximum-scale/user-scalable сознательно оставлены до этапа 8. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
     <title>Sasha Math Bot</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -10,6 +13,12 @@
     <link rel="stylesheet" href="styles/student.css">
 </head>
 <body>
+
+    <!-- Декоративный слой фона Cosmic Academy. Живёт ВНЕ пяти .screen, поэтому базовый и
+         купленный фон не гаснут при switchTab (display:none у экранов его не касается).
+         Классы bg-* (слот background) навешивает applyAppBackground; слой не перехватывает
+         клики и лежит под контентом, нижней навигацией и модалкой. -->
+    <div id="app-bg-layer" aria-hidden="true"></div>
 
     <!-- ЭКРАН 1: ПРОФИЛЬ -->
     <div id="screen-profile" class="screen active">

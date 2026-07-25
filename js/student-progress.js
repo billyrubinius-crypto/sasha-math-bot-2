@@ -68,6 +68,20 @@
             if (eq.frame && FRAME_CLASSES.has(eq.frame.payload)) container.classList.add(eq.frame.payload);
         }
 
+        // Экипированный фон (слот background) — на весь Mini App, а не на один экран профиля.
+        // Классы bg-* вешаются на глобальный декоративный слой #app-bg-layer, который лежит вне
+        // пяти .screen: фон виден на Профиле, Домашке, Лидерах, Магазине и «Ещё» и не гаснет
+        // при switchTab. Whitelist BG_CLASSES сохранён дословно — из БД в classList попадает
+        // только известный payload. Функция чисто визуальная: своих запросов не делает,
+        // equipment получает готовым (loadProfile → applyProfileCosmetics).
+        function applyAppBackground(eq) {
+            const layer = document.getElementById('app-bg-layer');
+            if (!layer) return;
+            BG_CLASSES.forEach(c => layer.classList.remove(c));
+            const payload = eq && eq.background ? eq.background.payload : null;
+            if (payload && BG_CLASSES.has(payload)) layer.classList.add(payload);
+        }
+
         function applyProfileCosmetics(eq) {
             renderNick(document.getElementById('user-name'), currentUser.first_name || '', eq, '');
             const titleEl = document.getElementById('profile-title');
@@ -81,9 +95,7 @@
                 titleEl.textContent = '';
             }
             applyAvatarFrame(document.getElementById('user-avatar-container'), eq);
-            const scr = document.getElementById('screen-profile');
-            BG_CLASSES.forEach(c => scr.classList.remove(c));
-            if (eq.background && BG_CLASSES.has(eq.background.payload)) scr.classList.add(eq.background.payload);
+            applyAppBackground(eq);
         }
 
         // --- ПРОФИЛЬ И ИСТОРИЯ ---

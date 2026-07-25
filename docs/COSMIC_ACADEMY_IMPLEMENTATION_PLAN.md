@@ -279,6 +279,49 @@ python -m http.server 8080
 feat(ui): design tokens, Telegram theme and global background (Cosmic Academy stage 1)
 ```
 
+### Фактическое решение этапа 1 (зафиксировано при реализации)
+
+1. **Токены.** В `styles/student.css` заведены две сырые палитры (`--ca-d-*` тёмная,
+   `--ca-l-*` светлая) — единственное место с hex базового UI; над ними семантический слой
+   (`--ca-bg-*`, `--ca-surface*`, `--ca-text*`, `--ca-border*`, акцент/успех/предупреждение/
+   ошибка/валюта/награда, тинты, вуаль, тени, радиусы, отступы, `--ca-nav-h`, `--ca-avatar-size`,
+   `--ca-touch`, транзишены, `--ca-gradient-primary`). Старые `--tg-*` оставлены **алиасами** к
+   семантике — двух конкурирующих систем нет. Вне `:root` hex остались только у платной
+   косметики (`.nick-gold`, `frame-*`) и rgba-узоры `bg-grid`/`bg-draft`; все три места
+   прокомментированы.
+2. **Тема.** Приоритет — `html[data-ca-theme="dark|light"]`, который ставит
+   `applyTelegramTheme(tg)` из `tg.colorScheme` и переприменяет по `themeChanged`; при
+   отсутствии атрибута работает `@media (prefers-color-scheme: dark)`. Telegram Theme Params
+   сохранены и используются через `--ca-tg-*`: канва `html` следует `--tg-theme-bg-color`, а
+   текст/подсказка/ссылка/кнопка — соответствующим параметрам темы (fallback — токены CA).
+   `setBackgroundColor` (6.1), `setHeaderColor` (hex — 6.9) и `setBottomBarColor` (7.10)
+   вызываются через `isVersionAtLeast` + `try/catch`. Порядок запуска не изменён.
+3. **Фон.** Выбран вариант (а) плана — **один** фиксированный слой `#app-bg-layer` в начале
+   `<body>`, вне пяти `.screen`: `position: fixed; inset: 0; z-index: -1; pointer-events: none`.
+   `body` стал прозрачным, базовый цвет канвы перенесён на `html` (иначе фон `body` перекрыл бы
+   слой с отрицательным `z-index`). Сам слой несёт базовую поверхность Cosmic Academy
+   (мягкие violet/blue/cyan glow + два редких «звёздных» тайла, без анимации, Canvas, видео и
+   WebGL); `::before` — экипированный фон магазина; `::after` — защитная вуаль
+   (`--ca-veil`) между фоном и контентом. `.ca-shell` не понадобился.
+4. **Экипированный фон.** Правила переехали с `#screen-profile.bg-*` на
+   `#app-bg-layer.bg-*::before` (старые селекторы удалены — двойного рисунка на профиле нет).
+   Классы вешает новая визуальная функция `applyAppBackground(eq)` в `student-progress.js`
+   (имя проверено на отсутствие коллизий во всех classic scripts): снимает все `BG_CLASSES`,
+   добавляет payload только при `BG_CLASSES.has(...)`. Вызовы — из `applyProfileCosmetics`
+   (путь `loadProfile`) и одной строкой из `equipShopItem` после успешного RPC. Чтобы не
+   добавлять новый запрос equipment, `render_payload` карточки прокидывается четвёртым
+   необязательным аргументом `equipShopItem` из уже загруженного каталога магазина
+   (`item_code` вида `bg_grid` намеренно **не** сопоставляется с классом `bg-grid`).
+5. **Safe area.** `viewport-fit=cover` добавлен, `maximum-scale`/`user-scalable` оставлены до
+   этапа 8. `body` получил `padding-top: env(safe-area-inset-top)` и
+   `padding-bottom: calc(var(--ca-nav-h) + env(safe-area-inset-bottom) + 10px)`, `.bottom-nav` —
+   высоту `calc(var(--ca-nav-h) + env(safe-area-inset-bottom))` с тем же нижним паддингом.
+   Добавлен глобальный `box-sizing: border-box` (иначе `select`/`input` с `width:100%` и
+   паддингом давали горизонтальное переполнение).
+6. **Контрактный чек.** `scripts/check_ui_contract.py` создан уже здесь (не на этапе 9);
+   `.wd-assigned`, `.status-submitted`, `.status-checked` вынесены в список известного долга,
+   чтобы чек не падал и не забывал о них.
+
 ---
 
 ## Этап 2. SVG-иконки и нижняя навигация

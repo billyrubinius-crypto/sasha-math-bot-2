@@ -540,7 +540,7 @@
                         const btn = document.createElement('button');
                         btn.className = 'shop-equip-btn';
                         btn.textContent = 'Надеть';
-                        btn.onclick = () => equipShopItem(item.slot, item.item_code, btn);
+                        btn.onclick = () => equipShopItem(item.slot, item.item_code, btn, item.render_payload);
                         action.appendChild(btn);
                     }
                 } else if (item.condition_achievement && !earned.has(item.condition_achievement)) {
@@ -648,7 +648,9 @@
         // Надеть/снять купленный предмет (S3). itemCode=null → снять слот. Переключение бесплатно,
         // проверка владения — внутри RPC equip_item (S1). После — перерисовка витрины; профиль
         // подхватит новую экипировку при следующем открытии вкладки.
-        async function equipShopItem(slot, itemCode, btn) {
+        // renderPayload — только для мгновенного обновления глобального фона: это уже загруженный
+        // shop_items.render_payload той же карточки, дополнительных запросов он не добавляет.
+        async function equipShopItem(slot, itemCode, btn, renderPayload) {
             if (btn) btn.disabled = true;
             try {
                 // secure path — gateway equip_item_self без p_student_id (T10-04B); legacy fallback —
@@ -659,6 +661,10 @@
                         p_student_id: currentUser.id, p_slot: slot, p_item_code: itemCode
                     });
                 if (error) throw error;
+                // Фон — глобальный слой Mini App, поэтому применяем его сразу после успешной
+                // смены экипировки: находясь в магазине, ученик видит результат без перезагрузки.
+                // Whitelist проверяет сама applyAppBackground (student-progress.js).
+                if (slot === 'background') applyAppBackground(itemCode ? { background: { payload: renderPayload } } : {});
                 await loadShop();
             } catch (e) {
                 alert('Не удалось: ' + (e.message || e));
