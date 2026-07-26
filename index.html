@@ -14,6 +14,144 @@
 </head>
 <body>
 
+    <!-- =====================================================================
+         Единый inline SVG-спрайт Cosmic Academy (этап 2).
+
+         Один скрытый <svg> в начале <body>: символы доступны всем пяти .screen и
+         модалке, потому что <use href="#ca-i-*"> ссылается на них по документу.
+         Внешних файлов, CDN и icon-шрифтов нет — Mini App работает одним HTTP-корнем.
+
+         Слой не влияет на layout (position:absolute + нулевой размер, см.
+         .ca-icon-sprite), не перехватывает клики и недоступен для фокуса
+         (aria-hidden + focusable="false").
+
+         Единый визуальный язык всех символов: viewBox 24×24, line icons,
+         fill="none", stroke="currentColor", stroke-width 1.8, round caps/joins.
+         Цвет НЕ задан внутри символов — иконка всегда берёт currentColor
+         родителя, поэтому светлая/тёмная тема работает без дублей.
+         fill="currentColor" встречается только у двух мелких акцентов
+         (центр медали, точка вопроса).
+         ===================================================================== -->
+    <svg class="ca-icon-sprite" aria-hidden="true" focusable="false" width="0" height="0">
+        <!-- Навигация: профиль -->
+        <symbol id="ca-i-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8.2" r="3.6"/>
+            <path d="M4.6 20.1c1.3-3.4 4.1-5.3 7.4-5.3s6.1 1.9 7.4 5.3"/>
+        </symbol>
+        <!-- Навигация: домашка (раскрытая книга) -->
+        <symbol id="ca-i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 6.6C10.4 5.3 8.4 4.6 6 4.6H4v12.9h2c2.4 0 4.4.7 6 2 1.6-1.3 3.6-2 6-2h2V4.6h-2c-2.4 0-4.4.7-6 2z"/>
+            <path d="M12 6.6v12.9"/>
+        </symbol>
+        <!-- Лидеры / лиги (кубок) -->
+        <symbol id="ca-i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7.6 4.5h8.8v3.9a4.4 4.4 0 0 1-8.8 0z"/>
+            <path d="M7.6 5.9H5.2a2.2 2.2 0 0 0 2.4 3.6"/>
+            <path d="M16.4 5.9h2.4a2.2 2.2 0 0 1-2.4 3.6"/>
+            <path d="M12 12.8v3.4"/>
+            <path d="M8.6 19.5h6.8l-.7-3.3H9.3z"/>
+        </symbol>
+        <!-- Магазин (сумка) -->
+        <symbol id="ca-i-shop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5.4 8.5h13.2l-1 11a1.6 1.6 0 0 1-1.6 1.4H8a1.6 1.6 0 0 1-1.6-1.4z"/>
+            <path d="M9 8.5V6.8a3 3 0 0 1 6 0v1.7"/>
+        </symbol>
+        <!-- Ещё / настройки (ползунки) -->
+        <symbol id="ca-i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6.8h9.4M18.4 6.8H20M4 12h1.6M10.6 12H20M4 17.2h9.4M18.4 17.2H20"/>
+            <circle cx="15.9" cy="6.8" r="2.1"/>
+            <circle cx="8.1" cy="12" r="2.1"/>
+            <circle cx="15.9" cy="17.2" r="2.1"/>
+        </symbol>
+        <!-- Решить домашку (карандаш) -->
+        <symbol id="ca-i-pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16.6 4a1.9 1.9 0 0 1 2.7 0l.7.7a1.9 1.9 0 0 1 0 2.7L8.9 18.5l-4.4 1 1-4.4z"/>
+            <path d="M15.2 5.4l3.4 3.4"/>
+        </symbol>
+        <!-- Мои работы / архив (лист с загнутым углом) -->
+        <symbol id="ca-i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7.4 3.8h6.2l4.2 4.2v10.6a1.6 1.6 0 0 1-1.6 1.6H7.4a1.6 1.6 0 0 1-1.6-1.6V5.4a1.6 1.6 0 0 1 1.6-1.6z"/>
+            <path d="M13.4 3.9V8h4.1"/>
+            <path d="M9.2 12.6h5.6M9.2 15.8h3.8"/>
+        </symbol>
+        <!-- Моя лига / история сезонов (медаль) -->
+        <symbol id="ca-i-medal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="14.9" r="5.1"/>
+            <path d="M8.9 10.5L6.1 3.8M15.1 10.5l2.8-6.7"/>
+            <circle cx="12" cy="14.9" r="1.7" fill="currentColor" stroke="none"/>
+        </symbol>
+        <!-- Общий топ (глобус) -->
+        <symbol id="ca-i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8.4"/>
+            <path d="M3.6 12h16.8"/>
+            <path d="M12 3.6c2.2 2.3 3.4 5.3 3.4 8.4s-1.2 6.1-3.4 8.4c-2.2-2.3-3.4-5.3-3.4-8.4S9.8 5.9 12 3.6z"/>
+        </symbol>
+        <!-- График пробников -->
+        <symbol id="ca-i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.2 4v14.8a1 1 0 0 0 1 1H20"/>
+            <path d="M7.6 15.4l3.4-4 2.7 2.2 4.4-5.4"/>
+        </symbol>
+        <!-- Витрина (звезда) -->
+        <symbol id="ca-i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3.8l2.6 5.3 5.8.9-4.2 4.1 1 5.8L12 17.1l-5.2 2.8 1-5.8-4.2-4.1 5.8-.9z"/>
+        </symbol>
+        <!-- Достижения (награда с лентами) -->
+        <symbol id="ca-i-award" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="9.4" r="5.6"/>
+            <path d="M8.6 14.2L7 21l5-2.7 5 2.7-1.6-6.8"/>
+        </symbol>
+        <!-- Коллекции (коробка с лентой) -->
+        <symbol id="ca-i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3.6 7.6h16.8v3.4H3.6z"/>
+            <path d="M5.2 11v8a1.4 1.4 0 0 0 1.4 1.4h10.8a1.4 1.4 0 0 0 1.4-1.4v-8"/>
+            <path d="M12 7.6v12.8M8.6 7.6L10.2 4M15.4 7.6L13.8 4"/>
+        </symbol>
+        <!-- Титул профиля (бирка) -->
+        <symbol id="ca-i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11.4 3.9H19a1.1 1.1 0 0 1 1.1 1.1v7.6a1.1 1.1 0 0 1-.3.8l-7.1 7.1a1.1 1.1 0 0 1-1.6 0l-7.6-7.6a1.1 1.1 0 0 1 0-1.6l7.1-7.1a1.1 1.1 0 0 1 .8-.3z"/>
+            <circle cx="15.9" cy="8.1" r="1.5"/>
+        </symbol>
+        <!-- Загрузка фотографии (камера) -->
+        <symbol id="ca-i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3.8 8.9a1.7 1.7 0 0 1 1.7-1.7h1.9l1.3-2.1a1.1 1.1 0 0 1 .9-.5h4.8a1.1 1.1 0 0 1 .9.5l1.3 2.1h1.9a1.7 1.7 0 0 1 1.7 1.7v8.6a1.7 1.7 0 0 1-1.7 1.7H5.5a1.7 1.7 0 0 1-1.7-1.7z"/>
+            <circle cx="12" cy="13.1" r="3.4"/>
+        </symbol>
+        <!-- Внешняя ссылка -->
+        <symbol id="ca-i-external-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.2 4.4h5.4v5.4"/>
+            <path d="M19.6 4.4l-8.2 8.2"/>
+            <path d="M17.4 13.6v4.7a1.7 1.7 0 0 1-1.7 1.7H5.7A1.7 1.7 0 0 1 4 18.3V8.3a1.7 1.7 0 0 1 1.7-1.7h4.7"/>
+        </symbol>
+        <!-- FAQ / помощь -->
+        <symbol id="ca-i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8.4"/>
+            <path d="M9.6 9.7a2.4 2.4 0 1 1 3.5 2.1c-.7.4-1.1 1-1.1 1.8v.4"/>
+            <circle cx="12" cy="16.8" r="1.1" fill="currentColor" stroke="none"/>
+        </symbol>
+        <!-- Пригласить родителя (пользователи) -->
+        <symbol id="ca-i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9.2" cy="8.6" r="3.3"/>
+            <path d="M3.4 19.6c.9-2.9 3.1-4.6 5.8-4.6s4.9 1.7 5.8 4.6"/>
+            <path d="M16.2 5.9a3.3 3.3 0 0 1 0 6.2"/>
+            <path d="M17.5 15.5c1.5.7 2.6 2 3.1 4.1"/>
+        </symbol>
+        <!-- Связаться с учителем (сообщение) -->
+        <symbol id="ca-i-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.3 11.9c0 4-3.7 7.2-8.3 7.2-.9 0-1.7-.1-2.5-.3l-4.9 1.6 1.3-3.7a6.9 6.9 0 0 1-2.2-4.8c0-4 3.7-7.2 8.3-7.2s8.3 3.2 8.3 7.2z"/>
+        </symbol>
+        <!-- История изменений (часы) -->
+        <symbol id="ca-i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8.4"/>
+            <path d="M12 7.4V12l3.2 2"/>
+        </symbol>
+        <!-- Календарь. В разметке пока не используется: на него ссылаются поля svg
+             ритмичных достижений в ACHIEVEMENTS_META (рендер достижений — этап 4). -->
+        <symbol id="ca-i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.4 7.6a1.7 1.7 0 0 1 1.7-1.7h11.8a1.7 1.7 0 0 1 1.7 1.7v10.3a1.7 1.7 0 0 1-1.7 1.7H6.1a1.7 1.7 0 0 1-1.7-1.7z"/>
+            <path d="M4.4 10.6h15.2M8.6 3.9v3.4M15.4 3.9v3.4"/>
+        </symbol>
+    </svg>
+
     <!-- Декоративный слой фона Cosmic Academy. Живёт ВНЕ пяти .screen, поэтому базовый и
          купленный фон не гаснут при switchTab (display:none у экранов его не касается).
          Классы bg-* (слот background) навешивает applyAppBackground; слой не перехватывает
@@ -40,7 +178,9 @@
         </div>
         <div class="rank-progress" id="rank-progress" style="display:none;"></div>
         <div class="profile-title-card" id="profile-title-row" style="display:none;">
-            <span class="profile-title-icon" aria-hidden="true">🏷️</span>
+            <span class="profile-title-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-tag" xlink:href="#ca-i-tag"></use></svg>
+            </span>
             <div class="profile-title-copy">
                 <div class="profile-title-label">Титул профиля</div>
                 <div class="profile-title" id="profile-title"></div>
@@ -85,7 +225,12 @@
         </div>
 
         <div class="mock-chart-section" id="mock-chart-section">
-            <div class="chart-title">📊 Результаты пробников</div>
+            <div class="chart-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-chart" xlink:href="#ca-i-chart"></use></svg>
+                </span>
+                Результаты пробников
+            </div>
             <div id="mock-chart-container">
                 <div class="chart-empty">Загрузка...</div>
             </div>
@@ -104,28 +249,54 @@
         </div>
 
         <div class="showcase-section" id="showcase-section" style="display:none;">
-            <div class="showcase-title">🌟 Витрина</div>
+            <div class="showcase-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-star" xlink:href="#ca-i-star"></use></svg>
+                </span>
+                Витрина
+            </div>
             <div class="showcase-grid" id="showcase-grid"></div>
             <div class="showcase-picker" id="showcase-picker" style="display:none;"></div>
         </div>
 
         <div class="achievements-section" id="achievements-section" style="display:none;">
-            <div class="achievements-title">🏆 Достижения</div>
+            <div class="achievements-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-award" xlink:href="#ca-i-award"></use></svg>
+                </span>
+                Достижения
+            </div>
             <div class="ach-grid" id="ach-grid"></div>
         </div>
 
         <div class="collections-section" id="collections-section" style="display:none;">
-            <div class="collections-title">📦 Коллекции</div>
+            <div class="collections-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-box" xlink:href="#ca-i-box"></use></svg>
+                </span>
+                Коллекции
+            </div>
             <div id="collections-list"></div>
         </div>
 
         <div class="history-section" id="season-history-section" style="display:none;">
-            <div class="history-title">🏅 История сезонов</div>
+            <div class="history-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-medal" xlink:href="#ca-i-medal"></use></svg>
+                </span>
+                История сезонов
+            </div>
             <ul class="history-list" id="season-history-list"></ul>
         </div>
 
         <div class="history-section">
-            <div class="history-title"> История изменений</div>
+            <!-- Иконка здесь раньше отсутствовала — строка начиналась с висячего пробела (§12.1) -->
+            <div class="history-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-history" xlink:href="#ca-i-history"></use></svg>
+                </span>
+                История изменений
+            </div>
             <ul class="history-list" id="balance-history-list">
                 <li style="text-align:center; padding:20px; opacity:0.5;">Загрузка...</li>
             </ul>
@@ -135,8 +306,18 @@
     <!-- ЭКРАН 2: ДОМАШКА -->
     <div id="screen-homework" class="screen">
         <div class="tabs-hw">
-            <button class="tab-btn active" onclick="switchHwTab('upload')">✏️ Решить домашку</button>
-            <button class="tab-btn" onclick="switchHwTab('archive')">🤓 Мои работы</button>
+            <button class="tab-btn active" onclick="switchHwTab('upload')">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-pencil" xlink:href="#ca-i-pencil"></use></svg>
+                </span>
+                Решить домашку
+            </button>
+            <button class="tab-btn" onclick="switchHwTab('archive')">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-archive" xlink:href="#ca-i-archive"></use></svg>
+                </span>
+                Мои работы
+            </button>
         </div>
 
         <!-- Вкладка загрузки -->
@@ -161,13 +342,18 @@
                 <div id="assignment-details" style="display:none; background:var(--tg-bg); border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid rgba(128,128,128,0.2);">
                     <div style="font-weight:700; margin-bottom:8px; font-size:var(--text-body);" id="detail-title"></div>
                     <div id="detail-count" style="display:none; font-size:var(--text-small); color:var(--tg-hint); margin-bottom:8px;"></div>
-                    <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:var(--text-body); display:inline-block; word-break:break-all;">🔗 Открыть условие задачи</a>
+                    <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:var(--text-body); display:inline-block; word-break:break-all;"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-external-link" xlink:href="#ca-i-external-link"></use></svg></span> Открыть условие задачи</a>
                     <div id="detail-feedback" style="display:none; margin-top:10px; padding:10px; background:rgba(220,53,69,0.1); border-radius:8px; font-size:var(--text-small); color:#721c24;"></div>
                 </div>
 
                 <!-- Загрузка фото -->
                 <div class="file-upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
-                    <div class="upload-icon">📷</div>
+                    <!-- .upload-icon остаётся ИМЕННО этим элементом и остаётся блочным:
+                         handleFileSelect/uploadDZ находят его через area.querySelector('.upload-icon')
+                         и переключают style.display между 'none' и 'block'. -->
+                    <div class="upload-icon" aria-hidden="true">
+                        <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-camera" xlink:href="#ca-i-camera"></use></svg>
+                    </div>
                     <div class="upload-text">Нажми, чтобы выбрать фото (можно несколько)</div>
                     <div id="file-list" class="file-list"></div>
                 </div>
@@ -193,10 +379,25 @@
 
     <!-- ЭКРАН 3: ЛИДЕРБОРД -->
     <div id="screen-leaderboard" class="screen">
-        <h2 style="text-align:center; margin-bottom:12px;">🏆 Лиги</h2>
+        <h2 class="ca-heading-with-icon ca-heading-center" style="text-align:center; margin-bottom:12px;">
+            <span class="ca-title-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-trophy" xlink:href="#ca-i-trophy"></use></svg>
+            </span>
+            Лиги
+        </h2>
         <div class="tabs-hw">
-            <button class="tab-btn active" id="lb-tab-league" onclick="switchLbMode('league')">🏅 Моя лига</button>
-            <button class="tab-btn" id="lb-tab-global" onclick="switchLbMode('global')">🌍 Общий топ</button>
+            <button class="tab-btn active" id="lb-tab-league" onclick="switchLbMode('league')">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-medal" xlink:href="#ca-i-medal"></use></svg>
+                </span>
+                Моя лига
+            </button>
+            <button class="tab-btn" id="lb-tab-global" onclick="switchLbMode('global')">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-globe" xlink:href="#ca-i-globe"></use></svg>
+                </span>
+                Общий топ
+            </button>
         </div>
 
         <!-- Режим: моя лига -->
@@ -217,7 +418,14 @@
 
     <!-- ЭКРАН: МАГАЗИН (S2) -->
     <div id="screen-shop" class="screen">
-        <h2 style="text-align:center; margin-bottom:4px;">🥯 Бубличная</h2>
+        <!-- 🥯 здесь работал иконкой ЭКРАНА магазина, поэтому заменён на ca-i-shop.
+             Как валюта продукта 🥯 сохранён везде: «🥯 Бублики», кнопка щита, FAQ, вся выдача JS. -->
+        <h2 class="ca-heading-with-icon ca-heading-center" style="text-align:center; margin-bottom:4px;">
+            <span class="ca-title-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-shop" xlink:href="#ca-i-shop"></use></svg>
+            </span>
+            Бубличная
+        </h2>
         <div class="shop-balance" id="shop-balance"></div>
         <div id="shop-content">
             <div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>
@@ -226,10 +434,20 @@
 
     <!-- ЭКРАН 4: ЕЩЁ -->
     <div id="screen-more" class="screen">
-        <h2 style="text-align:center; margin-bottom:20px;">⚙️ Ещё</h2>
+        <h2 class="ca-heading-with-icon ca-heading-center" style="text-align:center; margin-bottom:20px;">
+            <span class="ca-title-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-settings" xlink:href="#ca-i-settings"></use></svg>
+            </span>
+            Ещё
+        </h2>
 
         <div class="faq-section">
-            <div class="faq-title">❓ Частые вопросы</div>
+            <div class="faq-title ca-heading-with-icon">
+                <span class="ca-title-icon" aria-hidden="true">
+                    <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-help" xlink:href="#ca-i-help"></use></svg>
+                </span>
+                Частые вопросы
+            </div>
 
             <details class="faq-item">
                 <summary>Чем бублики отличаются от очков сезона?</summary>
@@ -302,8 +520,8 @@
             </details>
         </div>
 
-        <button class="more-link-btn" style="width:100%; border:none; cursor:pointer; margin-bottom:12px;" onclick="inviteParent()">👪 Пригласить родителя</button>
-        <a href="https://t.me/tomhardy10" target="_blank" class="more-link-btn">💬 Связаться с учителем</a>
+        <button class="more-link-btn" style="width:100%; border:none; cursor:pointer; margin-bottom:12px;" onclick="inviteParent()"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-users" xlink:href="#ca-i-users"></use></svg></span> Пригласить родителя</button>
+        <a href="https://t.me/tomhardy10" target="_blank" class="more-link-btn"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-message" xlink:href="#ca-i-message"></use></svg></span> Связаться с учителем</a>
     </div>
 
     <!-- Персональный титул (S8): первая отправка платная, retry после отказа бесплатен -->
@@ -326,22 +544,42 @@
         </div>
     </div>
 
-    <!-- НИЖНЕЕ МЕНЮ -->
-    <div class="bottom-nav">
-        <button class="nav-btn active" onclick="switchTab('profile')">
-            <span class="nav-icon">👤</span> Профиль
+    <!-- НИЖНЕЕ МЕНЮ.
+         Контракт: ровно пять .nav-btn в порядке Профиль → Домашка → Лидеры → Магазин → Ещё
+         (switchTab подсвечивает их по индексу 0–4), тот же onclick, тот же .nav-icon внутри.
+         aria-selected/aria-current намеренно НЕ проставлены: switchTab на этапе 2 менять
+         нельзя, а статическое значение стало бы неверным после первого переключения —
+         динамическая синхронизация отложена до этапа 8. -->
+    <div class="bottom-nav" role="tablist" aria-label="Разделы приложения">
+        <button class="nav-btn active" role="tab" onclick="switchTab('profile')">
+            <span class="nav-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-profile" xlink:href="#ca-i-profile"></use></svg>
+            </span>
+            <span class="nav-label">Профиль</span>
         </button>
-        <button class="nav-btn" onclick="switchTab('homework')">
-            <span class="nav-icon">📚</span> Домашка
+        <button class="nav-btn" role="tab" onclick="switchTab('homework')">
+            <span class="nav-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-book" xlink:href="#ca-i-book"></use></svg>
+            </span>
+            <span class="nav-label">Домашка</span>
         </button>
-        <button class="nav-btn" onclick="switchTab('leaderboard')">
-            <span class="nav-icon">🏆</span> Лидеры
+        <button class="nav-btn" role="tab" onclick="switchTab('leaderboard')">
+            <span class="nav-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-trophy" xlink:href="#ca-i-trophy"></use></svg>
+            </span>
+            <span class="nav-label">Лидеры</span>
         </button>
-        <button class="nav-btn" onclick="switchTab('shop')">
-            <span class="nav-icon">🥯</span> Магазин
+        <button class="nav-btn" role="tab" onclick="switchTab('shop')">
+            <span class="nav-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-shop" xlink:href="#ca-i-shop"></use></svg>
+            </span>
+            <span class="nav-label">Магазин</span>
         </button>
-        <button class="nav-btn" onclick="switchTab('more')">
-            <span class="nav-icon">⚙️</span> Ещё
+        <button class="nav-btn" role="tab" onclick="switchTab('more')">
+            <span class="nav-icon" aria-hidden="true">
+                <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-settings" xlink:href="#ca-i-settings"></use></svg>
+            </span>
+            <span class="nav-label">Ещё</span>
         </button>
     </div>
 

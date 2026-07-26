@@ -522,32 +522,36 @@
         // с теми, что выдают grant_weekly_achievements / record_approved_assignment (W09).
         // Legacy-достижения этапа 1 (streak_*, perfect_month, rebirth) показываются ТОЛЬКО их
         // владельцам: новая выдача прекращена после cutover, но полученные сохраняются (SPEC §8).
+        // Поле svg (этап 2) — id символа из inline-спрайта index.html БЕЗ решётки. Оно только
+        // добавлено рядом с существующим icon: сам icon остаётся эмодзи и остаётся источником
+        // отрисовки (loadAchievements, витрина, пикер, «🔒 Нужно: …» в магазине читают icon/name/code
+        // без изменений). Переключение рендера достижений на svg — этап 4.
         const ACHIEVEMENTS_META = [
-            { code: 'first_step',           icon: '🌱', name: 'Первый шаг' },
-            { code: 'first_good_week',      icon: '📗', name: 'Неделя получилась' },
-            { code: 'perfect_week',         icon: '🌟', name: 'Семь из семи' },
-            { code: 'rhythm_4',             icon: '📅', name: 'Месяц в ритме' },
-            { code: 'rhythm_12',            icon: '🗓', name: 'Четверть года' },
-            { code: 'rhythm_24',            icon: '🏅', name: 'Полгода в ритме' },
-            { code: 'good_weeks_36',        icon: '🎓', name: 'Учебный год' },
-            { code: 'no_shields_8',         icon: '💪', name: 'Своими силами' },
-            { code: 'perfect_month_weekly', icon: '✨', name: 'Идеальный месяц' },
-            { code: 'rebirth_week',         icon: '🕊', name: 'Возвращение' },
-            { code: 'clean_10',             icon: '🎯', name: 'С первого раза' },
+            { code: 'first_step',           icon: '🌱', name: 'Первый шаг',            svg: 'ca-i-pencil' },
+            { code: 'first_good_week',      icon: '📗', name: 'Неделя получилась',     svg: 'ca-i-book' },
+            { code: 'perfect_week',         icon: '🌟', name: 'Семь из семи',          svg: 'ca-i-star' },
+            { code: 'rhythm_4',             icon: '📅', name: 'Месяц в ритме',         svg: 'ca-i-calendar' },
+            { code: 'rhythm_12',            icon: '🗓', name: 'Четверть года',         svg: 'ca-i-calendar' },
+            { code: 'rhythm_24',            icon: '🏅', name: 'Полгода в ритме',       svg: 'ca-i-medal' },
+            { code: 'good_weeks_36',        icon: '🎓', name: 'Учебный год',           svg: 'ca-i-award' },
+            { code: 'no_shields_8',         icon: '💪', name: 'Своими силами',         svg: 'ca-i-medal' },
+            { code: 'perfect_month_weekly', icon: '✨', name: 'Идеальный месяц',       svg: 'ca-i-star' },
+            { code: 'rebirth_week',         icon: '🕊', name: 'Возвращение',           svg: 'ca-i-history' },
+            { code: 'clean_10',             icon: '🎯', name: 'С первого раза',        svg: 'ca-i-star' },
             // Достижения жизненных привычек Stage 4 (U06) — без бубликов, только badge.
-            { code: 'life_first',           icon: '🌿', name: 'Первый челлендж' },
-            { code: 'life_7',               icon: '🏃', name: 'Семь челленджей' },
-            { code: 'life_30',              icon: '🧗', name: 'Тридцать челленджей' },
-            { code: 'life_100',             icon: '🏆', name: 'Сотня челленджей' },
-            { code: 'life_variety_5',       icon: '🎨', name: 'Пять разных' },
-            { code: 'life_streak_7',        icon: '🌈', name: 'Неделя привычки' },
-            { code: 'streak_7',      icon: '🔥', name: 'Неделя огня',            legacy: true },
-            { code: 'streak_30',     icon: '📆', name: 'Месяц без пропусков',     legacy: true },
-            { code: 'streak_100',    icon: '💯', name: 'Сотня',                  legacy: true },
-            { code: 'streak_200',    icon: '⚡', name: '200 дней',               legacy: true },
-            { code: 'streak_365',    icon: '👑', name: 'Год дисциплины',         legacy: true },
-            { code: 'perfect_month', icon: '🌙', name: 'Идеальный месяц (стрик)', legacy: true },
-            { code: 'rebirth',       icon: '🪶', name: 'Возрождение (стрик)',     legacy: true }
+            { code: 'life_first',           icon: '🌿', name: 'Первый челлендж',       svg: 'ca-i-pencil' },
+            { code: 'life_7',               icon: '🏃', name: 'Семь челленджей',       svg: 'ca-i-medal' },
+            { code: 'life_30',              icon: '🧗', name: 'Тридцать челленджей',   svg: 'ca-i-medal' },
+            { code: 'life_100',             icon: '🏆', name: 'Сотня челленджей',      svg: 'ca-i-trophy' },
+            { code: 'life_variety_5',       icon: '🎨', name: 'Пять разных',           svg: 'ca-i-box' },
+            { code: 'life_streak_7',        icon: '🌈', name: 'Неделя привычки',       svg: 'ca-i-star' },
+            { code: 'streak_7',      icon: '🔥', name: 'Неделя огня',            svg: 'ca-i-calendar', legacy: true },
+            { code: 'streak_30',     icon: '📆', name: 'Месяц без пропусков',     svg: 'ca-i-calendar', legacy: true },
+            { code: 'streak_100',    icon: '💯', name: 'Сотня',                  svg: 'ca-i-trophy',   legacy: true },
+            { code: 'streak_200',    icon: '⚡', name: '200 дней',               svg: 'ca-i-trophy',   legacy: true },
+            { code: 'streak_365',    icon: '👑', name: 'Год дисциплины',         svg: 'ca-i-award',    legacy: true },
+            { code: 'perfect_month', icon: '🌙', name: 'Идеальный месяц (стрик)', svg: 'ca-i-star',    legacy: true },
+            { code: 'rebirth',       icon: '🪶', name: 'Возрождение (стрик)',     svg: 'ca-i-history', legacy: true }
         ];
 
         async function loadAchievements() {

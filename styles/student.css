@@ -392,6 +392,56 @@
         :focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
 
         /* =====================================================================
+           SVG-иконки Cosmic Academy (этап 2).
+
+           Спрайт — один скрытый <svg> в начале <body>. position:absolute с нулевым
+           размером выводит его из потока (body — flex-колонка), поэтому он не влияет
+           на layout и не создаёт горизонтальной прокрутки. visibility/display НЕ
+           используются: они могут просочиться в теневое дерево <use> и погасить
+           реальные иконки.
+
+           Размер иконки задаётся локальной переменной --ca-icon-size на контейнере,
+           цвет — только через currentColor, поэтому обе темы работают без дублей
+           правил и без hex в самих символах.
+           ===================================================================== */
+        .ca-icon-sprite {
+            position: absolute; width: 0; height: 0;
+            overflow: hidden; pointer-events: none;
+        }
+        .ca-icon {
+            width: var(--ca-icon-size, 20px); height: var(--ca-icon-size, 20px);
+            display: inline-block; vertical-align: middle; flex-shrink: 0;
+            fill: none; stroke: currentColor; stroke-width: 1.8;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        /* Заголовок с иконкой: иконка не уезжает под текст при переносе, текст
+           сохраняет собственный цвет, иконка берёт акцент. Модификатор -center —
+           для трёх центрированных h2 экранов (их inline text-align сохранён). */
+        .ca-heading-with-icon { display: flex; align-items: center; gap: var(--ca-space-2); min-width: 0; }
+        .ca-heading-with-icon.ca-heading-center { justify-content: center; }
+        .ca-title-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            flex-shrink: 0; vertical-align: middle; --ca-icon-size: 18px;
+        }
+        .ca-heading-with-icon > .ca-title-icon { color: var(--ca-accent); }
+        .screen > h2.ca-heading-with-icon > .ca-title-icon { --ca-icon-size: 20px; }
+        /* В табах и кнопках-ссылках иконка наследует цвет самого элемента
+           (активный таб, белый текст на градиенте) — акцент здесь не навязываем. */
+        .tab-btn > .ca-title-icon { --ca-icon-size: 17px; }
+        #detail-link > .ca-title-icon { --ca-icon-size: 16px; }
+        .more-link-btn > .ca-title-icon { --ca-icon-size: 18px; }
+
+        /* Существующие icon-контейнеры должны вмещать и эмодзи, и .ca-icon.
+           Содержимое этих контейнеров формирует JS и на этапе 2 остаётся эмодзи —
+           правила ниже нужны, чтобы SVG в них не потребовал правки JS позже. */
+        .now-icon .ca-icon, .quest-row-icon .ca-icon { --ca-icon-size: 18px; }
+        .ach-icon .ca-icon, .showcase-icon .ca-icon { display: block; margin: 0 auto; }
+        .ach-icon .ca-icon { --ca-icon-size: 26px; }
+        .showcase-icon .ca-icon { --ca-icon-size: 22px; }
+        .shop-preview .ca-icon { --ca-icon-size: 28px; }
+
+        /* =====================================================================
            Глобальный фон Cosmic Academy (этап 1).
 
            Один фиксированный декоративный слой ВНЕ пяти .screen — поэтому фон не
@@ -733,7 +783,11 @@
         .file-upload-area:hover { border-color: var(--tg-link); background: var(--ca-tint-accent); }
         .file-upload-area.has-file { border-color: var(--ca-success); background: var(--ca-tint-success); }
         #file-input { display: none; }
-        .upload-icon { font-size: 40px; margin-bottom: var(--ca-space-3); }
+        /* .upload-icon остаётся блочным: uploadDZ возвращает ему style.display = 'block'
+           после сброса формы. Поэтому центрируем сам SVG (margin auto), а не контейнер
+           через flex — иначе после первой загрузки иконка съехала бы влево. */
+        .upload-icon { margin-bottom: var(--ca-space-3); color: var(--ca-accent); --ca-icon-size: 40px; }
+        .upload-icon .ca-icon { display: block; margin: 0 auto; }
         .upload-text { font-size: var(--text-body); color: var(--tg-hint); }
 
         .file-list { margin-top: var(--ca-space-3); text-align: left; }
@@ -807,7 +861,18 @@
             min-height: var(--ca-touch);
         }
 
-        /* Нижнее меню */
+        /* =====================================================================
+           Нижнее меню (этап 2).
+
+           Контракт сохранён: пять .nav-btn в исходном порядке, .active переключает
+           switchTab по индексу, .nav-icon остаётся элементом внутри кнопки.
+           Формулы safe-area этапа 1 не изменены.
+
+           backdrop-filter удалён: поверхность панели непрозрачная (--ca-surface),
+           размывать под ней нечего — это был лишний композитный слой. Стабильная
+           контрастная поверхность к тому же гарантирует читаемость подписей на всех
+           четырёх пользовательских фонах.
+           ===================================================================== */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
             /* Видимая контентная высота панели остаётся ровно --ca-nav-h: safe-area добавляется
@@ -815,16 +880,43 @@
                иначе gesture bar/вырез съедали бы часть кнопок навигации. */
             height: calc(var(--ca-nav-h) + var(--ca-safe-bottom));
             padding-bottom: var(--ca-safe-bottom);
-            background: var(--ca-surface); display: flex; border-top: 1px solid var(--ca-border-soft);
-            z-index: 100; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            background: var(--ca-surface); display: flex; border-top: 1px solid var(--ca-border);
+            box-shadow: 0 -1px 0 var(--ca-divider);
+            z-index: 100;
         }
         .nav-btn {
-            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            border: none; background: transparent; color: var(--tg-hint); font-size: 11px; cursor: pointer;
-            transition: color var(--ca-transition); padding: 8px 0;
+            /* flex: 1 1 0 + min-width: 0 — пять строго равных колонок независимо от
+               длины подписи; на 360 px это 72 px на кнопку. */
+            flex: 1 1 0; min-width: 0; position: relative;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 3px; padding: 6px 2px; min-height: var(--ca-touch);
+            border: none; background: transparent; color: var(--ca-text-muted);
+            font-size: 11px; cursor: pointer;
+            transition: color var(--ca-transition);
+            -webkit-tap-highlight-color: transparent;
         }
-        .nav-btn.active { color: var(--tg-link); }
-        .nav-icon { font-size: 22px; margin-bottom: 3px; }
+        /* Активное состояние: акцент Cosmic Academy на иконке и подписи плюс тонкая
+           засечка на верхней кромке панели. Без пузырей, свечения и анимации. */
+        .nav-btn::before {
+            content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+            width: 22px; height: 2px; border-radius: var(--ca-radius-pill);
+            background: transparent; transition: background var(--ca-transition);
+        }
+        .nav-btn.active { color: var(--ca-accent); }
+        .nav-btn.active::before { background: var(--ca-accent); }
+        .nav-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: -3px; border-radius: var(--ca-radius-xs); }
+        .nav-btn:disabled { opacity: var(--ca-disabled-opacity); cursor: not-allowed; }
+        /* hover — только там, где указатель действительно наводится (не на тачскрине) */
+        @media (hover: hover) and (pointer: fine) {
+            .nav-btn:hover { color: var(--ca-text-secondary); }
+            .nav-btn.active:hover { color: var(--ca-accent); }
+        }
+        .nav-icon {
+            display: grid; place-items: center;
+            width: 24px; height: 24px; --ca-icon-size: 22px;
+        }
+        /* Подпись обязана остаться в одну строку и на 360 px */
+        .nav-label { font-size: 11px; line-height: 1.1; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
         /* Косметика: экипировка (S3) */
         /* Цвет ника — переопределяет цвет текста; «золотой» — градиентная заливка текста.
@@ -843,7 +935,7 @@
             background: var(--tg-secondary); border: 1px solid var(--ca-border-soft);
             border-radius: var(--ca-radius-md); padding: 9px 11px; margin-bottom: var(--ca-space-4);
         }
-        .profile-title-icon { flex-shrink: 0; font-size: 18px; }
+        .profile-title-icon { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--ca-accent); --ca-icon-size: 18px; }
         .profile-title-copy { min-width: 0; }
         .profile-title-label { color: var(--tg-hint); font-size: 10px; line-height: 1.2; margin-bottom: 2px; }
         .profile-title { color: var(--tg-text); font-size: 13px; line-height: 1.25; font-weight: 750; overflow-wrap: anywhere; }
