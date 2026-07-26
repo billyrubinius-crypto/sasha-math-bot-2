@@ -94,7 +94,7 @@
                 });
             } catch (e) {
                 count.textContent = '—';
-                list.innerHTML = '<div class="summary-empty" style="color:#f44336;">Ошибка загрузки заданий</div>';
+                list.innerHTML = '<div class="summary-empty is-error">Ошибка загрузки заданий</div>';
                 log(e.message);
             }
         }

@@ -730,19 +730,27 @@
         .now-item-meta { display: block; font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
         .now-arrow { font-size: 18px; line-height: 1; color: var(--ca-text-muted); flex-shrink: 0; }
         .summary-empty { text-align: center; padding: var(--ca-space-4) var(--ca-space-2); color: var(--ca-text-muted); font-size: 13px; }
-        /* Ошибочный вариант того же пустого состояния (этап 5, архив работ): цвет из
-           палитры вместо инлайнового color:red. Единый компонент состояний .ca-state*
-           появится на этапе 8 — этот модификатор туда же и переедет. */
+        /* Ошибочный вариант того же пустого состояния: цвет из палитры вместо
+           инлайнового color:red/#f44336 — тот же модификатор, что и у .chart-empty,
+           .league-note (is-warning) и архива домашки. */
         .summary-empty.is-error { color: var(--ca-error); }
 
-        /* Узкие экраны (360–380px): блок недели отдаёт полосе дней немного собственных
-           отступов, чтобы семь колонок остались комфортными (≈39px на день при 360px).
-           Отдельный медиазапрос этапа 3 — медиазапросы других этапов не трогаем. */
-        @media (max-width: 380px) {
-            .week-block { padding: var(--ca-space-4); }
-            .week-days-strip { gap: 3px; }
-            .week-day-chip { padding: var(--ca-space-2) 0; }
+        /* =====================================================================
+           Единый компонент состояний «загрузка / пусто / ошибка» (этап 8, §7.7).
+
+           .summary-empty / .chart-empty / .showcase-picker-empty НЕ удалены — их
+           по-прежнему создаёт JS, и они уже используют общий вид (муted-текст,
+           center, свой модификатор ошибки). .ca-state — тот же вид для мест, где
+           раньше был голый инлайновый style (история баланса, магазин при
+           загрузке/ошибке) — последние такие места в student-*.js на момент этого
+           этапа. --loading/--empty пока не отличаются от базового вида — это
+           семантические хуки на будущее (например, спиннер), не визуальный долг.
+           ===================================================================== */
+        .ca-state {
+            text-align: center; padding: var(--ca-space-5) var(--ca-space-2);
+            color: var(--ca-text-muted); font-size: 13px; line-height: 1.4;
         }
+        .ca-state--error { color: var(--ca-error); }
 
         /* =====================================================================
            Сегодня: два жизненных квеста + бонус за оба (этап 4).
@@ -796,6 +804,7 @@
         .mock-chart-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-5); margin-bottom: var(--ca-space-5); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
         .chart-title { font-weight: 800; font-size: var(--text-section); line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .chart-empty { text-align: center; padding: var(--ca-space-6) var(--ca-space-3); color: var(--ca-text-muted); font-size: var(--text-body); }
+        .chart-empty.is-error { color: var(--ca-error); }
         .exam-info-box {
             margin-top: var(--ca-space-3); padding: var(--ca-space-3);
             text-align: center; font-size: var(--text-small); line-height: 1.4;
@@ -849,7 +858,6 @@
         .ach-tile.locked { opacity: 0.45; filter: grayscale(1); }
         .ach-icon { font-size: 26px; line-height: 1; color: var(--ca-accent); }
         .ach-name { font-size: 11px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
-        @media (max-width: 380px) { .ach-grid { grid-template-columns: repeat(3, 1fr); } }
 
         /* Альбом коллекций (S6) */
         .collections-section { margin-top: var(--ca-space-6); }
@@ -860,7 +868,6 @@
         .coll-tile { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
         .coll-tile.locked .shop-preview { opacity: 0.42; filter: grayscale(1); }
         .coll-name { min-height: 27px; font-size: 11px; color: var(--ca-text-secondary); margin-top: var(--ca-space-1); line-height: 1.22; overflow-wrap: anywhere; }
-        @media (max-width: 380px) { .coll-grid { grid-template-columns: repeat(3, 1fr); } }
 
         /* =====================================================================
            Витрина профиля (S7, этап 4). Три слота; обработчик вешает JS
@@ -929,10 +936,6 @@
             background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-3);
             margin-bottom: var(--ca-space-3);
             border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1);
-        }
-        @media (max-width: 380px) {
-            .shop-item { --ca-shop-preview: 48px; grid-template-columns: var(--ca-shop-preview) minmax(0, 1fr); }
-            .shop-item .shop-action { grid-column: 2; align-items: flex-start; text-align: left; }
         }
 
         /* Превью косметики (§11, этап 7): один компонент в трёх контекстах —
@@ -1057,8 +1060,46 @@
         .study-tools { margin-bottom: 2px; }
         .study-tools .streak-badge { margin-bottom: 8px; }
         .study-tools .shield-widget { margin-bottom: var(--ca-space-5); }
+
+        /* =====================================================================
+           Единый брейкпоинт узких экранов (этап 8, §13.5).
+
+           Раньше здесь было четыре разных @media (max-width: 380px) блока
+           (по одному со стороны этапов 3/4/7) плюс буквальный дубль правила
+           .coll-grid (объявлено и здесь, и рядом с .coll-grid отдельно). Один
+           блок вместо четырёх; значения правил не менялись, дубль убран —
+           оставлена более безопасная версия .coll-grid с minmax(0, 1fr)
+           (защищает от переполнения длинным содержимым, как и базовое правило
+           .coll-grid для четырёх колонок).
+           ===================================================================== */
         @media (max-width: 380px) {
+            .week-block { padding: var(--ca-space-4); }
+            .week-days-strip { gap: 3px; }
+            .week-day-chip { padding: var(--ca-space-2) 0; }
+
+            .ach-grid { grid-template-columns: repeat(3, 1fr); }
             .coll-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+            .shop-item { --ca-shop-preview: 48px; grid-template-columns: var(--ca-shop-preview) minmax(0, 1fr); }
+            .shop-item .shop-action { grid-column: 2; align-items: flex-start; text-align: left; }
+        }
+
+        /* =====================================================================
+           Контейнер на широких окнах (этап 8): в Telegram Desktop окно может быть
+           значительно шире, чем ученический интерфейс задуман (карточки
+           растягивались на всю ширину). Экраны и нижняя навигация ограничены
+           тем же контейнером и центрированы; #app-bg-layer и модалка остаются
+           во всю ширину окна намеренно — фон-заливка и затемнение фона модалки
+           не должны обрываться по бокам центрированной колонки.
+           ===================================================================== */
+        @media (min-width: 480px) {
+            /* width:100% обязателен: .screen — прямой ребёнок body (flex-контейнера),
+               а auto-margins на кросс-оси flex-элемента отключают растяжение
+               (align-items:stretch) — без явной width элемент садится по
+               содержимому вместо заполнения доступной ширины, и max-width с
+               margin:auto не центрируют 480px-колонку, а более узкую. */
+            .screen { width: 100%; max-width: 480px; margin-left: auto; margin-right: auto; }
+            .bottom-nav { width: 480px; max-width: 480px; margin-left: auto; margin-right: auto; }
         }
 
         /* =====================================================================
@@ -1250,21 +1291,45 @@
         .ladder-step.achieved { opacity: 0.85; color: var(--ca-text); }
         .ladder-step.current { opacity: 1; background: var(--ca-tint-accent); border-color: var(--ca-accent); color: var(--ca-text); font-weight: 800; }
 
-        /* Ещё: FAQ и связь с учителем */
-        .faq-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: 18px; margin-bottom: var(--ca-space-6); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2); }
-        .faq-title { font-weight: 700; font-size: var(--text-body); margin-bottom: var(--ca-space-4); }
+        /* =====================================================================
+           Ещё: FAQ и связь с учителем (этап 8).
+
+           Тексты вопросов/ответов не менялись ни на символ — они описывают
+           действующие правила экономики. .faq-title поднят до типографики
+           остальных заголовков секций (было мельче остальных — var(--text-body)/700
+           вместо var(--text-section)/800). summary::before оставлен текстовым
+           шевроном (▸/▾) — декоративный, не «иконка интерфейса» в смысле §12.1,
+           замена на SVG не даёт ощутимой пользы при заметном риске для 14 строк.
+           ===================================================================== */
+        .faq-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-6); margin-bottom: var(--ca-space-6); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2); }
+        .faq-title { font-weight: 800; font-size: var(--text-section); line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .faq-item { border-bottom: 1px solid var(--ca-divider); padding: var(--ca-space-3) 0; }
         .faq-item:last-child { border-bottom: none; }
-        .faq-item summary { cursor: pointer; font-weight: 600; font-size: var(--text-body); list-style: none; }
+        .faq-item summary { cursor: pointer; font-weight: 600; font-size: var(--text-body); line-height: 1.3; list-style: none; }
         .faq-item summary::-webkit-details-marker { display: none; }
-        .faq-item summary::before { content: '▸ '; color: var(--tg-link); }
+        .faq-item summary::before { content: '▸ '; color: var(--ca-accent); }
         .faq-item[open] summary::before { content: '▾ '; }
-        .faq-answer { margin-top: 8px; font-size: 13px; color: var(--tg-hint); line-height: 1.4; }
+        .faq-item summary:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .faq-answer { margin-top: 8px; font-size: 13px; color: var(--tg-hint); line-height: 1.45; overflow-wrap: anywhere; }
+
+        /* Кнопка/ссылка «Пригласить родителя» и «Связаться с учителем»: раньше
+           border/cursor/width/margin-bottom задавались инлайновым style только у
+           button-варианта (у <a> их и не было — блочный элемент сам растягивается
+           на ширину экрана через display:block). Теперь оба варианта оформлены
+           одним классом без инлайна. */
         .more-link-btn {
-            display: block; text-align: center; background: var(--ca-gradient-primary); color: var(--ca-on-accent);
+            /* box-sizing: border-box уже задан общим правилом выше (input/select/…/.more-link-btn).
+               width:100% обязателен: <button> — форм-контрол, display:block один не растягивает
+               его на всю ширину (в отличие от обычных block-элементов), в то время как <a>
+               растягивается и без явной width — оба варианта явной width не портят. */
+            display: block; width: 100%; text-align: center;
+            background: var(--ca-gradient-primary); color: var(--ca-on-accent);
             padding: var(--ca-space-5); border-radius: var(--ca-radius-md); font-weight: 700; font-size: 15px; text-decoration: none;
-            min-height: var(--ca-touch);
+            min-height: var(--ca-touch); border: none; cursor: pointer;
+            margin-bottom: var(--ca-space-4);
         }
+        .more-link-btn:last-child { margin-bottom: 0; }
+        .more-link-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
 
         /* =====================================================================
            Нижнее меню (этап 2).

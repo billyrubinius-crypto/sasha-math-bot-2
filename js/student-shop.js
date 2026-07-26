@@ -332,7 +332,7 @@
         async function loadShop() {
             const content = document.getElementById('shop-content');
             const balanceEl = document.getElementById('shop-balance');
-            content.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
+            content.innerHTML = '<div class="ca-state ca-state--loading">Загрузка...</div>';
             try {
                 const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes, seasonRes, customTitleRes] = await Promise.all([
                     db.from('shop_items')
@@ -381,7 +381,7 @@
                 always.forEach(i => content.appendChild(renderShopItem(i, owned, earned, balance, equippedBySlot, null, customTitle)));
 
             } catch (e) {
-                content.innerHTML = '<div style="text-align:center; padding:30px; color:#f44336;">Ошибка загрузки магазина</div>';
+                content.innerHTML = '<div class="ca-state ca-state--error">Ошибка загрузки магазина</div>';
                 log('❌ Магазин: ' + (e.message || e));
             }
         }

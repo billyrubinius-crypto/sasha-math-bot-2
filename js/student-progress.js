@@ -258,7 +258,7 @@
 
                 renderMockChart(container, data);
             } catch (e) {
-                container.innerHTML = `<div class="chart-empty" style="color:#f44336;">Ошибка загрузки графика</div>`;
+                container.innerHTML = `<div class="chart-empty is-error">Ошибка загрузки графика</div>`;
                 log(e.message);
             }
         }
@@ -377,7 +377,7 @@
                 if (error) throw error;
                 
                 if (!data || data.length === 0) {
-                    list.innerHTML = '<li style="text-align:center; padding:20px; opacity:0.5;">📭 История пока пуста</li>';
+                    list.innerHTML = '<li class="ca-state ca-state--empty">📭 История пока пуста</li>';
                     return;
                 }
                 
@@ -474,7 +474,7 @@
                 });
                 
             } catch (e) {
-                list.innerHTML = '<li style="text-align:center; color:red; padding:20px;">Ошибка загрузки истории</li>';
+                list.innerHTML = '<li class="ca-state ca-state--error">Ошибка загрузки истории</li>';
                 log(e.message);
             }
         }

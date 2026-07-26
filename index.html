@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <!-- viewport-fit=cover — чтобы работали env(safe-area-inset-*) (нижняя gesture bar, вырезы).
-         maximum-scale/user-scalable сознательно оставлены до этапа 8. -->
+         maximum-scale/user-scalable=no: решение по плану принимается на этапе 8, после
+         проверки реального поведения жестов/зума в Telegram WebView. В этой среде нет
+         доступа к настоящему Telegram-клиенту на устройстве, поэтому решение — оставить
+         метатег как есть до появления возможности проверить жесты (двойной тап, зум,
+         скролл) в реальном WebView; снятие блокировки масштабирования без такой проверки
+         рискует непроверенно изменить поведение жестов внутри Mini App. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <title>Sasha Math Bot</title>
@@ -306,7 +311,7 @@
                 История изменений
             </div>
             <ul class="history-list" id="balance-history-list">
-                <li style="text-align:center; padding:20px; opacity:0.5;">Загрузка...</li>
+                <li class="ca-state ca-state--loading">Загрузка...</li>
             </ul>
         </div>
     </div>
@@ -448,9 +453,9 @@
         </div>
     </div>
 
-    <!-- ЭКРАН 4: ЕЩЁ -->
+    <!-- ЭКРАН 4: ЕЩЁ (этап 8) -->
     <div id="screen-more" class="screen">
-        <h2 class="ca-heading-with-icon ca-heading-center" style="text-align:center; margin-bottom:20px;">
+        <h2 class="screen-title ca-heading-with-icon ca-heading-center">
             <span class="ca-title-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-settings" xlink:href="#ca-i-settings"></use></svg>
             </span>
@@ -536,7 +541,7 @@
             </details>
         </div>
 
-        <button class="more-link-btn" style="width:100%; border:none; cursor:pointer; margin-bottom:12px;" onclick="inviteParent()"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-users" xlink:href="#ca-i-users"></use></svg></span> Пригласить родителя</button>
+        <button class="more-link-btn" onclick="inviteParent()"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-users" xlink:href="#ca-i-users"></use></svg></span> Пригласить родителя</button>
         <a href="https://t.me/tomhardy10" target="_blank" class="more-link-btn"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-message" xlink:href="#ca-i-message"></use></svg></span> Связаться с учителем</a>
     </div>
 
