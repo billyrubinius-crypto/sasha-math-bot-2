@@ -61,23 +61,28 @@
             --ca-d-elev-2: 0 6px 18px rgba(4,6,14,0.45);
             --ca-d-elev-modal: 0 18px 45px rgba(4,6,14,0.62);
 
-            /* --- Сырая палитра: светлая --- */
-            --ca-l-bg-deep: #EDEFFD;
-            --ca-l-bg-app: #F5F6FF;
+            /* --- Сырая палитра: светлая ---
+               Исправляющий проход «усиление светлой темы» (после этапов 1-6): исходные
+               значения были почти белыми и почти не передавали фирменный космический
+               характер Cosmic Academy. Ниже — более выраженная холодная сиренево-синяя
+               основа, различимые glow/звёзды и более глубокие тени; тёмная палитра
+               --ca-d-* этим проходом не затронута. */
+            --ca-l-bg-deep: #E5E8FF;
+            --ca-l-bg-app: #F0F2FF;
             --ca-l-surface: #FFFFFF;
-            --ca-l-surface-elevated: #F8F8FF;
-            --ca-l-surface-nested: #ECEEFA;
-            --ca-l-border: #D7DAEE;
+            --ca-l-surface-elevated: #F8F7FF;
+            --ca-l-surface-nested: #EAECFA;
+            --ca-l-border: #CDD2F0;
             /* мягкая граница светлой темы в спецификации не задана — производная от --ca-l-border */
-            --ca-l-border-soft: #E4E7F6;
+            --ca-l-border-soft: #DEE2F5;
             --ca-l-text: #17192A;
             --ca-l-text-secondary: #666C86;
             --ca-l-text-muted: #9398AD;
-            --ca-l-violet: #674DE0;
-            --ca-l-blue: #3F70E8;
+            --ca-l-violet: #7357F2;
+            --ca-l-blue: #476FFF;
             /* cyan/turquoise светлой темы в спецификации не заданы — затемнённые пары к тёмным */
-            --ca-l-cyan: #2A93C7;
-            --ca-l-turquoise: #1E9E92;
+            --ca-l-cyan: #209DCE;
+            --ca-l-turquoise: #168F87;
             --ca-l-success: #24875C;
             --ca-l-warning: #B76A17;
             --ca-l-error: #D94B62;
@@ -86,26 +91,26 @@
             --ca-l-on-accent: #FFFFFF;
             --ca-l-on-warning: #FFFFFF;
             /* полупрозрачные производные светлой палитры */
-            --ca-l-tint-accent: rgba(103,77,224,0.12);
-            --ca-l-accent-soft: rgba(103,77,224,0.38);
-            --ca-l-tint-info: rgba(63,112,232,0.12);
+            --ca-l-tint-accent: rgba(115,87,242,0.14);
+            --ca-l-accent-soft: rgba(115,87,242,0.42);
+            --ca-l-tint-info: rgba(71,111,255,0.14);
             --ca-l-tint-success: rgba(36,135,92,0.12);
             --ca-l-tint-warning: rgba(183,106,23,0.12);
             --ca-l-tint-reward: rgba(168,117,18,0.12);
             --ca-l-tint-error: rgba(217,75,98,0.12);
             --ca-l-tint-currency: rgba(201,99,145,0.12);
-            --ca-l-tint-muted: rgba(102,108,134,0.10);
-            --ca-l-divider: rgba(102,108,134,0.16);
-            --ca-l-base-tint: rgba(245,246,255,0.90);
-            --ca-l-veil: rgba(245,246,255,0.34);
+            --ca-l-tint-muted: rgba(92,98,140,0.11);
+            --ca-l-divider: rgba(91,96,138,0.18);
+            --ca-l-base-tint: rgba(240,242,255,0.82);
+            --ca-l-veil: rgba(240,242,255,0.14);
             --ca-l-scrim: rgba(23,25,42,0.52);
-            --ca-l-glow-violet: rgba(118,87,240,0.16);
-            --ca-l-glow-blue: rgba(77,124,240,0.14);
-            --ca-l-glow-cyan: rgba(56,208,193,0.10);
-            --ca-l-star: rgba(103,77,224,0.28);
-            --ca-l-elev-1: 0 3px 12px rgba(23,25,42,0.07);
-            --ca-l-elev-2: 0 4px 15px rgba(23,25,42,0.10);
-            --ca-l-elev-modal: 0 12px 35px rgba(23,25,42,0.28);
+            --ca-l-glow-violet: rgba(118,87,240,0.25);
+            --ca-l-glow-blue: rgba(77,124,240,0.21);
+            --ca-l-glow-cyan: rgba(56,208,193,0.14);
+            --ca-l-star: rgba(103,77,224,0.38);
+            --ca-l-elev-1: 0 4px 14px rgba(54,45,120,0.10);
+            --ca-l-elev-2: 0 8px 24px rgba(54,45,120,0.14);
+            --ca-l-elev-modal: 0 16px 40px rgba(38,31,92,0.24);
 
             /* --- Не зависят от темы --- */
             /* Основной градиент Cosmic Academy (фирменный, одинаков в обеих темах) */
