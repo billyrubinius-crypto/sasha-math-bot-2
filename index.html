@@ -244,7 +244,9 @@
 
         <div class="study-tools">
             <div id="streak-display" class="streak-badge" style="display:none;">🔥 0 дней</div>
-            <div id="streak-progress" class="streak-progress" style="display:none; margin-bottom:20px;"></div>
+            <!-- margin-bottom переехал в CSS (.streak-progress); инлайновым остаётся только
+                 display — им управляет renderStreakProgress/renderQuestStreak. -->
+            <div id="streak-progress" class="streak-progress" style="display:none;"></div>
             <div class="shield-widget" id="shield-widget" style="display:none;">
                 <div class="shield-info">
                     <span id="shield-count">🛡 0 щитов</span>

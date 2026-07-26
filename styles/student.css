@@ -551,27 +551,41 @@
             color: var(--ca-text-secondary);
         }
         .group-badge.assigned { background: var(--ca-tint-info); color: var(--ca-accent-blue); }
+        /* Серия и щиты (этап 4). Бейдж серии — тёплая пилюля-тинт, а не сплошная
+           заливка: это статус, а не действие. display: inline-block продублирован
+           из инлайнового style.display, который ставит JS (loadProfile/renderQuestStreak). */
         .streak-badge {
-            display: inline-block; background: var(--ca-warning); color: var(--ca-on-warning);
-            padding: var(--ca-space-1) var(--ca-space-3); border-radius: var(--ca-radius-md); font-size: var(--text-small); font-weight: bold; margin-bottom: var(--ca-space-4);
+            display: inline-block; background: var(--ca-tint-warning); color: var(--ca-warning);
+            padding: var(--ca-space-1) var(--ca-space-3); border-radius: var(--ca-radius-pill);
+            font-size: var(--text-small); font-weight: 800; margin-bottom: var(--ca-space-4);
         }
 
-        /* Прогресс стрика */
-        .streak-dots { display: flex; gap: 8px; margin-bottom: var(--ca-space-2); }
-        .streak-dot { flex: 1; text-align: center; padding: var(--ca-space-2) 0; border-radius: var(--ca-radius-sm); background: var(--ca-surface-nested); font-size: var(--text-small); font-weight: 700; color: var(--tg-hint); }
-        .streak-dot.filled { background: var(--ca-warning); color: var(--ca-on-warning); }
-        .streak-note { font-size: var(--text-small); color: var(--tg-hint); text-align: center; }
+        /* Прогресс стрика: три ступени награды (display: block ставит renderStreakProgress) */
+        .streak-progress { margin-bottom: var(--ca-space-6); }
+        .streak-dots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ca-space-2); margin-bottom: var(--ca-space-2); }
+        .streak-dot {
+            min-width: 0; text-align: center; padding: var(--ca-space-2) var(--ca-space-1);
+            border-radius: var(--ca-radius-sm); border: 1px solid var(--ca-border-soft);
+            background: var(--ca-surface-nested); font-size: var(--text-small); font-weight: 700; color: var(--ca-text-secondary);
+        }
+        .streak-dot.filled { background: var(--ca-tint-warning); border-color: var(--ca-warning); color: var(--ca-warning); }
+        .streak-note { font-size: 11px; color: var(--ca-text-secondary); text-align: center; line-height: 1.35; }
 
-        /* Щит стрика (G9) */
+        /* Щит стрика (G9): счётчик + покупка. Тексты, лимит и цена приходят из loadShields. */
         .shield-widget {
-            display: flex; align-items: center; justify-content: space-between; gap: var(--ca-space-3);
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ca-space-3);
             background: var(--tg-secondary); border-radius: var(--ca-radius-lg); padding: var(--ca-space-4) var(--ca-space-5); margin-bottom: var(--ca-space-6);
             border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2);
         }
-        .shield-info { font-size: var(--text-body); font-weight: 600; }
-        .shield-info .shield-hint { display: block; font-size: 11px; color: var(--tg-hint); font-weight: 400; margin-top: 2px; }
-        .shield-buy-btn { background: var(--ca-gradient-primary); color: var(--ca-on-accent); border: none; border-radius: var(--ca-radius-sm); padding: var(--ca-space-3) var(--ca-space-5); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .shield-info { flex: 1 1 150px; min-width: 0; font-size: var(--text-body); font-weight: 700; }
+        .shield-info .shield-hint { display: block; font-size: 11px; color: var(--ca-text-secondary); font-weight: 400; margin-top: 2px; line-height: 1.35; overflow-wrap: anywhere; }
+        .shield-buy-btn {
+            box-sizing: border-box; flex-shrink: 0; min-height: var(--ca-touch); padding: 0 var(--ca-space-5);
+            background: var(--ca-gradient-primary); color: var(--ca-on-accent); border: none; border-radius: var(--ca-radius-sm);
+            font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
         .shield-buy-btn:disabled { opacity: var(--ca-disabled-opacity); cursor: default; }
+        .shield-buy-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
 
         /* =====================================================================
            Единый рабочий блок: неделя сверху, действия сейчас ниже (этап 3).
@@ -718,32 +732,65 @@
             .week-day-chip { padding: var(--ca-space-2) 0; }
         }
 
-        /* Сегодня: math + life квесты Stage 4 (U04) */
+        /* =====================================================================
+           Сегодня: два жизненных квеста + бонус за оба (этап 4).
+
+           Строка квеста переносится: на узком экране пара кнопок уходит под текст
+           целой группой, а не сжимает название испытания до одной буквы. Обёртка
+           .quest-row-trailing / .life-row-trailing при этом остаётся тем же
+           элементом — setLifeControlsDisabled ищет кнопки именно через
+           querySelectorAll('.life-row-trailing button').
+           ===================================================================== */
         .today-block { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-5); margin-bottom: var(--ca-space-5); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
-        .today-block-title { font-weight: 800; font-size: var(--text-section); }
-        .quest-row { display: flex; align-items: flex-start; gap: var(--ca-space-3); padding: var(--ca-space-3) 0; border-bottom: 1px solid var(--ca-divider); }
+        .today-block-title { font-weight: 800; font-size: var(--text-section); line-height: 1.25; }
+        .quest-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: var(--ca-space-3);
+            padding: var(--ca-space-3) 0; border-bottom: 1px solid var(--ca-divider);
+        }
         .quest-row:last-child { border-bottom: none; }
-        .quest-row-icon { width: var(--ca-icon-tile); height: var(--ca-icon-tile); border-radius: var(--ca-radius-xs); display: grid; place-items: center; flex-shrink: 0; background: var(--ca-surface-nested); font-size: 15px; }
-        .quest-row-main { min-width: 0; flex: 1; }
-        .quest-row-title { display: block; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
-        .quest-row-meta { display: block; font-size: 11px; color: var(--tg-hint); margin-top: 2px; overflow-wrap: anywhere; }
-        .quest-row-note { display: block; font-size: 10px; color: var(--tg-hint); margin-top: var(--ca-space-1); font-style: italic; }
-        .quest-row-trailing { display: flex; align-items: center; gap: var(--ca-space-2); flex-shrink: 0; }
-        .quest-badge { font-size: 11px; font-weight: 700; padding: var(--ca-space-1) 8px; border-radius: var(--ca-radius-sm); white-space: nowrap; }
+        .quest-row-icon { width: var(--ca-icon-tile); height: var(--ca-icon-tile); border-radius: var(--ca-radius-xs); display: grid; place-items: center; flex-shrink: 0; background: var(--ca-surface-nested); font-size: 15px; line-height: 1; align-self: flex-start; }
+        .quest-row-main { min-width: 0; flex: 1 1 150px; }
+        .quest-row-title { display: block; font-size: 13px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+        .quest-row-meta { display: block; font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; line-height: 1.35; overflow-wrap: anywhere; }
+        /* Пояснение «Действия временно недоступны» — предупреждение, а не курсивная сноска */
+        .quest-row-note { display: block; font-size: 11px; color: var(--ca-warning); margin-top: var(--ca-space-1); line-height: 1.35; overflow-wrap: anywhere; }
+        .quest-row-trailing { display: flex; align-items: center; gap: var(--ca-space-2); flex-shrink: 0; margin-left: auto; }
+        .quest-badge { font-size: 11px; font-weight: 700; padding: var(--ca-space-1) var(--ca-space-3); border-radius: var(--ca-radius-pill); white-space: nowrap; }
         .quest-badge-paid { background: var(--ca-tint-success); color: var(--ca-success); }
         .quest-badge-wait { background: var(--ca-tint-info); color: var(--ca-accent-blue); }
-        .quest-badge-locked { background: var(--ca-tint-muted); color: var(--tg-hint); }
-        .quest-claim-btn { background: var(--tg-btn); color: var(--tg-btn-text); border: none; border-radius: var(--ca-radius-xs); padding: 8px var(--ca-space-3); font-size: var(--text-small); font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .quest-badge-locked { background: var(--ca-tint-muted); color: var(--ca-text-secondary); }
+        .quest-claim-btn {
+            box-sizing: border-box; min-height: var(--ca-touch); padding: 0 var(--ca-space-4);
+            background: var(--ca-gradient-primary); color: var(--ca-on-accent);
+            border: none; border-radius: var(--ca-radius-sm);
+            font-size: var(--text-small); font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
         .quest-claim-btn:disabled { opacity: var(--ca-disabled-opacity); cursor: default; }
-        .quest-replace-btn { background: var(--ca-surface-nested); border: 1px solid var(--ca-border); border-radius: var(--ca-radius-xs); width: 32px; height: 32px; font-size: var(--text-body); cursor: pointer; flex-shrink: 0; color: var(--tg-text); }
+        .quest-replace-btn {
+            box-sizing: border-box; width: var(--ca-touch); height: var(--ca-touch);
+            background: var(--ca-surface-nested); border: 1px solid var(--ca-border);
+            border-radius: var(--ca-radius-sm); font-size: var(--text-body);
+            cursor: pointer; flex-shrink: 0; color: var(--tg-text);
+        }
         .quest-replace-btn:disabled { opacity: 0.4; cursor: default; }
+        .quest-claim-btn:focus-visible, .quest-replace-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
 
-        /* График пробников */
+        /* =====================================================================
+           График пробников (этап 4). Разметка SVG живёт в renderMockChart:
+           там же поднят кегль подписей (было 9px, на 360px это ~8px после
+           масштабирования) и цвета переведены на токены. #exam-info-box создаётся
+           той же строкой и читается в showExamInfo — ID сохранён дословно (R5).
+           ===================================================================== */
         .mock-chart-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-5); margin-bottom: var(--ca-space-5); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
-        .chart-title { font-weight: 800; font-size: var(--text-section); margin-bottom: var(--ca-space-4); }
+        .chart-title { font-weight: 800; font-size: var(--text-section); line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .chart-empty { text-align: center; padding: var(--ca-space-6) var(--ca-space-3); color: var(--ca-text-muted); font-size: var(--text-body); }
-        .exam-info-box { margin-top: var(--ca-space-3); text-align: center; font-size: 13px; padding: 8px; background: var(--ca-surface-nested); border-radius: var(--ca-radius-sm); min-height: 18px; }
-        .chart-disclaimer { margin-top: var(--ca-space-2); text-align: center; font-size: 11px; color: var(--tg-hint); }
+        .exam-info-box {
+            margin-top: var(--ca-space-3); padding: var(--ca-space-3);
+            text-align: center; font-size: var(--text-small); line-height: 1.4;
+            background: var(--ca-surface-nested); border: 1px solid var(--ca-border-soft);
+            border-radius: var(--ca-radius-md); min-height: 18px; overflow-wrap: anywhere;
+        }
+        .chart-disclaimer { margin-top: var(--ca-space-2); text-align: center; font-size: 11px; color: var(--ca-text-muted); line-height: 1.35; }
 
         /* Рейтинг и бублики (этап 3): две равные карточки, всегда в одну строку.
            minmax(0, 1fr) вместо 1fr — длинное значение не растягивает свою колонку и не
@@ -756,70 +803,93 @@
            токен валюты (и эмодзи 🥯 в подписи сохранено как есть, SVG его не заменяет). */
         .stat-card.stat-currency .stat-val { color: var(--ca-currency); }
 
-        /* История баланса */
+        /* Истории (этап 4): баланс и сезоны — один визуальный компонент .history-item.
+           Тексты причин (reasonMap) и подстановка ярлыков в loadBalanceHistory не тронуты. */
         .history-section { margin-top: var(--ca-space-6); }
-        .history-title { font-size: var(--text-section); font-weight: 800; margin-bottom: var(--ca-space-4); }
+        .history-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .history-list { list-style: none; padding: 0; margin: 0; background: var(--tg-secondary); border-radius: var(--ca-radius-xl); overflow: hidden; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2); }
         .history-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: var(--ca-space-5) var(--ca-space-5); border-bottom: 1px solid var(--ca-divider);
+            display: flex; justify-content: space-between; align-items: center; gap: var(--ca-space-3);
+            padding: var(--ca-space-4) var(--ca-space-5); border-bottom: 1px solid var(--ca-divider);
         }
         .history-item:last-child { border-bottom: none; }
-        .hist-info { flex: 1; }
-        .hist-reason { font-weight: 600; font-size: var(--text-body); }
-        .hist-date { font-size: 11px; color: var(--tg-hint); margin-top: 3px; }
-        .hist-amount { font-weight: 800; font-size: var(--text-section); }
+        .hist-info { flex: 1; min-width: 0; }
+        .hist-reason { font-weight: 600; font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
+        .hist-date { font-size: 11px; color: var(--ca-text-secondary); margin-top: 3px; }
+        .hist-amount { flex-shrink: 0; font-weight: 800; font-size: var(--text-body); white-space: nowrap; font-variant-numeric: tabular-nums; }
         .hist-positive { color: var(--ca-success); }
         .hist-negative { color: var(--ca-error); }
 
-        /* Достижения (G5) */
+        /* =====================================================================
+           Достижения (G5, этап 4). Полученные — SVG-иконка спрайта в акценте,
+           неполученные — 🔒 и grayscale. Поле icon в ACHIEVEMENTS_META остаётся
+           и работает запасным вариантом, витрина и пикер читают его как раньше.
+           ===================================================================== */
         .achievements-section { margin-top: var(--ca-space-6); }
-        .achievements-title { font-size: var(--text-section); font-weight: 800; margin-bottom: var(--ca-space-4); }
-        .ach-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ca-space-3); }
+        .achievements-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; margin-bottom: var(--ca-space-4); }
+        .ach-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ca-space-2); }
         .ach-tile {
-            background: var(--tg-secondary); border-radius: var(--ca-radius-lg); padding: var(--ca-space-4) var(--ca-space-2);
-            text-align: center; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2);
+            min-width: 0; background: var(--tg-secondary); border-radius: var(--ca-radius-lg);
+            padding: var(--ca-space-3) var(--ca-space-2);
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: var(--ca-space-2);
+            text-align: center; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1);
         }
-        .ach-tile.locked { opacity: 0.4; filter: grayscale(1); }
-        .ach-icon { font-size: 28px; line-height: 1; }
-        .ach-name { font-size: 11px; font-weight: 600; margin-top: var(--ca-space-2); line-height: 1.2; }
+        .ach-tile.locked { opacity: 0.45; filter: grayscale(1); }
+        .ach-icon { font-size: 26px; line-height: 1; color: var(--ca-accent); }
+        .ach-name { font-size: 11px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
         @media (max-width: 380px) { .ach-grid { grid-template-columns: repeat(3, 1fr); } }
 
         /* Альбом коллекций (S6) */
         .collections-section { margin-top: var(--ca-space-6); }
-        .collections-title { font-size: var(--text-section); font-weight: 800; margin-bottom: var(--ca-space-4); }
+        .collections-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .collection-block { margin-bottom: var(--ca-space-5); }
-        .collection-season-title { font-size: 13px; font-weight: 700; color: var(--tg-hint); margin-bottom: 8px; }
-        .coll-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
-        .coll-tile { min-width: 0; text-align: center; }
+        .collection-season-title { font-size: var(--text-small); font-weight: 700; color: var(--ca-text-secondary); margin-bottom: var(--ca-space-2); }
+        .coll-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ca-space-2); }
+        .coll-tile { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
         .coll-tile.locked .shop-preview { opacity: 0.42; filter: grayscale(1); }
-        .coll-name { min-height: 27px; font-size: 11px; color: var(--tg-text); margin-top: 5px; line-height: 1.22; overflow-wrap: anywhere; }
+        .coll-name { min-height: 27px; font-size: 11px; color: var(--ca-text-secondary); margin-top: var(--ca-space-1); line-height: 1.22; overflow-wrap: anywhere; }
         @media (max-width: 380px) { .coll-grid { grid-template-columns: repeat(3, 1fr); } }
 
-        /* Витрина профиля (S7) */
+        /* =====================================================================
+           Витрина профиля (S7, этап 4). Три слота; обработчик вешает JS
+           (tile.onclick = openShowcasePicker(pos)), повторный клик по тому же
+           слоту закрывает пикер — поведение не меняется.
+           ===================================================================== */
         .showcase-section { margin-top: var(--ca-space-5); margin-bottom: var(--ca-space-5); }
-        .showcase-title { font-size: var(--text-section); font-weight: 800; margin-bottom: var(--ca-space-4); }
-        .showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .showcase-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; margin-bottom: var(--ca-space-4); }
+        .showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ca-space-2); }
         .showcase-tile {
-            background: var(--tg-secondary); border-radius: var(--ca-radius-lg); padding: 9px 5px;
-            text-align: center; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); cursor: pointer; min-height: 64px;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-width: 0; background: var(--tg-secondary); border-radius: var(--ca-radius-lg); padding: var(--ca-space-3) var(--ca-space-2);
+            text-align: center; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); cursor: pointer;
+            min-height: calc(var(--ca-touch) + var(--ca-space-6));
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ca-space-1);
+            transition: border-color var(--ca-transition), background var(--ca-transition);
         }
-        .showcase-tile.empty { opacity: 0.5; border: 1.5px dashed var(--ca-border); box-shadow: none; background: transparent; }
-        .showcase-icon { font-size: 23px; line-height: 1; }
-        .showcase-name { font-size: 10px; font-weight: 650; margin-top: 5px; line-height: 1.2; overflow-wrap: anywhere; }
+        .showcase-tile.empty { opacity: 0.6; border: 1.5px dashed var(--ca-border); box-shadow: none; background: transparent; }
+        @media (hover: hover) and (pointer: fine) {
+            .showcase-tile:hover { border-color: var(--ca-accent-soft); }
+        }
+        .showcase-icon { font-size: 22px; line-height: 1; }
+        .showcase-name { font-size: 10px; font-weight: 650; line-height: 1.2; overflow-wrap: anywhere; }
         .showcase-picker {
             margin-top: var(--ca-space-3); background: var(--ca-surface-elevated); border-radius: var(--ca-radius-lg); padding: var(--ca-space-4);
             border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2);
             max-height: 240px; overflow-y: auto;
         }
-        .showcase-picker-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+        .showcase-picker-title { font-size: 13px; font-weight: 700; margin-bottom: var(--ca-space-2); }
         .showcase-chip {
-            display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
-            background: var(--ca-surface-nested); border: none; border-radius: var(--ca-radius-sm); padding: 8px var(--ca-space-3);
+            display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--ca-touch); text-align: left;
+            background: var(--ca-surface-nested); border: 1px solid var(--ca-border-soft); border-radius: var(--ca-radius-sm);
+            padding: var(--ca-space-2) var(--ca-space-3);
             margin-bottom: var(--ca-space-2); font-size: 13px; cursor: pointer; color: var(--tg-text);
+            overflow-wrap: anywhere;
         }
-        .showcase-chip-clear { color: var(--ca-error); font-weight: 600; }
+        .showcase-chip:last-child { margin-bottom: 0; }
+        .showcase-chip:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        @media (hover: hover) and (pointer: fine) {
+            .showcase-chip:hover { border-color: var(--ca-accent-soft); background: var(--ca-tint-accent); }
+        }
+        .showcase-chip-clear { color: var(--ca-error); font-weight: 700; }
         .showcase-picker-empty { font-size: var(--text-small); color: var(--ca-text-muted); text-align: center; padding: var(--ca-space-3); }
 
         /* Магазин «Бубличная» (S2) */

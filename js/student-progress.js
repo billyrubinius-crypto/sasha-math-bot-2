@@ -270,8 +270,11 @@
             const points = trajectory.points || [];
             mockExamPoints = points;
 
-            const W = 320, H = 140;
-            const padL = 32, padR = 12, padT = 10, padB = 26;
+            // Этап 4: холст чуть выше и поля больше — только чтобы вместить подписи 11px
+            // (было 9px, после масштабирования на 360px это читалось как ~8px, §17).
+            // xFor/yFor, minScore/maxScore и обработчик точки не менялись.
+            const W = 320, H = 152;
+            const padL = 34, padR = 12, padT = 12, padB = 32;
             const plotW = W - padL - padR;
             const plotH = H - padT - padB;
 
@@ -290,26 +293,28 @@
             const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
                 const y = padT + plotH * (1 - f);
                 const val = Math.round(minScore + (maxScore - minScore) * f);
-                return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="rgba(128,128,128,0.15)" stroke-width="1"/>
-                        <text x="${padL - 6}" y="${y + 4}" font-size="9" text-anchor="end" fill="var(--tg-hint)">${val}</text>`;
+                return `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="var(--ca-divider)" stroke-width="1"/>
+                        <text x="${padL - 6}" y="${y + 4}" font-size="11" text-anchor="end" fill="var(--ca-text-secondary)">${val}</text>`;
             }).join('');
 
             const linePoints = points.map((p, i) => `${xFor(i)},${yFor(Number(p.score) || 0)}`).join(' ');
 
             const dots = points.map((p, i) => {
                 const x = xFor(i), y = yFor(Number(p.score) || 0);
-                return `<circle cx="${x}" cy="${y}" r="5" fill="var(--tg-link)" stroke="var(--tg-bg)" stroke-width="2" style="cursor:pointer" onclick="showExamInfo(${i})"/>`;
+                // stroke — цвет поверхности карточки (график лежит на .mock-chart-section),
+                // раньше это был фон приложения и вокруг точки оставалось чужое кольцо.
+                return `<circle cx="${x}" cy="${y}" r="6" fill="var(--ca-accent)" stroke="var(--ca-surface)" stroke-width="2" style="cursor:pointer" onclick="showExamInfo(${i})"/>`;
             }).join('');
 
             const labels = points.map((p, i) => {
                 const x = xFor(i);
-                return `<text x="${x}" y="${H - padB + 16}" font-size="9" text-anchor="middle" fill="var(--tg-hint)">№${i + 1}</text>`;
+                return `<text x="${x}" y="${H - padB + 18}" font-size="11" text-anchor="middle" fill="var(--ca-text-secondary)">№${i + 1}</text>`;
             }).join('');
 
             container.innerHTML = `
                 <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;">
                     ${gridLines}
-                    <polyline points="${linePoints}" fill="none" stroke="var(--tg-link)" stroke-width="1.5" opacity="0.4"/>
+                    <polyline points="${linePoints}" fill="none" stroke="var(--ca-accent)" stroke-width="2" opacity="0.55" stroke-linecap="round" stroke-linejoin="round"/>
                     ${dots}
                     ${labels}
                 </svg>
@@ -571,8 +576,17 @@
                     if (a.legacy && !has) return; // legacy — показываем только владельцам
                     const tile = document.createElement('div');
                     tile.className = `ach-tile ${has ? '' : 'locked'}`;
+                    // Этап 4: полученное достижение рисуется символом спрайта (поле svg,
+                    // добавленное на этапе 2), неполученное — замком. Эмодзи icon остаётся
+                    // в метаданных и работает запасным вариантом; витрина, пикер и подписи
+                    // условий в магазине по-прежнему читают icon/name/code без изменений.
+                    const iconMarkup = has
+                        ? (a.svg
+                            ? `<svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#${a.svg}" xlink:href="#${a.svg}"></use></svg>`
+                            : a.icon)
+                        : '🔒';
                     tile.innerHTML = `
-                        <div class="ach-icon">${has ? a.icon : '🔒'}</div>
+                        <div class="ach-icon">${iconMarkup}</div>
                         <div class="ach-name">${esc(a.name)}</div>
                     `;
                     grid.appendChild(tile);
