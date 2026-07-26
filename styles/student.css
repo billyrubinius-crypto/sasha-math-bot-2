@@ -128,10 +128,17 @@
             --ca-space-7: 25px;
 
             --ca-nav-h: 65px;
-            --ca-avatar-size: 40px;
+            --ca-avatar-size: 48px;
             --ca-avatar-sm: 32px;
             --ca-touch: 44px;
             --ca-icon-tile: 30px;
+
+            /* Отступ колонки информации профиля (этап 3). Раньше это было магическое 52px
+               в .profile-meta-row и .rank-progress — ровно «аватар 40 + gap 12» (§17), из-за
+               чего смена размера аватара разъезжалась с выравниванием. Теперь величина
+               выводится из тех же токенов, что и сама сетка шапки: колонка аватара
+               (--ca-avatar-size) плюс её gap (--ca-space-4, см. .profile-header). */
+            --ca-profile-indent: calc(var(--ca-avatar-size) + var(--ca-space-4));
 
             /* Safe area: и браузерный env(), и CSS-переменные Telegram (Bot API 8.0+ проставляет
                --tg-safe-area-inset-*, WebApp может их не знать) — берём большее из двух источников,
@@ -495,8 +502,26 @@
         .screen.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Профиль */
-        .profile-header { display: flex; align-items: flex-start; gap: var(--ca-space-4); margin-bottom: var(--ca-space-3); padding-top: 8px; }
+        /* =====================================================================
+           Шапка профиля (этап 3).
+
+           Одна сетка на всю верхнюю группу: колонка аватара (--ca-avatar-size) и
+           колонка информации (minmax(0,1fr)). Прогресс звания и карточка титула —
+           сёстры .profile-header в разметке, поэтому выравниваются по той же колонке
+           через --ca-profile-indent; магических 52px больше нет нигде.
+
+           Косметика (R4/§10.1): ни одно правило здесь не задаёт color вложенным span
+           внутри #user-name — иначе индивидуальный цвет ника (инлайн), .nick-gold
+           (background-clip: text), emoji-статус и корона перестали бы работать.
+           На .avatar-container не добавлены ни box-sizing, ни transform, ни цвет:
+           frame-* рисуются кольцами box-shadow, а frame-orbit — conic-gradient
+           фоном самого контейнера с padding: 3px в content-box.
+           ===================================================================== */
+        .profile-header {
+            display: grid; grid-template-columns: var(--ca-avatar-size) minmax(0, 1fr);
+            align-items: center; gap: var(--ca-space-4);
+            margin-bottom: var(--ca-space-3); padding-top: 8px;
+        }
         .avatar-container {
             width: var(--ca-avatar-size); height: var(--ca-avatar-size); border-radius: 50%; flex-shrink: 0;
             background: var(--tg-secondary); overflow: hidden; position: relative;
@@ -507,17 +532,25 @@
             width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
             font-size: var(--text-section); font-weight: bold; color: var(--tg-link); background: var(--ca-tint-accent);
         }
-        .profile-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
-        .user-name { font-size: var(--text-section); line-height: 1.25; font-weight: 800; margin: 0; text-align: left; overflow-wrap: anywhere; min-width: 0; }
+        .profile-identity { min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: var(--ca-space-2); }
+        .user-name { font-size: var(--text-screen); line-height: 1.2; font-weight: 800; margin: 0; text-align: left; overflow-wrap: anywhere; min-width: 0; }
         .profile-meta-list { display: flex; flex-direction: column; gap: var(--ca-space-1); min-width: 0; }
-        /* display: grid продублирован из инлайнового style.display, который ставит JS (§13.6-5) */
-        .profile-meta-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: baseline; gap: 7px; min-width: 0; }
-        .profile-meta-label { color: var(--tg-hint); font-size: 11px; line-height: 1.25; }
-        .profile-meta-value { min-width: 0; font-size: var(--text-small); font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
-        .group-badge {
-            color: var(--tg-hint);
+        /* display: grid продублирован из инлайнового style.display, который ставит JS (§13.6-5).
+           Колонка подписи — auto с минимумом в em: она растёт под длинную подпись вместо того,
+           чтобы обрезать её (как делала жёсткая колонка 52px), и обе строки при этом выровнены,
+           потому что минимум одинаковый и задан относительно кегля самой подписи. */
+        .profile-meta-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--ca-space-2); min-width: 0; }
+        .profile-meta-label { min-width: 4.6em; color: var(--ca-text-secondary); font-size: 11px; line-height: 1.3; }
+        .profile-meta-value {
+            min-width: 0; max-width: 100%; justify-self: start;
+            padding: 2px 8px; border-radius: var(--ca-radius-pill);
+            background: var(--ca-tint-muted); color: var(--ca-text-secondary);
+            font-size: var(--text-small); font-weight: 700; line-height: 1.35; overflow-wrap: anywhere;
         }
-        .group-badge.assigned { color: var(--tg-link); }
+        .group-badge {
+            color: var(--ca-text-secondary);
+        }
+        .group-badge.assigned { background: var(--ca-tint-info); color: var(--ca-accent-blue); }
         .streak-badge {
             display: inline-block; background: var(--ca-warning); color: var(--ca-on-warning);
             padding: var(--ca-space-1) var(--ca-space-3); border-radius: var(--ca-radius-md); font-size: var(--text-small); font-weight: bold; margin-bottom: var(--ca-space-4);
@@ -540,46 +573,150 @@
         .shield-buy-btn { background: var(--ca-gradient-primary); color: var(--ca-on-accent); border: none; border-radius: var(--ca-radius-sm); padding: var(--ca-space-3) var(--ca-space-5); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .shield-buy-btn:disabled { opacity: var(--ca-disabled-opacity); cursor: default; }
 
-        /* Единый рабочий блок: неделя сверху, действия сейчас ниже */
+        /* =====================================================================
+           Единый рабочий блок: неделя сверху, действия сейчас ниже (этап 3).
+
+           Остаётся одним блоком .week-block внутри профиля (отдельного экрана недели
+           и отдельного экрана «Сделать сейчас» нет). Порядок разделов не меняется:
+           заголовок → подзаголовок → прогресс → семь дней → деталь дня → еженедельное
+           → итоги → прогноз → «Сделать сейчас».
+           ===================================================================== */
         .week-block { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-5); margin-bottom: var(--ca-space-5); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
         .week-block-head, .now-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ca-space-4); }
-        .week-block-title, .now-title { font-weight: 800; font-size: var(--text-section); }
-        .week-progress { font-size: var(--text-screen); font-weight: 800; color: var(--tg-link); white-space: nowrap; }
-        .week-block-sub { font-size: 11px; color: var(--tg-hint); margin-top: 2px; }
-        .week-days-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 13px; }
-        .week-day-chip { min-width: 0; height: 54px; padding: 5px 2px; border: 1px solid transparent; border-radius: var(--ca-radius-xs); background: var(--ca-surface-nested); color: var(--tg-text); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ca-space-1); }
-        .week-day-chip.today { border-color: var(--ca-accent-soft); }
-        .week-day-chip.selected { border-color: var(--tg-link); }
-        .week-day-name { font-size: 10px; color: var(--tg-hint); }
-        .week-day-mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--ca-tint-muted); }
-        .week-day-chip.wd-approved .week-day-mark { background: var(--ca-success); color: var(--ca-on-accent); }
-        .week-day-chip.wd-shielded .week-day-mark { background: var(--ca-warning); color: var(--ca-on-warning); }
-        .week-day-chip.wd-revision .week-day-mark { background: var(--ca-reward); color: var(--ca-on-warning); }
-        .week-day-chip.wd-missed .week-day-mark { background: var(--ca-error); color: var(--ca-on-accent); }
+        .week-block-title, .now-title { font-weight: 800; font-size: var(--text-section); line-height: 1.25; min-width: 0; }
+        /* Прогресс недели — компактная пилюля, а не второй заголовок экрана: цифра
+           остаётся главной в блоке, но не спорит по весу с названием раздела. */
+        .week-progress {
+            flex-shrink: 0; white-space: nowrap;
+            font-size: var(--text-section); font-weight: 800; line-height: 1.2;
+            color: var(--ca-accent); background: var(--ca-tint-accent);
+            padding: var(--ca-space-1) var(--ca-space-3); border-radius: var(--ca-radius-pill);
+        }
+        .week-block-sub { font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
+
+        /* Полоса из семи дней: ровно семь равных колонок на любой ширине (никакой
+           фиксированной ширины чипа, никакого переноса и горизонтальной прокрутки).
+           На 360px внутренняя ширина .week-block ≈ 288px, при gap 4px это ≈ 37.7px
+           на день — достаточно для метки 22px и подписи дня. Высота задана минимумом
+           (--ca-touch), а не жёсткими 54px: чип не сожмётся ниже комфортного тапа и
+           вырастет, если подпись перенесётся при увеличенном системном шрифте. */
+        .week-days-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--ca-space-1); margin-top: var(--ca-space-4); }
+        .week-day-chip {
+            min-width: 0; min-height: var(--ca-touch); padding: var(--ca-space-2) 1px;
+            border: 1px solid var(--ca-border-soft); border-radius: var(--ca-radius-sm);
+            background: var(--ca-surface-nested); color: var(--tg-text);
+            cursor: pointer; -webkit-tap-highlight-color: transparent;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+            transition: border-color var(--ca-transition), background var(--ca-transition);
+        }
+        .week-day-name { font-size: 11px; line-height: 1.1; color: var(--ca-text-secondary); }
+        .week-day-mark {
+            width: 22px; height: 22px; border-radius: 50%;
+            display: grid; place-items: center;
+            font-size: 12px; line-height: 1; font-weight: 800;
+            background: var(--ca-tint-muted); color: var(--ca-text-secondary);
+        }
+        /* Семь серверных статусов дня. Цвет — не единственный сигнал: у каждого статуса
+           остаётся собственный знак из WEEK_DAY_MARKS и aria-label с текстовой подписью
+           («Понедельник: принято»), а состояния «щит» и «не назначено» дополнительно
+           отличаются рамкой и приглушённостью. */
+        .week-day-chip.wd-not_assigned { opacity: 0.55; }
+        .week-day-chip.wd-not_assigned .week-day-mark { background: var(--ca-tint-muted); color: var(--ca-text-muted); }
+        .week-day-chip.wd-assigned .week-day-mark { background: var(--ca-tint-info); color: var(--ca-accent-blue); }
         .week-day-chip.wd-submitted .week-day-mark { background: var(--ca-accent-blue); color: var(--ca-on-accent); }
-        .week-day-chip.wd-not_assigned { opacity: 0.45; }
-        .week-day-detail { display: none; margin-top: var(--ca-space-3); padding: var(--ca-space-3) 0 2px; border-top: 1px solid var(--ca-divider); font-size: var(--text-small); line-height: 1.45; }
-        .week-day-detail.open { display: flex; align-items: center; justify-content: space-between; gap: var(--ca-space-3); }
-        .week-day-detail-main { min-width: 0; }
+        .week-day-chip.wd-revision .week-day-mark { background: var(--ca-warning); color: var(--ca-on-warning); }
+        .week-day-chip.wd-approved .week-day-mark { background: var(--ca-success); color: var(--ca-on-accent); }
+        .week-day-chip.wd-missed .week-day-mark { background: var(--ca-error); color: var(--ca-on-accent); }
+        /* «Закрыто щитом»: знак — эмодзи 🛡, оно рисуется своими цветами и не подчиняется
+           color, поэтому статус держится на тёплой подложке чипа и его рамке. */
+        .week-day-chip.wd-shielded { background: var(--ca-tint-warning); border-color: var(--ca-warning); }
+        .week-day-chip.wd-shielded .week-day-mark { background: var(--ca-tint-warning); color: var(--ca-warning); font-size: 11px; }
+        /* today и selected могут стоять на одном дне: «сегодня» — мягкая рамка и акцентная
+           подпись, «выбран» — сплошная рамка с внутренним кольцом (inset, чтобы кольцо не
+           выходило в соседнюю колонку). Порядок правил важен: selected перебивает today. */
+        .week-day-chip.today { border-color: var(--ca-accent-soft); }
+        .week-day-chip.today .week-day-name { color: var(--ca-accent); font-weight: 800; }
+        .week-day-chip.selected { border-color: var(--ca-accent); box-shadow: inset 0 0 0 1px var(--ca-accent); }
+        .week-day-chip:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        @media (hover: hover) and (pointer: fine) {
+            .week-day-chip:hover { border-color: var(--ca-accent-soft); }
+        }
+
+        /* Деталь выбранного дня: раскрытие — только классом .open (его ставит/снимает
+           selectWeekDay/renderWeekDayDetail). flex-wrap — чтобы на узком экране кнопка
+           щита уходила на свою строку, а не выдавливалась за край. */
+        .week-day-detail {
+            display: none; margin-top: var(--ca-space-3); padding: var(--ca-space-3);
+            border-radius: var(--ca-radius-md); background: var(--ca-surface-nested);
+            border: 1px solid var(--ca-border-soft);
+            font-size: var(--text-small); line-height: 1.45;
+        }
+        .week-day-detail.open { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ca-space-3); }
+        .week-day-detail-main { flex: 1 1 150px; min-width: 0; }
         .week-day-detail-title { font-weight: 700; overflow-wrap: anywhere; }
-        .week-day-detail-note { color: var(--tg-hint); margin-top: 2px; }
-        .week-shield-btn { font-size: 10px; padding: var(--ca-space-1) 8px; border-radius: var(--ca-radius-xs); border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        .week-day-detail-note { color: var(--ca-text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
+        .week-shield-btn {
+            flex: 0 0 auto; min-height: var(--ca-touch); padding: 0 var(--ca-space-4);
+            border: 1px solid transparent; border-radius: var(--ca-radius-sm);
+            font-size: var(--text-small); font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
         .week-shield-btn.apply { background: var(--ca-warning); color: var(--ca-on-warning); }
-        .week-shield-btn.remove { background: var(--ca-tint-muted); color: var(--ca-text-secondary); }
+        .week-shield-btn.remove { background: transparent; border-color: var(--ca-border); color: var(--ca-text-secondary); }
+        .week-shield-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
         .week-shield-btn:disabled { opacity: var(--ca-disabled-opacity); cursor: default; }
-        .week-weekly-row { margin-top: var(--ca-space-3); font-size: var(--text-small); overflow-wrap: anywhere; }
-        .week-totals, .week-forecast, .week-neutral-note { margin-top: 5px; font-size: 11px; color: var(--tg-hint); line-height: 1.4; }
-        .now-section { margin-top: var(--ca-space-5); padding-top: var(--ca-space-5); border-top: 1px solid var(--ca-divider); }
-        .now-count { min-width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--tg-link); color: var(--ca-on-accent); font-size: var(--text-small); font-weight: 800; }
-        .now-list { margin-top: 8px; }
-        .now-item { width: 100%; display: flex; align-items: center; gap: var(--ca-space-3); padding: var(--ca-space-3) 0; border: 0; border-bottom: 1px solid var(--ca-divider); background: transparent; color: var(--tg-text); text-align: left; cursor: pointer; }
-        .now-item:last-child { border-bottom: none; }
-        .now-icon { width: var(--ca-icon-tile); height: var(--ca-icon-tile); border-radius: var(--ca-radius-xs); display: grid; place-items: center; flex-shrink: 0; background: var(--ca-surface-nested); }
+
+        /* Три информационные строки недели (§13.6-2: классов у них раньше не было в
+           разметке, поэтому эти правила не применялись вообще). Читаются как один
+           компактный блок: отбивка сверху, единый ритм, значения в <b> контрастнее
+           подписи. :empty гасит строку целиком — до загрузки и в ошибочной ветке
+           loadWeekBlock не остаётся ни висячей линии, ни пустых отступов. */
+        .week-weekly-row {
+            margin-top: var(--ca-space-4); padding-top: var(--ca-space-3);
+            border-top: 1px solid var(--ca-divider);
+            font-size: var(--text-small); line-height: 1.45; overflow-wrap: anywhere;
+        }
+        .week-totals, .week-forecast, .week-neutral-note { margin-top: var(--ca-space-2); font-size: 11px; color: var(--ca-text-secondary); line-height: 1.4; overflow-wrap: anywhere; }
+        .week-weekly-row b, .week-totals b { font-weight: 800; color: var(--ca-text); }
+        .week-weekly-row:empty, .week-totals:empty, .week-forecast:empty { display: none; }
+
+        /* «Сделать сейчас»: строки-мини-карточки внутри того же блока недели. */
+        .now-section { margin-top: var(--ca-space-5); padding-top: var(--ca-space-4); border-top: 1px solid var(--ca-divider); }
+        .now-count {
+            box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 var(--ca-space-2);
+            border-radius: var(--ca-radius-pill); display: grid; place-items: center; flex-shrink: 0;
+            background: var(--ca-accent); color: var(--ca-on-accent); font-size: var(--text-small); font-weight: 800;
+        }
+        .now-list { margin-top: var(--ca-space-3); display: grid; gap: var(--ca-space-2); }
+        /* box-sizing здесь точечный: глобального border-box в проекте нет, а width: 100%
+           вместе с горизонтальным padding и рамкой иначе дал бы переполнение по ширине. */
+        .now-item {
+            box-sizing: border-box; width: 100%; min-height: var(--ca-touch);
+            display: flex; align-items: center; gap: var(--ca-space-3);
+            padding: var(--ca-space-2) var(--ca-space-3);
+            border: 1px solid var(--ca-border-soft); border-radius: var(--ca-radius-md);
+            background: var(--ca-surface-nested); color: var(--tg-text);
+            text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+            transition: border-color var(--ca-transition), background var(--ca-transition);
+        }
+        .now-item:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        @media (hover: hover) and (pointer: fine) {
+            .now-item:hover { border-color: var(--ca-accent-soft); background: var(--ca-tint-accent); }
+        }
+        .now-icon { width: var(--ca-icon-tile); height: var(--ca-icon-tile); border-radius: var(--ca-radius-xs); display: grid; place-items: center; flex-shrink: 0; background: var(--ca-surface); font-size: 15px; line-height: 1; }
         .now-main { min-width: 0; flex: 1; }
-        .now-item-title { display: block; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
-        .now-item-meta { display: block; font-size: 10px; color: var(--tg-hint); margin-top: 2px; overflow-wrap: anywhere; }
-        .now-arrow { font-size: 18px; color: var(--tg-hint); }
-        .summary-empty { text-align: center; padding: var(--ca-space-4) var(--ca-space-1) var(--ca-space-1); color: var(--ca-text-muted); font-size: 13px; }
+        .now-item-title { display: block; font-size: 13px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+        .now-item-meta { display: block; font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
+        .now-arrow { font-size: 18px; line-height: 1; color: var(--ca-text-muted); flex-shrink: 0; }
+        .summary-empty { text-align: center; padding: var(--ca-space-4) var(--ca-space-2); color: var(--ca-text-muted); font-size: 13px; }
+
+        /* Узкие экраны (360–380px): блок недели отдаёт полосе дней немного собственных
+           отступов, чтобы семь колонок остались комфортными (≈39px на день при 360px).
+           Отдельный медиазапрос этапа 3 — медиазапросы других этапов не трогаем. */
+        @media (max-width: 380px) {
+            .week-block { padding: var(--ca-space-4); }
+            .week-days-strip { gap: 3px; }
+            .week-day-chip { padding: var(--ca-space-2) 0; }
+        }
 
         /* Сегодня: math + life квесты Stage 4 (U04) */
         .today-block { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-5); margin-bottom: var(--ca-space-5); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
@@ -608,10 +745,16 @@
         .exam-info-box { margin-top: var(--ca-space-3); text-align: center; font-size: 13px; padding: 8px; background: var(--ca-surface-nested); border-radius: var(--ca-radius-sm); min-height: 18px; }
         .chart-disclaimer { margin-top: var(--ca-space-2); text-align: center; font-size: 11px; color: var(--tg-hint); }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--ca-space-3); margin-bottom: var(--ca-space-5); }
-        .stat-card { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: 13px var(--ca-space-3); text-align: left; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
-        .stat-val { font-size: var(--text-metric); line-height: 1.1; font-weight: 850; color: var(--tg-link); margin-bottom: 3px; }
-        .stat-label { font-size: var(--text-small); color: var(--tg-hint); letter-spacing: 0.1px; }
+        /* Рейтинг и бублики (этап 3): две равные карточки, всегда в одну строку.
+           minmax(0, 1fr) вместо 1fr — длинное значение не растягивает свою колонку и не
+           выталкивает вторую карточку за экран; жёсткой ширины ни у одной из них нет. */
+        .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ca-space-3); margin-bottom: var(--ca-space-5); }
+        .stat-card { min-width: 0; background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-4); text-align: left; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
+        .stat-val { font-size: var(--text-metric); line-height: 1.1; font-weight: 850; color: var(--ca-accent); margin-bottom: 3px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+        .stat-label { font-size: 11px; color: var(--ca-text-secondary); letter-spacing: 0.1px; overflow-wrap: anywhere; }
+        /* Бублики — валюта продукта, поэтому у второй карточки собственный семантический
+           токен валюты (и эмодзи 🥯 в подписи сохранено как есть, SVG его не заменяет). */
+        .stat-card.stat-currency .stat-val { color: var(--ca-currency); }
 
         /* История баланса */
         .history-section { margin-top: var(--ca-space-6); }
@@ -936,12 +1079,14 @@
         }
         .nick-crown, .nick-status { margin: 0 3px; -webkit-text-fill-color: initial; }
 
-        /* Экипированный титул — отдельная подписанная карточка, а не часть длинного имени. */
+        /* Экипированный титул — отдельная подписанная карточка, а не часть длинного имени.
+           Выровнена по колонке информации профиля тем же токеном, что и прогресс звания. */
         /* display: flex продублирован из инлайнового style.display, который ставит JS (§13.6-5) */
         .profile-title-card {
             display: flex; align-items: center; gap: var(--ca-space-3); min-width: 0;
             background: var(--tg-secondary); border: 1px solid var(--ca-border-soft);
-            border-radius: var(--ca-radius-md); padding: 9px 11px; margin-bottom: var(--ca-space-4);
+            border-radius: var(--ca-radius-md); padding: var(--ca-space-3); margin-bottom: var(--ca-space-4);
+            margin-left: var(--ca-profile-indent);
         }
         .profile-title-icon { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--ca-accent); --ca-icon-size: 18px; }
         .profile-title-copy { min-width: 0; }
@@ -950,11 +1095,16 @@
 
         /* Звание по труду (L04) — отдельная сущность от экипированного custom title */
         .rank-badge {
-            color: var(--ca-warning);
+            background: var(--ca-tint-reward); color: var(--ca-reward);
         }
+        /* Подпись прогресса до следующего звания. Ширины не имеет — занимает всю колонку
+           информации и переносится по словам; отступ слева выведен из токенов шапки
+           (--ca-profile-indent), поэтому текст не заезжает под аватар при любом его размере.
+           display остаётся block: именно это значение ставит инлайном loadRankTitle. */
         .rank-progress {
-            font-size: 11px; line-height: 1.35; color: var(--tg-hint);
-            margin: 0 0 var(--ca-space-3) 52px; text-align: left;
+            font-size: 11px; line-height: 1.4; color: var(--ca-text-secondary);
+            margin: 0 0 var(--ca-space-4) var(--ca-profile-indent); text-align: left;
+            overflow-wrap: break-word;
         }
 
         /* Рамки аватара (слот frame). База — кольцо вокруг круглого аватара.

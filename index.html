@@ -187,9 +187,11 @@
             </div>
         </div>
 
+        <!-- Ровно две карточки статистики. ID, тексты и источник данных не меняются;
+             .stat-currency — вспомогательный класс оформления (бублики — валюта продукта). -->
         <div class="study-stats stats-grid">
             <div class="stat-card"><div class="stat-val" id="val-rating">-</div><div class="stat-label">Рейтинг</div></div>
-            <div class="stat-card"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
+            <div class="stat-card stat-currency"><div class="stat-val" id="val-huikons">-</div><div class="stat-label">🥯 Бублики</div></div>
         </div>
 
         <!-- Единый рабочий блок: компактная неделя и конкретные действия сейчас -->
@@ -203,9 +205,13 @@
             </div>
             <div class="week-days-strip" id="week-days-strip"></div>
             <div class="week-day-detail" id="week-day-detail"></div>
-            <div id="week-weekly-row"></div>
-            <div id="week-totals"></div>
-            <div id="week-forecast"></div>
+            <!-- Три информационные строки недели. Классы добавлены на этапе 3 (§13.6-2):
+                 правила .week-weekly-row / .week-totals / .week-forecast существовали в CSS,
+                 но не применялись — в разметке у этих div были только ID. ID сохранены
+                 дословно, их читает loadWeekBlock. -->
+            <div id="week-weekly-row" class="week-weekly-row"></div>
+            <div id="week-totals" class="week-totals"></div>
+            <div id="week-forecast" class="week-forecast"></div>
             <div class="now-section">
                 <div class="now-head">
                     <div class="now-title">Сделать сейчас</div>
