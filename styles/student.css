@@ -395,6 +395,9 @@
         }
         button, input, select, textarea { font-family: inherit; line-height: 1.25; }
         .screen > h2 { font-size: var(--text-screen); line-height: 1.2; }
+        /* Заголовок экрана: отступ вместо инлайнового margin-bottom (этап 6 — на
+           #screen-leaderboard; магазин и «Ещё» переедут на этот же класс на этапах 7–8). */
+        .screen-title { margin: 0 0 var(--ca-space-4); }
 
         :focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
 
@@ -1099,29 +1102,60 @@
         }
         .hw-comment.rejected { background: var(--ca-tint-error); color: var(--ca-error); }
 
-        /* Лидерборд */
-        .leaderboard-list { list-style: none; padding: 0; margin: 0; background: var(--tg-secondary); border-radius: var(--ca-radius-xl); overflow: hidden; border: 1px solid var(--ca-border-soft); }
+        /* =====================================================================
+           Лидерборд и лиги (этап 6).
+
+           Строка участника — одна сетка на оба режима («Моя лига» и «Общий топ»),
+           её собирает общий хелпер buildLeaderboardRow. Колонки: ранг (по контенту,
+           с минимумом в em вместо жёстких 35px), аватар (--ca-avatar-sm), имя с
+           титулом (minmax(0,1fr) — переносится и не выталкивает очки) и очки.
+           Отступ между колонками задаёт gap, поэтому margin-right у .lb-avatar
+           больше не нужен (§17: 35px + 32px + 10px были подобраны на глаз).
+
+           Цвет ника (R4): ни одного правила color внутри .lb-name-line — иначе
+           .nick-gold и индивидуальный цвет перестали бы работать.
+           ===================================================================== */
+        .leaderboard-list { list-style: none; padding: 0; margin: 0; background: var(--tg-secondary); border-radius: var(--ca-radius-xl); overflow: hidden; border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
         .lb-item {
-            display: flex; align-items: center; padding: var(--ca-space-5) var(--ca-space-5); border-bottom: 1px solid var(--ca-divider);
+            display: grid; grid-template-columns: auto var(--ca-avatar-sm) minmax(0, 1fr) auto;
+            align-items: center; gap: var(--ca-space-3);
+            padding: var(--ca-space-3) var(--ca-space-4);
+            border-bottom: 1px solid var(--ca-divider);
+            border-left: 4px solid transparent;
         }
         .lb-item:last-child { border-bottom: none; }
-        .lb-rank { width: 35px; font-weight: 800; color: var(--tg-hint); font-size: var(--text-section); }
+        .lb-rank { min-width: 2.4em; text-align: center; font-weight: 800; color: var(--ca-text-secondary); font-size: var(--text-body); font-variant-numeric: tabular-nums; }
         .lb-name { flex: 1; font-weight: 600; font-size: 15px; }
-        .lb-score { font-weight: 800; color: var(--tg-link); font-size: var(--text-section); }
+        .lb-score { font-weight: 800; color: var(--ca-accent); font-size: var(--text-body); white-space: nowrap; font-variant-numeric: tabular-nums; }
         .lb-me { background: var(--ca-tint-accent); }
+        .lb-promote { border-left-color: var(--ca-success); }
+        .lb-demote { border-left-color: var(--ca-error); }
 
         /* Лиги (L03) */
         .lb-mode { display: none; }
         .lb-mode.active { display: block; }
-        .league-badge { text-align: center; font-size: 26px; font-weight: 800; margin-bottom: var(--ca-space-2); }
-        .league-note { font-size: 13px; color: var(--tg-hint); text-align: center; margin-bottom: var(--ca-space-5); }
-        .league-standing { text-align: center; font-size: 15px; margin-bottom: var(--ca-space-5); }
-        .lb-promote { border-left: 4px solid var(--ca-success); }
-        .lb-demote { border-left: 4px solid var(--ca-error); }
-        .league-ladder { list-style: none; padding: 0; margin: 18px 0 0; }
-        .ladder-step { display: flex; align-items: center; gap: var(--ca-space-3); padding: 9px var(--ca-space-5); border-radius: var(--ca-radius-sm); margin-bottom: var(--ca-space-1); background: var(--tg-secondary); opacity: 0.5; font-size: 15px; }
-        .ladder-step.achieved { opacity: 0.8; }
-        .ladder-step.current { opacity: 1; background: var(--ca-tint-accent); font-weight: 800; }
+        .lb-season-label { text-align: center; font-size: var(--text-small); color: var(--ca-text-secondary); margin-bottom: var(--ca-space-4); }
+        .league-badge {
+            text-align: center; font-size: var(--text-screen); line-height: 1.2; font-weight: 800;
+            padding: var(--ca-space-4); margin-bottom: var(--ca-space-3);
+            background: var(--tg-secondary); border: 1px solid var(--ca-border-soft);
+            border-radius: var(--ca-radius-xl); box-shadow: var(--ca-elev-1); overflow-wrap: anywhere;
+        }
+        .league-note { font-size: var(--text-small); color: var(--ca-text-secondary); text-align: center; line-height: 1.45; margin-bottom: var(--ca-space-4); overflow-wrap: anywhere; }
+        /* Предупреждение о пропущенных сезонах: цвет из палитры вместо инлайнового #e67e22 */
+        .league-note.is-warning { color: var(--ca-warning); }
+        .league-standing { text-align: center; font-size: var(--text-body); margin-bottom: var(--ca-space-4); }
+        .league-ladder { list-style: none; padding: 0; margin: var(--ca-space-5) 0 0; display: grid; gap: var(--ca-space-1); }
+        .ladder-step {
+            display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--ca-space-3);
+            padding: var(--ca-space-2) var(--ca-space-4); border-radius: var(--ca-radius-sm);
+            background: var(--tg-secondary); border: 1px solid var(--ca-border-soft);
+            font-size: var(--text-body); color: var(--ca-text-secondary); opacity: 0.6;
+        }
+        .ladder-mark { display: grid; place-items: center; width: 20px; font-size: var(--text-small); line-height: 1; }
+        .ladder-name { min-width: 0; overflow-wrap: anywhere; }
+        .ladder-step.achieved { opacity: 0.85; color: var(--ca-text); }
+        .ladder-step.current { opacity: 1; background: var(--ca-tint-accent); border-color: var(--ca-accent); color: var(--ca-text); font-weight: 800; }
 
         /* Ещё: FAQ и связь с учителем */
         .faq-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: 18px; margin-bottom: var(--ca-space-6); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2); }
@@ -1266,13 +1300,29 @@
 
         /* Лидерборд: аватар со рамкой + строка ника с косметикой (S3) */
         .lb-avatar {
-            width: var(--ca-avatar-sm); height: var(--ca-avatar-sm); border-radius: 50%; flex-shrink: 0; margin-right: var(--ca-space-3);
+            width: var(--ca-avatar-sm); height: var(--ca-avatar-sm); border-radius: 50%; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center; overflow: hidden;
             font-size: 13px; font-weight: bold; color: var(--tg-link); background: var(--ca-tint-accent);
         }
-        .lb-name-wrap { flex: 1; min-width: 0; }
-        .lb-name-line { display: flex; align-items: center; gap: 2px; }
-        .lb-title { font-size: 11px; color: var(--tg-hint); margin-top: 1px; }
+        /* Известный дефект §10.2: frame-orbit рассчитан на аватар с потомком
+           .avatar-img/.avatar-placeholder, а в лидерборде внутри лежит текстовая буква —
+           padding: 3px сжимал её, встречное вращение не применялось, а overflow: hidden
+           дополнительно резал бы кольцо. Чиним чисто в CSS, без правки JS и whitelist:
+           кольцо рисует ::before за пределами бокса (inset: -3px, z-index: -1 — фон самой
+           плашки перекрывает внутреннюю часть), сам контейнер не вращается и не сжимается.
+           Анимацию гасит общий блок prefers-reduced-motion ниже. */
+        .lb-avatar.frame-orbit {
+            padding: 0; overflow: visible; position: relative;
+            background: var(--ca-tint-accent); animation: none;
+        }
+        .lb-avatar.frame-orbit::before {
+            content: ''; position: absolute; inset: -3px; border-radius: 50%; z-index: -1;
+            background: conic-gradient(#00bcd4, #3f51b5, #00bcd4);
+            animation: frameSpin 3.5s linear infinite;
+        }
+        .lb-name-wrap { min-width: 0; }
+        .lb-name-line { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; overflow-wrap: anywhere; }
+        .lb-title { font-size: 11px; color: var(--ca-text-secondary); margin-top: 1px; overflow-wrap: anywhere; }
 
         /* Экипировка в магазине (кнопки Надеть/Снять на купленном) */
         .shop-equip-btn {
@@ -1288,7 +1338,8 @@
             .frame-pulsar { animation: none; }
             .frame-orbit,
             .frame-orbit .avatar-img,
-            .frame-orbit .avatar-placeholder { animation: none; }
+            .frame-orbit .avatar-placeholder,
+            .lb-avatar.frame-orbit::before { animation: none; }
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;

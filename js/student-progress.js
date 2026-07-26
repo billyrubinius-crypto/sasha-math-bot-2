@@ -651,15 +651,60 @@
                 if (t === currentTier) cls += ' current';
                 else if (t < currentTier) cls += ' achieved';
                 const mark = t === currentTier ? '📍' : (t < currentTier ? '✓' : '🔒');
-                html += `<li class="${cls}"><span>${mark}</span><span>${esc(LEAGUE_LADDER[t - 1])}</span></li>`;
+                html += `<li class="${cls}"><span class="ladder-mark">${mark}</span><span class="ladder-name">${esc(LEAGUE_LADDER[t - 1])}</span></li>`;
             }
             html += '</ul>';
             return html;
         }
 
+        // Строка участника рейтинга — один компонент для «Моей лиги» и «Общего топа» (§7.4:
+        // раньше обе функции собирали байт-в-байт одинаковый li). Только сборка DOM: данные,
+        // запросы, места и переходы по-прежнему приходят готовыми снаружи.
+        //
+        // DOM-путь (createElement + textContent) сохранён намеренно (R8): имя ученика и титул
+        // приходят из БД, строковый шаблон здесь открыл бы XSS. Косметику по-прежнему
+        // навешивают renderNick/applyAvatarFrame — их вызовы перенесены дословно.
+        function buildLeaderboardRow(options) {
+            const { rankText, name, eq, isMe, scoreText, modifiers } = options;
+            const li = document.createElement('li');
+            li.className = ['lb-item', isMe ? 'lb-me' : '', modifiers || ''].filter(Boolean).join(' ');
+
+            const rank = document.createElement('div');
+            rank.className = 'lb-rank'; rank.textContent = rankText;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'lb-avatar';
+            avatar.textContent = name ? name[0].toUpperCase() : '?';
+            applyAvatarFrame(avatar, eq);
+
+            const wrap = document.createElement('div');
+            wrap.className = 'lb-name-wrap';
+            const line = document.createElement('div');
+            line.className = 'lb-name-line';
+            renderNick(line, name || '', eq, isMe ? ' (Вы)' : '');
+            wrap.appendChild(line);
+            if (eq.title) {
+                const title = equippedTitleText(eq.title);
+                if (title) {
+                    const t = document.createElement('div');
+                    t.className = 'lb-title'; t.textContent = title;
+                    wrap.appendChild(t);
+                }
+            }
+
+            const score = document.createElement('div');
+            score.className = 'lb-score'; score.textContent = scoreText;
+
+            li.appendChild(rank);
+            li.appendChild(avatar);
+            li.appendChild(wrap);
+            li.appendChild(score);
+            return li;
+        }
+
         async function loadLeague() {
             const box = document.getElementById('league-content');
-            box.innerHTML = '<div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>';
+            box.innerHTML = '<div class="summary-empty">Загрузка...</div>';
             try {
                 // claim-based self-обёртки (T10-08B): identity из JWT; preview — leaderboard
                 // (student+teacher), definer, без раскрытия telegram_username.
@@ -734,44 +779,16 @@
                     cohort.forEach(r => {
                         const isMe = r.student_id === currentUser.id;
                         const eq = buildEquipMap(eqByStudent[r.student_id] || []);
-                        const li = document.createElement('li');
-                        li.className = 'lb-item' + (isMe ? ' lb-me' : '') +
-                            (r.projected_movement === 'promote' ? ' lb-promote' : '') +
-                            (r.projected_movement === 'demote' ? ' lb-demote' : '');
-
-                        const rank = document.createElement('div');
-                        rank.className = 'lb-rank'; rank.textContent = `#${r.place}`;
-
-                        const avatar = document.createElement('div');
-                        avatar.className = 'lb-avatar';
-                        avatar.textContent = nameById[r.student_id] ? nameById[r.student_id][0].toUpperCase() : '?';
-                        applyAvatarFrame(avatar, eq);
-
-                        const wrap = document.createElement('div');
-                        wrap.className = 'lb-name-wrap';
-                        const line = document.createElement('div');
-                        line.className = 'lb-name-line';
-                        renderNick(line, nameById[r.student_id] || '', eq, isMe ? ' (Вы)' : '');
-                        wrap.appendChild(line);
-                        if (eq.title) {
-                            const title = equippedTitleText(eq.title);
-                            if (title) {
-                                const t = document.createElement('div');
-                                t.className = 'lb-title'; t.textContent = title;
-                                wrap.appendChild(t);
-                            }
-                        }
-
-                        const score = document.createElement('div');
-                        score.className = 'lb-score';
                         const arrow = r.projected_movement === 'promote' ? ' ↑' : (r.projected_movement === 'demote' ? ' ↓' : '');
-                        score.textContent = `${r.points} ⭐${arrow}`;
-
-                        li.appendChild(rank);
-                        li.appendChild(avatar);
-                        li.appendChild(wrap);
-                        li.appendChild(score);
-                        listEl.appendChild(li);
+                        listEl.appendChild(buildLeaderboardRow({
+                            rankText: `#${r.place}`,
+                            name: nameById[r.student_id] || '',
+                            eq,
+                            isMe,
+                            scoreText: `${r.points} ⭐${arrow}`,
+                            modifiers: (r.projected_movement === 'promote' ? 'lb-promote' : '') +
+                                (r.projected_movement === 'demote' ? 'lb-demote' : '')
+                        }));
                     });
                     box.appendChild(listEl);
                 }
@@ -779,8 +796,7 @@
                 // Предупреждение о неактивных сезонах (второй пустой сезон подряд — понижение).
                 if (snap.inactive_seasons >= 1) {
                     const warn = document.createElement('div');
-                    warn.className = 'league-note';
-                    warn.style.color = '#e67e22';
+                    warn.className = 'league-note is-warning';
                     warn.textContent = `Пропущено сезонов подряд без очков: ${snap.inactive_seasons}. Ещё один такой сезон — понижение на лигу.`;
                     box.appendChild(warn);
                 }
@@ -789,14 +805,14 @@
                 ladder.innerHTML = renderLeagueLadder(tier);
                 box.appendChild(ladder);
             } catch (e) {
-                box.innerHTML = '<div style="text-align:center; color:#f44336; padding:30px;">Ошибка лиги</div>';
+                box.innerHTML = '<div class="summary-empty is-error">Ошибка лиги</div>';
                 log('❌ Лига: ' + (e.message || e));
             }
         }
 
         async function loadGlobalTop() {
             const list = document.getElementById('lb-list');
-            list.innerHTML = '<li style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</li>';
+            list.innerHTML = '<li class="summary-empty">Загрузка...</li>';
 
             try {
                 const [{ data, error }, seasonId] = await Promise.all([
@@ -819,49 +835,23 @@
                 data.forEach((student, index) => {
                     const isMe = student.telegram_id === currentUser.id;
                     const eq = buildEquipMap(eqByStudent[student.telegram_id] || []);
-                    const li = document.createElement('li');
-                    li.className = `lb-item ${isMe ? 'lb-me' : ''}`;
 
                     let rankDisplay = `#${index + 1}`;
                     if (index === 0) rankDisplay = '🥇';
                     if (index === 1) rankDisplay = '🥈';
                     if (index === 2) rankDisplay = '🥉';
 
-                    const rank = document.createElement('div');
-                    rank.className = 'lb-rank'; rank.textContent = rankDisplay;
-
-                    const avatar = document.createElement('div');
-                    avatar.className = 'lb-avatar';
-                    avatar.textContent = student.name ? student.name[0].toUpperCase() : '?';
-                    applyAvatarFrame(avatar, eq);
-
-                    const wrap = document.createElement('div');
-                    wrap.className = 'lb-name-wrap';
-                    const line = document.createElement('div');
-                    line.className = 'lb-name-line';
-                    renderNick(line, student.name || '', eq, isMe ? ' (Вы)' : '');
-                    wrap.appendChild(line);
-                    if (eq.title) {
-                        const title = equippedTitleText(eq.title);
-                        if (title) {
-                            const t = document.createElement('div');
-                            t.className = 'lb-title'; t.textContent = title;
-                            wrap.appendChild(t);
-                        }
-                    }
-
-                    const score = document.createElement('div');
-                    score.className = 'lb-score'; score.textContent = `${student.rating} ⭐`;
-
-                    li.appendChild(rank);
-                    li.appendChild(avatar);
-                    li.appendChild(wrap);
-                    li.appendChild(score);
-                    list.appendChild(li);
+                    list.appendChild(buildLeaderboardRow({
+                        rankText: rankDisplay,
+                        name: student.name || '',
+                        eq,
+                        isMe,
+                        scoreText: `${student.rating} ⭐`
+                    }));
                 });
 
             } catch (e) {
-                list.innerHTML = '<li style="text-align:center; color:#f44336; padding:30px;">Ошибка</li>';
+                list.innerHTML = '<li class="summary-empty is-error">Ошибка</li>';
                 log('❌ Лидерборд: ' + (e.message || e));
             }
         }

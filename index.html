@@ -395,7 +395,7 @@
 
     <!-- ЭКРАН 3: ЛИДЕРБОРД -->
     <div id="screen-leaderboard" class="screen">
-        <h2 class="ca-heading-with-icon ca-heading-center" style="text-align:center; margin-bottom:12px;">
+        <h2 class="screen-title ca-heading-with-icon ca-heading-center">
             <span class="ca-title-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-trophy" xlink:href="#ca-i-trophy"></use></svg>
             </span>
@@ -419,15 +419,15 @@
         <!-- Режим: моя лига -->
         <div id="lb-mode-league" class="lb-mode active">
             <div id="league-content">
-                <div style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</div>
+                <div class="summary-empty">Загрузка...</div>
             </div>
         </div>
 
         <!-- Режим: общий сезонный топ (топ-3 получают 100/60/30 бубликов) -->
         <div id="lb-mode-global" class="lb-mode">
-            <div id="lb-season-label" style="text-align:center; opacity:0.6; font-size:var(--text-small); margin-bottom:16px;"></div>
+            <div id="lb-season-label" class="lb-season-label"></div>
             <ul class="leaderboard-list" id="lb-list">
-                <li style="text-align: center; padding: 30px; opacity: 0.5;">Загрузка...</li>
+                <li class="summary-empty">Загрузка...</li>
             </ul>
         </div>
     </div>
