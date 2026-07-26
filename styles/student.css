@@ -904,60 +904,151 @@
         .showcase-chip-clear { color: var(--ca-error); font-weight: 700; }
         .showcase-picker-empty { font-size: var(--text-small); color: var(--ca-text-muted); text-align: center; padding: var(--ca-space-3); }
 
-        /* Магазин «Бубличная» (S2) */
-        .shop-balance { background: linear-gradient(135deg, var(--ca-tint-currency), var(--ca-tint-reward)); border: 1px solid var(--ca-border-soft); border-radius: var(--ca-radius-xl); text-align: center; font-size: var(--text-section); font-weight: 800; padding: var(--ca-space-4); margin-bottom: 18px; }
-        .shop-section-title { font-size: var(--text-section); font-weight: 800; margin: var(--ca-space-6) 0 5px; }
-        .shop-section-note { font-size: var(--text-small); color: var(--tg-hint); margin-bottom: var(--ca-space-4); }
+        /* =====================================================================
+           Магазин «Бубличная» (S2, этап 7).
+
+           .shop-item несёт свою собственную ширину колонки превью через
+           --ca-shop-preview (по умолчанию 56px, 48px на ≤380px) — единственный
+           медиазапрос для этого компонента вместо прежних двух дублирующих блоков
+           (§13.5). .coll-tile/.showcase-tile используют .shop-preview в других
+           контекстах и получают свой фиксированный размер отдельным правилом
+           ниже — тоже без общего медиазапроса.
+           ===================================================================== */
+        .shop-balance {
+            background: linear-gradient(135deg, var(--ca-tint-currency), var(--ca-tint-reward));
+            border: 1px solid var(--ca-border-soft); border-radius: var(--ca-radius-xl);
+            text-align: center; font-size: var(--text-section); font-weight: 800;
+            padding: var(--ca-space-4); margin-bottom: var(--ca-space-5); box-shadow: var(--ca-elev-1);
+        }
+        .shop-section-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; margin: var(--ca-space-6) 0 var(--ca-space-2); }
+        .shop-section-note { font-size: var(--text-small); color: var(--ca-text-secondary); line-height: 1.4; margin-bottom: var(--ca-space-4); }
         .shop-item {
-            display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 11px;
-            background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: 11px; margin-bottom: var(--ca-space-3);
+            --ca-shop-preview: 56px;
+            display: grid; grid-template-columns: var(--ca-shop-preview) minmax(0, 1fr) auto;
+            align-items: center; gap: var(--ca-space-3);
+            background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-3);
+            margin-bottom: var(--ca-space-3);
             border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1);
         }
+        @media (max-width: 380px) {
+            .shop-item { --ca-shop-preview: 48px; grid-template-columns: var(--ca-shop-preview) minmax(0, 1fr); }
+            .shop-item .shop-action { grid-column: 2; align-items: flex-start; text-align: left; }
+        }
+
+        /* Превью косметики (§11, этап 7): один компонент в трёх контекстах —
+           .shop-item (56/48px через --ca-shop-preview), .coll-tile и .showcase-tile
+           (44px фиксированно, без медиазапроса — их сетки уже сжимаются числом
+           колонок). Оформление по слотам ниже. */
         .shop-preview {
-            width: 56px; height: 56px; border-radius: var(--ca-radius-lg); flex-shrink: 0;
+            width: var(--ca-shop-preview, 56px); height: var(--ca-shop-preview, 56px);
+            border-radius: var(--ca-radius-lg); flex-shrink: 0;
             display: flex; align-items: center; justify-content: center; font-size: var(--text-metric);
             background: var(--ca-surface-nested); overflow: hidden; border: 1px solid var(--ca-border-soft); position: relative;
         }
-        .shop-body { flex: 1; min-width: 0; }
-        .shop-name { font-weight: 750; font-size: var(--text-body); line-height: 1.2; overflow-wrap: anywhere; }
-        .shop-desc { font-size: 11px; color: var(--tg-hint); margin-top: 2px; }
+        .coll-tile .shop-preview, .showcase-tile .shop-preview { width: 44px; height: 44px; }
+
+        /* Слот name_color: реальный цвет ника на образце «Aa». .nick-gold — тот же
+           класс, что и на профиле/лидерборде (переопределяет background/color сам). */
+        .shop-preview-name-sample { font-size: 15px; font-weight: 800; color: var(--ca-text); }
+
+        /* Слот frame: компактный демо-аватар с реальной рамкой (32px, --ca-avatar-sm —
+           не зависит от размера профильного аватара). overflow: visible на самом
+           превью — иначе кольца frame-fire100/legend/pulsar обрезались бы. */
+        .shop-preview.shop-preview-frame { overflow: visible; }
+        .shop-preview-avatar-demo {
+            width: var(--ca-avatar-sm); height: var(--ca-avatar-sm); border-radius: 50%;
+            overflow: hidden; position: relative; background: var(--tg-secondary); flex-shrink: 0;
+        }
+
+        /* Слот background: настоящая миниатюра — те же классы bg-*, что и у
+           #app-bg-layer, альфа поднята под маленький масштаб превью (иначе узор
+           почти не читается на 44-56px). Сами классы и BG_CLASSES не меняются. */
+        .shop-preview.bg-grid {
+            background-color: var(--ca-surface-nested);
+            background-image: linear-gradient(rgba(128,128,128,0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(128,128,128,0.22) 1px, transparent 1px);
+            background-size: 10px 10px;
+        }
+        .shop-preview.bg-space {
+            background-color: #11142a;
+            background-image: radial-gradient(circle at 22% 22%, rgba(63,81,181,0.55), transparent 45%), radial-gradient(circle at 78% 72%, rgba(156,39,176,0.5), transparent 42%);
+        }
+        .shop-preview.bg-aurora {
+            background-color: var(--ca-surface-nested);
+            background-image: linear-gradient(160deg, rgba(38,166,154,0.45), transparent 42%), linear-gradient(20deg, rgba(126,87,194,0.45), transparent 48%);
+        }
+        .shop-preview.bg-draft {
+            background-color: #efe9d8;
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(96,96,96,0.22) 6px, rgba(96,96,96,0.22) 7px);
+        }
+
+        /* Слот title: компактный ОБЩИЙ пример (иконка-бирка + декоративная полоска),
+           без текста конкретного товара — item.name внутри превью не парсится. */
+        .shop-preview-title-demo { display: flex; flex-direction: column; align-items: center; gap: var(--ca-space-1); }
+        .shop-preview-title-demo-icon { font-size: 18px; line-height: 1; }
+        .shop-preview-title-demo-bar { width: 26px; height: 5px; border-radius: var(--ca-radius-pill); background: var(--ca-tint-accent); }
+
+        .shop-body { min-width: 0; }
+        .shop-name { font-weight: 750; font-size: var(--text-body); line-height: 1.25; overflow-wrap: anywhere; }
+        .shop-desc { font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
         .shop-leaving { color: var(--ca-warning); font-weight: 600; }
-        .shop-action { flex-shrink: 0; text-align: right; }
+        /* flex-column с gap заменяет прежние точечные margin-bottom, которые JS
+           расставлял инлайновым style (renderShopItem) — теперь верстается только CSS. */
+        .shop-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ca-space-1); text-align: right; }
         .shop-buy-btn {
+            box-sizing: border-box; min-height: 36px;
             background: var(--ca-gradient-primary); color: var(--ca-on-accent); border: none; border-radius: var(--ca-radius-sm);
-            padding: 9px 11px; font-size: var(--text-small); font-weight: 800; cursor: pointer; white-space: nowrap;
+            padding: 0 var(--ca-space-4); font-size: var(--text-small); font-weight: 800; cursor: pointer; white-space: nowrap;
         }
         .shop-buy-btn:disabled { opacity: 0.45; cursor: default; }
+        .shop-buy-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
         .shop-state { font-size: var(--text-small); font-weight: 700; white-space: nowrap; }
         .shop-state.owned { color: var(--ca-success); }
-        .shop-state.locked { color: var(--tg-hint); }
-        .shop-emoji-chips { display: flex; flex-wrap: wrap; gap: var(--ca-space-2); margin-top: 8px; }
+        .shop-state.locked { color: var(--ca-text-secondary); }
+        .shop-emoji-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ca-space-2); margin-top: 8px; }
         .shop-emoji-chip {
-            font-size: var(--text-screen); padding: var(--ca-space-1) 8px; border-radius: var(--ca-radius-xs); cursor: pointer;
+            box-sizing: border-box; min-width: 40px; min-height: 40px;
+            font-size: var(--text-screen); padding: var(--ca-space-1) 8px; border-radius: var(--ca-radius-sm); cursor: pointer;
             background: var(--ca-surface-nested); border: 1px solid var(--ca-border);
         }
         .shop-emoji-chip:disabled { opacity: 0.45; cursor: default; }
-        .custom-title-text { font-size: var(--text-small); font-weight: 600; margin-top: 5px; word-break: break-word; }
-        .custom-title-reason { font-size: 11px; color: var(--ca-error); margin-top: var(--ca-space-1); line-height: 1.3; }
+        .shop-emoji-chip:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .custom-title-text { font-size: var(--text-small); font-weight: 600; margin-top: 5px; overflow-wrap: anywhere; }
+        .custom-title-reason { font-size: 11px; color: var(--ca-error); margin-top: var(--ca-space-1); line-height: 1.3; overflow-wrap: anywhere; }
+
+        /* =====================================================================
+           Модалка персонального титула (S8, этап 7).
+
+           Показ по-прежнему только через класс .active — closeCustomTitleModal и
+           inline onclick на фон не менялись. role="dialog"/aria-modal — статические
+           атрибуты в index.html, они не требуют правки JS (неактивная модалка
+           display:none уже не видна вспомогательным технологиям). Блокировка
+           прокрутки фона — тоже чистый CSS (:has деградирует безопасно: без
+           поддержки фон просто остаётся прокручиваемым, как раньше).
+           ===================================================================== */
         #custom-title-modal {
             display: none; position: fixed; inset: 0; z-index: 2000; padding: var(--ca-space-6);
             background: var(--ca-scrim); align-items: center; justify-content: center;
         }
         #custom-title-modal.active { display: flex; }
+        body:has(#custom-title-modal.active) { overflow: hidden; }
         .custom-title-dialog {
             width: 100%; max-width: 380px; background: var(--ca-surface-elevated); color: var(--tg-text);
-            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-lg); padding: 18px; box-shadow: var(--ca-elev-modal);
+            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-lg); padding: var(--ca-space-6); box-shadow: var(--ca-elev-modal);
         }
+        .custom-title-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; }
+        .custom-title-help { font-size: var(--text-small); color: var(--ca-text-secondary); margin-top: 5px; line-height: 1.4; }
         .custom-title-input {
-            width: 100%; margin-top: var(--ca-space-4); padding: 11px var(--ca-space-4); border-radius: var(--ca-radius-sm);
+            box-sizing: border-box; width: 100%; margin-top: var(--ca-space-4); padding: 11px var(--ca-space-4); border-radius: var(--ca-radius-sm);
             border: 1px solid var(--ca-border); background: var(--ca-surface-nested); color: var(--tg-text);
-            font: inherit;
+            font: inherit; min-height: var(--ca-touch);
         }
-        .custom-title-meta { display: flex; justify-content: space-between; gap: var(--ca-space-4); margin-top: var(--ca-space-2); font-size: 11px; color: var(--tg-hint); }
-        .custom-title-preview { min-height: 20px; margin-top: var(--ca-space-4); text-align: center; font-size: 13px; font-weight: 600; }
-        .custom-title-error { min-height: 17px; color: var(--ca-error); font-size: var(--text-small); margin-top: 8px; }
+        .custom-title-input:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .custom-title-meta { display: flex; justify-content: space-between; gap: var(--ca-space-4); margin-top: var(--ca-space-2); font-size: 11px; color: var(--ca-text-secondary); }
+        .custom-title-preview { min-height: 20px; margin-top: var(--ca-space-4); text-align: center; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+        .custom-title-error { min-height: 17px; color: var(--ca-error); font-size: var(--text-small); margin-top: 8px; line-height: 1.35; overflow-wrap: anywhere; }
         .custom-title-actions { display: flex; gap: 8px; margin-top: var(--ca-space-3); }
-        .custom-title-actions button { flex: 1; border: none; border-radius: var(--ca-radius-sm); padding: var(--ca-space-3); font-weight: 700; cursor: pointer; }
+        .custom-title-actions button { flex: 1; min-height: var(--ca-touch); border: none; border-radius: var(--ca-radius-sm); padding: var(--ca-space-3); font-weight: 700; cursor: pointer; }
+        .custom-title-actions button:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
         .custom-title-cancel { background: var(--ca-surface-nested); color: var(--tg-text); border: 1px solid var(--ca-border); }
         .custom-title-submit { background: var(--ca-gradient-primary); color: var(--ca-on-accent); }
         .custom-title-submit:disabled { opacity: 0.45; cursor: default; }
@@ -968,9 +1059,6 @@
         .study-tools .shield-widget { margin-bottom: var(--ca-space-5); }
         @media (max-width: 380px) {
             .coll-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-            .shop-item { grid-template-columns: 50px minmax(0, 1fr); }
-            .shop-preview { width: 48px; height: 48px; }
-            .shop-action { grid-column: 2; text-align: left; }
         }
 
         /* =====================================================================
@@ -1329,12 +1417,15 @@
         .lb-name-line { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; overflow-wrap: anywhere; }
         .lb-title { font-size: 11px; color: var(--ca-text-secondary); margin-top: 1px; overflow-wrap: anywhere; }
 
-        /* Экипировка в магазине (кнопки Надеть/Снять на купленном) */
+        /* Экипировка в магазине (кнопки Надеть/Снять на купленном). display/margin-bottom
+           не нужны: .shop-action теперь flex-колонка с собственным gap (этап 7). */
         .shop-equip-btn {
+            box-sizing: border-box; min-height: 36px;
             background: transparent; color: var(--ca-accent); border: 1px solid var(--ca-accent);
-            border-radius: var(--ca-radius-sm); padding: var(--ca-space-2) var(--ca-space-3); font-size: var(--text-small); font-weight: 700; cursor: pointer; white-space: nowrap;
+            border-radius: var(--ca-radius-sm); padding: 0 var(--ca-space-3); font-size: var(--text-small); font-weight: 700; cursor: pointer; white-space: nowrap;
         }
-        .shop-equipped { font-size: var(--text-small); font-weight: 700; color: var(--ca-success); display: block; margin-bottom: var(--ca-space-1); }
+        .shop-equip-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .shop-equipped { font-size: var(--text-small); font-weight: 700; color: var(--ca-success); }
 
         /* Уважение к системной настройке «меньше движения»: декоративная анимация выключается,
            сами классы рамок остаются (косметика продолжает отображаться статично). */

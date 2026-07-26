@@ -401,20 +401,70 @@
             return wrap;
         }
 
+        // Превью показывает сам предмет по фактическому слоту (этап 7, §11.2), не общую
+        // иконку категории. История: редизайн bb89030 был откачен a26a98a — причины отката
+        // не повторяются здесь: DOM-путь (createElement/textContent) сохранён, innerHTML нет
+        // нигде в этой функции; фоны и рамки сопоставляются через существующие whitelist-Sets
+        // BG_CLASSES/FRAME_CLASSES по render_payload (а не по item_code с чужим разделителем);
+        // текст титула не вытаскивается регуляркой из item.name — превью титула нарочно общее,
+        // а не «текст этого конкретного товара».
         function shopPreview(item) {
             const p = document.createElement('div');
             p.className = 'shop-preview';
             if (item.slot === 'name_color') {
+                // Пример ника настоящим цветом; 'gold' — тем же градиентным классом, что и
+                // на профиле/лидерборде (.nick-gold), валидный hex — тем же regex-фильтром,
+                // что и applyNickColor в student-progress.js.
+                const sample = document.createElement('span');
+                sample.className = 'shop-preview-name-sample';
+                sample.textContent = 'Aa';
                 if (item.render_payload === 'gold') {
-                    p.style.background = 'linear-gradient(135deg,#f9d423,#e6a817)';
+                    sample.classList.add('nick-gold');
                 } else if (/^#[0-9a-fA-F]{6}$/.test(item.render_payload || '')) {
-                    p.style.background = item.render_payload;
+                    sample.style.color = item.render_payload;
                 }
-                p.style.color = '#fff';
-                p.textContent = 'Aa';
+                p.appendChild(sample);
+            } else if (item.slot === 'frame') {
+                // Компактный демонстрационный аватар с реальной рамкой: тот же whitelist
+                // FRAME_CLASSES и та же структура (.avatar-placeholder внутри), что и на
+                // профиле/лидерборде, поэтому frame-orbit вращается и гасится по
+                // prefers-reduced-motion без отдельного кода.
+                p.classList.add('shop-preview-frame');
+                const demo = document.createElement('div');
+                demo.className = 'shop-preview-avatar-demo';
+                if (FRAME_CLASSES.has(item.render_payload)) demo.classList.add(item.render_payload);
+                const inner = document.createElement('span');
+                inner.className = 'avatar-placeholder';
+                inner.textContent = 'A';
+                demo.appendChild(inner);
+                p.appendChild(demo);
+            } else if (item.slot === 'background') {
+                // Настоящая миниатюра фона — тот же класс bg-*, что и у глобального слоя
+                // #app-bg-layer, только в масштабе превью; whitelist BG_CLASSES не меняется.
+                if (BG_CLASSES.has(item.render_payload)) p.classList.add(item.render_payload);
+            } else if (item.slot === 'title') {
+                // Компактный ОБЩИЙ пример титула — без текста конкретного товара:
+                // extraction регуляркой из item.name внутри превью повторяла бы проблемное
+                // решение bb89030.
+                const demo = document.createElement('div');
+                demo.className = 'shop-preview-title-demo';
+                const icon = document.createElement('span');
+                icon.className = 'shop-preview-title-demo-icon';
+                icon.textContent = '🏷️';
+                const bar = document.createElement('span');
+                bar.className = 'shop-preview-title-demo-bar';
+                demo.appendChild(icon);
+                demo.appendChild(bar);
+                p.appendChild(demo);
+            } else if (item.slot === 'crown') {
+                p.textContent = '👑';
+            } else if (item.slot === 'status_emoji') {
+                // Настоящий emoji товара — данные из БД (как и в openShowcasePicker/loadShop).
+                p.textContent = (item.render_payload || '').split(/\s+/).filter(Boolean)[0] || '😀';
+            } else if (item.item_kind === 'shield') {
+                p.textContent = '🛡️';
             } else {
-                const icons = { crown: '👑', title: '🏷️', frame: '🖼️', background: '🎨', status_emoji: '😀' };
-                p.textContent = item.item_kind === 'shield' ? '🛡️' : (icons[item.slot] || '🥯');
+                p.textContent = '🥯';
             }
             return p;
         }
@@ -510,7 +560,6 @@
                 } else {
                     const label = document.createElement('div');
                     label.className = 'shop-desc';
-                    label.style.marginBottom = '4px';
                     label.textContent = `в запасе: ${qty}/${SHIELD_MAX}`;
                     action.appendChild(label);
                     action.appendChild(shopBuyButton(item, balance));
@@ -534,8 +583,6 @@
                         const s = document.createElement('span');
                         s.className = 'shop-state owned';
                         s.textContent = '✓ Куплено';
-                        s.style.display = 'block';
-                        s.style.marginBottom = '4px';
                         action.appendChild(s);
                         const btn = document.createElement('button');
                         btn.className = 'shop-equip-btn';

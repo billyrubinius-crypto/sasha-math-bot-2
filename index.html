@@ -432,11 +432,11 @@
         </div>
     </div>
 
-    <!-- ЭКРАН: МАГАЗИН (S2) -->
+    <!-- ЭКРАН: МАГАЗИН (S2, этап 7) -->
     <div id="screen-shop" class="screen">
         <!-- 🥯 здесь работал иконкой ЭКРАНА магазина, поэтому заменён на ca-i-shop.
              Как валюта продукта 🥯 сохранён везде: «🥯 Бублики», кнопка щита, FAQ, вся выдача JS. -->
-        <h2 class="ca-heading-with-icon ca-heading-center" style="text-align:center; margin-bottom:4px;">
+        <h2 class="screen-title ca-heading-with-icon ca-heading-center">
             <span class="ca-title-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-shop" xlink:href="#ca-i-shop"></use></svg>
             </span>
@@ -444,7 +444,7 @@
         </h2>
         <div class="shop-balance" id="shop-balance"></div>
         <div id="shop-content">
-            <div style="text-align:center; padding:30px; opacity:0.5;">Загрузка...</div>
+            <div class="summary-empty">Загрузка...</div>
         </div>
     </div>
 
@@ -540,11 +540,17 @@
         <a href="https://t.me/tomhardy10" target="_blank" class="more-link-btn"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-message" xlink:href="#ca-i-message"></use></svg></span> Связаться с учителем</a>
     </div>
 
-    <!-- Персональный титул (S8): первая отправка платная, retry после отказа бесплатен -->
-    <div id="custom-title-modal" onclick="if (event.target === this) closeCustomTitleModal()">
+    <!-- Персональный титул (S8, этап 7): первая отправка платная, retry после отказа бесплатен.
+         Механика показа (.active) и inline onclick сохранены дословно — closeCustomTitleModal
+         не меняется. role="dialog"/aria-modal/aria-labelledby — статические атрибуты: они не
+         объявляют диалог активным сами по себе (display:none у неактивной модалки уже скрывает
+         её от вспомогательных технологий), поэтому JS открытия/закрытия трогать не нужно.
+         Блокировка прокрутки фона — тоже чистый CSS (см. body:has(#custom-title-modal.active)). -->
+    <div id="custom-title-modal" role="dialog" aria-modal="true" aria-labelledby="custom-title-title"
+        onclick="if (event.target === this) closeCustomTitleModal()">
         <div class="custom-title-dialog">
-            <div style="font-size:var(--text-section); font-weight:800;">Персональный титул</div>
-            <div id="custom-title-help" style="font-size:var(--text-small); color:var(--tg-hint); margin-top:5px;"></div>
+            <div id="custom-title-title" class="custom-title-title">Персональный титул</div>
+            <div id="custom-title-help" class="custom-title-help"></div>
             <input id="custom-title-input" class="custom-title-input" type="text" autocomplete="off"
                 placeholder="Например: Гроза логарифмов" oninput="updateCustomTitleForm()">
             <div class="custom-title-meta">
