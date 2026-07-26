@@ -328,30 +328,38 @@
             </button>
         </div>
 
-        <!-- Вкладка загрузки -->
+        <!-- Вкладка загрузки.
+             Инлайновых style здесь не осталось, кроме служебных display:none — их
+             переключает JS (showAssignmentDetails правит #assignment-details,
+             #detail-count, #detail-link, #detail-feedback). -->
         <div id="hw-upload" class="hw-view active">
             <div class="dz-section">
-                <div class="dz-title" style="margin-bottom: 10px;">✏️ Решить домашку</div>
-                
+                <div class="dz-title ca-heading-with-icon ca-heading-center">
+                    <span class="ca-title-icon" aria-hidden="true">
+                        <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-pencil" xlink:href="#ca-i-pencil"></use></svg>
+                    </span>
+                    Решить домашку
+                </div>
+
                 <!-- Инструкция -->
-                <p style="text-align:center; font-size:var(--text-small); color:var(--tg-hint); margin-bottom:20px; line-height:1.4;">
+                <p class="dz-hint">
                     Выбери задание ниже, перейди по ссылке, реши его и вернись сюда, чтобы загрузить фото решения.
                 </p>
 
                 <!-- Выбор задания -->
                 <div class="input-group">
-                    <label style="font-weight:800; color:var(--tg-text); margin-bottom:5px;">Какое ДЗ решаешь?</label>
-                    <select id="assignment-select" onchange="showAssignmentDetails()">
+                    <label class="dz-label" for="assignment-select">Какое ДЗ решаешь?</label>
+                    <select id="assignment-select" class="dz-select" onchange="showAssignmentDetails()">
                         <option value="">Выбери задание из списка...</option>
                     </select>
                 </div>
 
                 <!-- Карточка с деталями выбранного задания -->
-                <div id="assignment-details" style="display:none; background:var(--tg-bg); border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid rgba(128,128,128,0.2);">
-                    <div style="font-weight:700; margin-bottom:8px; font-size:var(--text-body);" id="detail-title"></div>
-                    <div id="detail-count" style="display:none; font-size:var(--text-small); color:var(--tg-hint); margin-bottom:8px;"></div>
-                    <a id="detail-link" href="#" target="_blank" style="color:var(--tg-link); text-decoration:none; font-size:var(--text-body); display:inline-block; word-break:break-all;"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-external-link" xlink:href="#ca-i-external-link"></use></svg></span> Открыть условие задачи</a>
-                    <div id="detail-feedback" style="display:none; margin-top:10px; padding:10px; background:rgba(220,53,69,0.1); border-radius:8px; font-size:var(--text-small); color:#721c24;"></div>
+                <div id="assignment-details" class="assignment-details" style="display:none;">
+                    <div class="detail-title" id="detail-title"></div>
+                    <div id="detail-count" class="detail-count" style="display:none;"></div>
+                    <a id="detail-link" class="detail-link" href="#" target="_blank"><span class="ca-title-icon" aria-hidden="true"><svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-external-link" xlink:href="#ca-i-external-link"></use></svg></span> Открыть условие задачи</a>
+                    <div id="detail-feedback" class="detail-feedback" style="display:none;"></div>
                 </div>
 
                 <!-- Загрузка фото -->
@@ -367,11 +375,11 @@
                 </div>
                 <input type="file" id="file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
 
-                <button class="primary" id="btn-upload-dz" onclick="uploadDZ()" disabled style="padding:16px;">📤 Загрузить ДЗ для проверки</button>
+                <button class="primary" id="btn-upload-dz" onclick="uploadDZ()" disabled>📤 Загрузить ДЗ для проверки</button>
                 <div id="dz-status" class="dz-status"></div>
             </div>
-            
-            <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: var(--text-small);">
+
+            <div class="dz-footnote">
                 Бублики начисляются после проверки учителем.<br>
                 Размер награды зависит от типа задания.
             </div>
@@ -380,7 +388,7 @@
         <!-- Вкладка архива -->
         <div id="hw-archive" class="hw-view">
             <ul class="my-hw-list" id="my-hw-list">
-                <li style="text-align:center; padding:20px; opacity:0.5;">Загрузка истории...</li>
+                <li class="summary-empty">Загрузка истории...</li>
             </ul>
         </div>
     </div>

@@ -245,8 +245,8 @@
             const status = document.getElementById('dz-status');
             const assignmentId = select.value;
 
-            if (!assignmentId) { status.innerText = "⚠️ Выбери задание из списка!"; status.style.color = "#ff9800"; return; }
-            if (selectedFiles.length === 0) { status.innerText = "⚠️ Выберите фото!"; status.style.color = "#ff9800"; return; }
+            if (!assignmentId) { status.innerText = "⚠️ Выбери задание из списка!"; status.style.color = "var(--ca-warning)"; return; }
+            if (selectedFiles.length === 0) { status.innerText = "⚠️ Выберите фото!"; status.style.color = "var(--ca-warning)"; return; }
             
             // === ЛОГИКА ДЕДЛАЙНОВ И НАГРАД ===
             const assignment = activeAssignments.find(a => a.id === assignmentId);
@@ -259,7 +259,7 @@
             // ежедневка с истёкшим/отсутствующим окном исправления к отправке не принимается (W03).
             if (!isAssignmentAvailable(assignment, nowInstant, todayMSK)) {
                 status.innerText = "⏰ Время вышло — работа больше не принимается";
-                status.style.color = "#f44336";
+                status.style.color = "var(--ca-error)";
                 return;
             }
 
@@ -296,7 +296,7 @@
             // Проверка дедлайна (только если он установлен)
             if (deadlineMSK && nowInstant > deadlineMSK) {
                 status.innerText = `⏰ Время вышло! Дедлайн: ${deadlineMSK.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК`;
-                status.style.color = "#f44336";
+                status.style.color = "var(--ca-error)";
                 return;
             }
             // ==============================
@@ -342,7 +342,7 @@
                 const isResubmission = assignment.status === 'checked';
 
                 status.innerText = isResubmission ? '✅ Работа пересдана на проверку!' : '✅ ДЗ загружено, ждёт проверки';
-                status.style.color = "#4caf50";
+                status.style.color = "var(--ca-success)";
                 
                 // Сброс формы
                 selectedFiles = [];
@@ -359,7 +359,7 @@
 
             } catch (e) {
                 status.innerText = " Ошибка: " + e.message;
-                status.style.color = "#f44336";
+                status.style.color = "var(--ca-error)";
                 log(e.message);
             } finally {
                 btn.disabled = false;
@@ -381,7 +381,7 @@
                 if (error) throw error;
                 
                 if (!data || data.length === 0) {
-                    list.innerHTML = '<li style="text-align:center; padding:20px; opacity:0.5;">Ты еще не сдавал ДЗ</li>';
+                    list.innerHTML = '<li class="summary-empty">Ты еще не сдавал ДЗ</li>';
                     return;
                 }
                 
@@ -428,7 +428,7 @@
                 });
                 
             } catch (e) {
-                list.innerHTML = '<li style="text-align:center; color:red; padding:20px;">Ошибка загрузки</li>';
+                list.innerHTML = '<li class="summary-empty is-error">Ошибка загрузки</li>';
                 log(e.message);
             }
         }

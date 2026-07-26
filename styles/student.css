@@ -722,6 +722,10 @@
         .now-item-meta { display: block; font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
         .now-arrow { font-size: 18px; line-height: 1; color: var(--ca-text-muted); flex-shrink: 0; }
         .summary-empty { text-align: center; padding: var(--ca-space-4) var(--ca-space-2); color: var(--ca-text-muted); font-size: 13px; }
+        /* Ошибочный вариант того же пустого состояния (этап 5, архив работ): цвет из
+           палитры вместо инлайнового color:red. Единый компонент состояний .ca-state*
+           появится на этапе 8 — этот модификатор туда же и переедет. */
+        .summary-empty.is-error { color: var(--ca-error); }
 
         /* Узкие экраны (360–380px): блок недели отдаёт полосе дней немного собственных
            отступов, чтобы семь колонок остались комфортными (≈39px на день при 360px).
@@ -961,76 +965,137 @@
             .shop-action { grid-column: 2; text-align: left; }
         }
 
-        /* Домашка */
-        .dz-section { background: var(--tg-secondary); border-radius: var(--ca-radius-2xl); padding: var(--ca-space-7); margin-top: var(--ca-space-3); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
-        .dz-title { font-size: var(--text-screen); line-height: 1.2; font-weight: 800; margin-bottom: var(--ca-space-6); text-align: center; }
+        /* =====================================================================
+           Домашка (этап 5): форма сдачи и архив работ.
+
+           Инлайновые style из #screen-homework переехали сюда классами
+           (.dz-hint, .dz-label, .dz-select, .assignment-details, .detail-*,
+           .dz-footnote). ID и способ показа/скрытия не изменились: JS по-прежнему
+           правит style.display у #assignment-details, #detail-count, #detail-link
+           и #detail-feedback, поэтому базовые display в CSS совместимы с теми
+           значениями, которые он проставляет (block / inline-block).
+           ===================================================================== */
+        .dz-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-5); margin-top: var(--ca-space-3); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-1); }
+        .dz-title { font-size: var(--text-section); line-height: 1.25; font-weight: 800; margin-bottom: var(--ca-space-3); }
+        .dz-hint { margin: 0 0 var(--ca-space-5); text-align: center; font-size: var(--text-small); color: var(--ca-text-secondary); line-height: 1.45; }
+        .dz-footnote { margin-top: var(--ca-space-5); text-align: center; font-size: var(--text-small); color: var(--ca-text-muted); line-height: 1.45; }
 
         .tabs-hw { display: flex; gap: var(--ca-space-3); margin-bottom: var(--ca-space-6); }
-        .tab-btn { flex: 1; padding: var(--ca-space-3); border: none; background: transparent; color: var(--tg-hint); font-size: var(--text-body); font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; min-height: var(--ca-touch); }
-        .tab-btn.active { color: var(--tg-link); border-bottom-color: var(--tg-link); }
+        .tab-btn { flex: 1; min-width: 0; padding: var(--ca-space-3) var(--ca-space-2); border: none; background: transparent; color: var(--ca-text-secondary); font-size: var(--text-body); font-weight: 700; cursor: pointer; border-bottom: 2px solid var(--ca-divider); min-height: var(--ca-touch); transition: color var(--ca-transition), border-color var(--ca-transition); }
+        .tab-btn.active { color: var(--ca-accent); border-bottom-color: var(--ca-accent); }
+        .tab-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: -2px; }
+        @media (hover: hover) and (pointer: fine) {
+            .tab-btn:hover { color: var(--ca-text); }
+            .tab-btn.active:hover { color: var(--ca-accent); }
+        }
 
         .hw-view { display: none; }
         .hw-view.active { display: block; }
 
-        .input-group { display: flex; flex-direction: column; gap: var(--ca-space-3); margin-bottom: var(--ca-space-5); }
+        .input-group { display: flex; flex-direction: column; gap: var(--ca-space-2); margin-bottom: var(--ca-space-5); }
         .input-group label { font-size: var(--text-body); line-height: 1.3; }
-        select {
-            padding: var(--ca-space-5); border-radius: var(--ca-radius-md); border: 1px solid var(--ca-border);
+        .dz-label { font-weight: 800; color: var(--ca-text); }
+        /* Правило перенесено с голого select на класс (§13.2): раньше любой новый
+           <select> в приложении молча получал эти паддинги и width: 100%.
+           Внешний вид и поведение самого #assignment-select не изменились. */
+        .dz-select {
+            padding: var(--ca-space-4); border-radius: var(--ca-radius-md); border: 1px solid var(--ca-border);
             background: var(--ca-surface-nested); color: var(--tg-text); font-size: var(--text-body); outline: none; width: 100%;
             min-height: var(--ca-touch);
         }
+        .dz-select:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .dz-select:disabled { opacity: var(--ca-disabled-opacity); }
+
+        /* Карточка выбранного задания */
+        .assignment-details {
+            background: var(--ca-surface-nested); border: 1px solid var(--ca-border-soft);
+            border-radius: var(--ca-radius-md); padding: var(--ca-space-4); margin-bottom: var(--ca-space-5);
+        }
+        .detail-title { font-weight: 700; font-size: var(--text-body); line-height: 1.3; margin-bottom: var(--ca-space-2); overflow-wrap: anywhere; }
+        .detail-count { font-size: var(--text-small); color: var(--ca-text-secondary); margin-bottom: var(--ca-space-2); }
+        .detail-link { display: inline-block; color: var(--tg-link); text-decoration: none; font-size: var(--text-body); line-height: 1.35; word-break: break-all; }
+        .detail-link:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .detail-feedback {
+            margin-top: var(--ca-space-3); padding: var(--ca-space-3);
+            background: var(--ca-tint-error); color: var(--ca-error);
+            border-radius: var(--ca-radius-xs); font-size: var(--text-small); line-height: 1.4; overflow-wrap: anywhere;
+        }
 
         button.primary {
-            width: 100%; padding: var(--ca-space-5); border-radius: var(--ca-radius-md); border: none; min-height: var(--ca-touch);
+            width: 100%; padding: var(--ca-space-4); border-radius: var(--ca-radius-md); border: none; min-height: var(--ca-touch);
             background: var(--ca-gradient-primary); color: var(--ca-on-accent); font-weight: 700; font-size: var(--text-body); cursor: pointer;
         }
+        button.primary:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
         button:disabled { opacity: var(--ca-disabled-opacity); cursor: not-allowed; }
-        .dz-status { text-align: center; font-size: 13px; min-height: 20px; margin-top: var(--ca-space-3); font-weight: 500; }
+        .dz-status { text-align: center; font-size: 13px; min-height: 20px; margin-top: var(--ca-space-3); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
 
         /* Загрузка файла (MULTI) */
         .file-upload-area {
-            border: 2px dashed var(--ca-border); border-radius: var(--ca-radius-md); padding: var(--ca-space-6);
-            text-align: center; margin-bottom: var(--ca-space-5); cursor: pointer; transition: all var(--ca-transition);
+            border: 2px dashed var(--ca-border); border-radius: var(--ca-radius-md); padding: var(--ca-space-5);
+            text-align: center; margin-bottom: var(--ca-space-5); cursor: pointer; transition: border-color var(--ca-transition), background var(--ca-transition);
             background: var(--ca-surface-nested);
         }
-        .file-upload-area:hover { border-color: var(--tg-link); background: var(--ca-tint-accent); }
-        .file-upload-area.has-file { border-color: var(--ca-success); background: var(--ca-tint-success); }
+        @media (hover: hover) and (pointer: fine) {
+            .file-upload-area:hover { border-color: var(--ca-accent); background: var(--ca-tint-accent); }
+        }
+        .file-upload-area.has-file { border-style: solid; border-color: var(--ca-success); background: var(--ca-tint-success); }
         #file-input { display: none; }
         /* .upload-icon остаётся блочным: uploadDZ возвращает ему style.display = 'block'
            после сброса формы. Поэтому центрируем сам SVG (margin auto), а не контейнер
            через flex — иначе после первой загрузки иконка съехала бы влево. */
-        .upload-icon { margin-bottom: var(--ca-space-3); color: var(--ca-accent); --ca-icon-size: 40px; }
+        .upload-icon { margin-bottom: var(--ca-space-3); color: var(--ca-accent); --ca-icon-size: 36px; }
         .upload-icon .ca-icon { display: block; margin: 0 auto; }
-        .upload-text { font-size: var(--text-body); color: var(--tg-hint); }
+        .upload-text { font-size: var(--text-body); color: var(--ca-text-secondary); line-height: 1.4; overflow-wrap: anywhere; }
 
-        .file-list { margin-top: var(--ca-space-3); text-align: left; }
+        .file-list { margin-top: var(--ca-space-3); text-align: left; display: grid; gap: var(--ca-space-1); }
         .file-item {
-            background: var(--ca-tint-muted); padding: 8px var(--ca-space-4); border-radius: var(--ca-radius-xs);
-            margin-bottom: 5px; font-size: 13px; display: flex; justify-content: space-between;
+            background: var(--ca-surface); border: 1px solid var(--ca-border-soft); padding: var(--ca-space-2) var(--ca-space-3);
+            border-radius: var(--ca-radius-xs); font-size: var(--text-small); display: flex; justify-content: space-between; gap: var(--ca-space-2);
+            min-width: 0; overflow-wrap: anywhere;
         }
 
-        /* Список моих работ */
+        /* =====================================================================
+           Архив «Мои работы» (этап 5, §13.6-1 / R15).
+
+           JS ставит класс `status-${hw.status}`, а hw.status после фильтра
+           .neq('status','assigned') принимает только значения submitted и checked —
+           то есть реально создаются .status-submitted и .status-checked, для которых
+           стилей не было вообще (цветная полоска не работала ни разу). Добавлены
+           правила именно для фактических классов; данные и логика не тронуты, а
+           старые .status-pending/approved/rejected оставлены как есть.
+
+           Вердикт («Принято» / «Возврат») живёт не в status, а в approval_status и
+           виден только по бейджу, поэтому у .status-checked базовая полоска
+           нейтральная, а точный цвет доопределяется через :has() по бейджу. Там, где
+           :has() не поддерживается, правило просто игнорируется и остаётся
+           нейтральная полоска — деградация без потери информации (бейдж цветной).
+           ===================================================================== */
         .my-hw-list { list-style: none; padding: 0; margin: 0; }
         .my-hw-item {
-            background: var(--tg-secondary); border-radius: var(--ca-radius-md); padding: var(--ca-space-5); margin-bottom: var(--ca-space-4);
-            border: 1px solid var(--ca-border-soft); border-left: 4px solid transparent;
+            background: var(--tg-secondary); border-radius: var(--ca-radius-md); padding: var(--ca-space-4); margin-bottom: var(--ca-space-3);
+            border: 1px solid var(--ca-border-soft); border-left: 4px solid var(--ca-border);
         }
         .my-hw-item.status-pending { border-left-color: var(--ca-warning); }
         .my-hw-item.status-approved { border-left-color: var(--ca-success); }
         .my-hw-item.status-rejected { border-left-color: var(--ca-error); }
+        .my-hw-item.status-submitted { border-left-color: var(--ca-warning); }
+        .my-hw-item.status-checked { border-left-color: var(--ca-border); }
+        .my-hw-item.status-checked:has(.badge-approved) { border-left-color: var(--ca-success); }
+        .my-hw-item.status-checked:has(.badge-rejected) { border-left-color: var(--ca-error); }
 
-        .hw-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .hw-variant { font-weight: bold; font-size: var(--text-section); }
-        .hw-pages { font-size: var(--text-small); color: var(--tg-hint); margin-left: 5px; }
-        .hw-date { font-size: 11px; color: var(--tg-hint); }
-        .hw-badge { font-size: 10px; padding: 3px 8px; border-radius: var(--ca-radius-sm); font-weight: bold; text-transform: uppercase; }
+        .hw-header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--ca-space-3); margin-bottom: var(--ca-space-2); }
+        .hw-header > div { min-width: 0; }
+        .hw-variant { font-weight: 750; font-size: var(--text-body); line-height: 1.3; overflow-wrap: anywhere; }
+        .hw-pages { font-size: var(--text-small); color: var(--ca-text-secondary); margin-left: 5px; white-space: nowrap; }
+        .hw-date { font-size: 11px; color: var(--ca-text-secondary); margin-top: 2px; }
+        .hw-badge { flex-shrink: 0; font-size: 10px; padding: 3px var(--ca-space-2); border-radius: var(--ca-radius-pill); font-weight: 800; text-transform: uppercase; white-space: nowrap; }
         .badge-pending { background: var(--ca-tint-warning); color: var(--ca-warning); }
         .badge-approved { background: var(--ca-tint-success); color: var(--ca-success); }
         .badge-rejected { background: var(--ca-tint-error); color: var(--ca-error); }
 
         .hw-comment {
-            margin-top: var(--ca-space-3); padding: var(--ca-space-3); background: var(--ca-tint-muted);
-            border-radius: var(--ca-radius-xs); font-size: 13px; color: var(--tg-text);
+            margin-top: var(--ca-space-3); padding: var(--ca-space-3); background: var(--ca-surface-nested);
+            border-radius: var(--ca-radius-xs); font-size: var(--text-small); line-height: 1.4; color: var(--tg-text); overflow-wrap: anywhere;
         }
         .hw-comment.rejected { background: var(--ca-tint-error); color: var(--ca-error); }
 
