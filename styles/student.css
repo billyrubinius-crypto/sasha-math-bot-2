@@ -872,13 +872,21 @@
            размывать под ней нечего — это был лишний композитный слой. Стабильная
            контрастная поверхность к тому же гарантирует читаемость подписей на всех
            четырёх пользовательских фонах.
+
+           Высота панели (box-sizing здесь content-box — глобального border-box нет):
+             height          = --ca-nav-h                  — контентная высота под кнопки;
+             padding-bottom  = --ca-safe-bottom            — safe-area, ровно один раз;
+             итоговая внешняя высота ≈ --ca-nav-h + --ca-safe-bottom (+1px border-top).
+           Столько же резервирует body в своём padding-bottom, поэтому нижний контент
+           не уходит под панель и safe-area не учитывается дважды.
            ===================================================================== */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
-            /* Видимая контентная высота панели остаётся ровно --ca-nav-h: safe-area добавляется
-               ТОЛЬКО через padding-bottom (доп. пространство под панелью), а не ещё раз в height,
-               иначе gesture bar/вырез съедали бы часть кнопок навигации. */
-            height: calc(var(--ca-nav-h) + var(--ca-safe-bottom));
+            /* height — ТОЛЬКО контентная высота (--ca-nav-h). safe-area добавляется
+               один раз через padding-bottom; прибавлять её ещё и к height нельзя —
+               при content-box она сложилась бы дважды и панель стала бы выше, чем
+               резервирует body. */
+            height: var(--ca-nav-h);
             padding-bottom: var(--ca-safe-bottom);
             background: var(--ca-surface); display: flex; border-top: 1px solid var(--ca-border);
             box-shadow: 0 -1px 0 var(--ca-divider);

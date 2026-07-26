@@ -547,35 +547,39 @@
     <!-- НИЖНЕЕ МЕНЮ.
          Контракт: ровно пять .nav-btn в порядке Профиль → Домашка → Лидеры → Магазин → Ещё
          (switchTab подсвечивает их по индексу 0–4), тот же onclick, тот же .nav-icon внутри.
-         aria-selected/aria-current намеренно НЕ проставлены: switchTab на этапе 2 менять
-         нельзя, а статическое значение стало бы неверным после первого переключения —
-         динамическая синхронизация отложена до этапа 8. -->
-    <div class="bottom-nav" role="tablist" aria-label="Разделы приложения">
-        <button class="nav-btn active" role="tab" onclick="switchTab('profile')">
+
+         Семантика — role="navigation" с aria-label, а НЕ tabs-паттерн. Полноценные
+         role="tablist"/role="tab" требуют синхронного aria-selected, aria-controls и
+         клавиатурной навигации стрелками; всё это живёт в switchTab, менять который на
+         этапе 2 запрещено. Неполный tabs-паттерн хуже обычных кнопок: скринридер объявил
+         бы вкладки, ни одна из которых не выбрана. Поэтому кнопки остаются кнопками,
+         а полный tabs-паттерн вместе с правкой switchTab отложен до этапа 8. -->
+    <div class="bottom-nav" role="navigation" aria-label="Разделы приложения">
+        <button class="nav-btn active" onclick="switchTab('profile')">
             <span class="nav-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-profile" xlink:href="#ca-i-profile"></use></svg>
             </span>
             <span class="nav-label">Профиль</span>
         </button>
-        <button class="nav-btn" role="tab" onclick="switchTab('homework')">
+        <button class="nav-btn" onclick="switchTab('homework')">
             <span class="nav-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-book" xlink:href="#ca-i-book"></use></svg>
             </span>
             <span class="nav-label">Домашка</span>
         </button>
-        <button class="nav-btn" role="tab" onclick="switchTab('leaderboard')">
+        <button class="nav-btn" onclick="switchTab('leaderboard')">
             <span class="nav-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-trophy" xlink:href="#ca-i-trophy"></use></svg>
             </span>
             <span class="nav-label">Лидеры</span>
         </button>
-        <button class="nav-btn" role="tab" onclick="switchTab('shop')">
+        <button class="nav-btn" onclick="switchTab('shop')">
             <span class="nav-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-shop" xlink:href="#ca-i-shop"></use></svg>
             </span>
             <span class="nav-label">Магазин</span>
         </button>
-        <button class="nav-btn" role="tab" onclick="switchTab('more')">
+        <button class="nav-btn" onclick="switchTab('more')">
             <span class="nav-icon" aria-hidden="true">
                 <svg class="ca-icon" aria-hidden="true" focusable="false"><use href="#ca-i-settings" xlink:href="#ca-i-settings"></use></svg>
             </span>
