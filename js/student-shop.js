@@ -237,14 +237,9 @@
             try {
                 // secure path (JWT активен) — через claim-based gateway set_showcase_self без
                 // p_student_id (identity из claim; T10-04B). Legacy fallback — прежний RPC.
-                const { error } = studentSecurePathActive()
-                    ? await db.rpc('set_showcase_self', {
-                        p_position: position, p_kind: kind, p_ref_code: refCode
-                    })
-                    : await db.rpc('set_showcase', {
-                        p_student_id: currentUser.id, p_position: position, p_kind: kind, p_ref_code: refCode
-                    });
-                if (error) throw error;
+                // Сам вызов вынесен в setShowcaseRpc: витриной управляют два экрана (профиль
+                // и инвентарь), путь к RPC должен быть один.
+                await setShowcaseRpc(position, kind, refCode);
                 await loadShowcase();
             } catch (e) {
                 alert('Не удалось: ' + (e.message || e));
@@ -731,5 +726,196 @@
                 alert('Не удалось: ' + (e.message || e));
                 if (btn) btn.disabled = false;
             }
+        }
+
+        // --- ИНВЕНТАРЬ (вкладка «Ещё») ---
+        // Почему отдельный раздел, а не карточки в магазине: магазин по определению показывает
+        // только то, что продаётся сейчас (active = true + ротационный бандл текущего сезона,
+        // ensure_season_rotation/S4), поэтому у предмета прошлого сезона там просто нет
+        // карточки — а значит, и кнопки «Надеть». Экипировку это ограничивать не должно:
+        // владение постоянно (student_items), и серверная equip_item с миграции 053 больше не
+        // требует, чтобы предмет был в продаже. Список отдаёт get_student_inventory_self —
+        // владение, слот, каталожные атрибуты и флаги «надето»/«на витрине» считает сервер,
+        // клиент ничего не сверяет сам и ничего не фильтрует по сезону.
+        const INVENTORY_SLOT_TITLES = {
+            background:   '🖼 Фоны',
+            frame:        '🖼 Рамки аватара',
+            name_color:   '🎨 Цвет ника',
+            crown:        '👑 Корона',
+            title:        '🏷️ Титулы',
+            status_emoji: '😀 Эмодзи-статус'
+        };
+        // Порядок разделов инвентаря = фактические слоты каталога (shop_items.slot, миграции
+        // 008/010). Слоты, которых здесь нет, не теряются — они уходят в раздел «Другое».
+        const INVENTORY_SLOT_ORDER = ['background', 'frame', 'name_color', 'crown', 'title', 'status_emoji'];
+
+        let inventoryShowcaseUsed = new Set();
+
+        async function loadInventory() {
+            const box = document.getElementById('inventory-content');
+            box.innerHTML = '<div class="ca-state ca-state--loading">Загрузка...</div>';
+            try {
+                // Занятые слоты витрины нужны, чтобы кнопка «На витрину» знала свободную
+                // позицию: витрина хранит и достижения, поэтому из одного инвентаря её
+                // состояние не вывести. Экипировку это не трогает — состояния независимы.
+                const [{ data, error }, { data: showcase }] = await Promise.all([
+                    db.rpc('get_student_inventory_self'),
+                    db.from('student_showcase').select('position').eq('student_id', currentUser.id)
+                ]);
+                if (error) throw error;
+                inventoryShowcaseUsed = new Set((showcase || []).map(s => s.position));
+
+                const rows = data || [];
+                if (!rows.length) {
+                    box.innerHTML = '<div class="ca-state ca-state--empty">Пока пусто. Загляни в Бубличную — там продаются рамки, фоны и титулы.</div>';
+                    return;
+                }
+
+                box.innerHTML = '';
+                const shown = new Set();
+                INVENTORY_SLOT_ORDER.forEach(slot => {
+                    const items = rows.filter(r => r.slot === slot);
+                    if (!items.length) return;
+                    items.forEach(i => shown.add(i.item_code));
+                    box.appendChild(shopSectionTitle(INVENTORY_SLOT_TITLES[slot] || slot, ''));
+                    items.forEach(i => box.appendChild(renderInventoryItem(i)));
+                });
+                const rest = rows.filter(r => !shown.has(r.item_code));
+                if (rest.length) {
+                    box.appendChild(shopSectionTitle('✨ Другое', ''));
+                    rest.forEach(i => box.appendChild(renderInventoryItem(i)));
+                }
+            } catch (e) {
+                box.innerHTML = '<div class="ca-state ca-state--error">Не удалось загрузить инвентарь</div>';
+                log('❌ Инвентарь: ' + (e.message || e));
+            }
+        }
+
+        function renderInventoryItem(item) {
+            const row = document.createElement('div');
+            row.className = 'shop-item inventory-item';
+            // shopPreview работает по slot/render_payload/item_kind — те же поля отдаёт RPC,
+            // поэтому превью инвентаря байт-в-байт совпадает с превью магазина (те же
+            // whitelist-Sets BG_CLASSES/FRAME_CLASSES, никакого innerHTML).
+            row.appendChild(shopPreview(item));
+
+            const body = document.createElement('div');
+            body.className = 'shop-body';
+            const name = document.createElement('div');
+            name.className = 'shop-name';
+            name.textContent = item.name;
+            body.appendChild(name);
+
+            const meta = document.createElement('div');
+            meta.className = 'shop-desc';
+            const bits = [];
+            if (item.season_id) bits.push(`Сезон №${item.season_id}`);
+            bits.push(item.available_now ? 'Есть в магазине' : 'Больше не продаётся');
+            meta.textContent = bits.join(' · ');
+            body.appendChild(meta);
+
+            if (item.showcase_position) {
+                const sc = document.createElement('div');
+                sc.className = 'shop-desc inventory-showcase-state';
+                sc.textContent = `На витрине, слот ${item.showcase_position}`;
+                body.appendChild(sc);
+            }
+            row.appendChild(body);
+
+            const action = document.createElement('div');
+            action.className = 'shop-action';
+
+            if (item.slot === 'status_emoji') {
+                // Эмодзи-статус по правилам магазина меняется только покупкой смены (008).
+                const s = document.createElement('span');
+                s.className = 'shop-state locked';
+                s.textContent = 'Меняется покупкой';
+                action.appendChild(s);
+            } else if (item.is_equipped) {
+                const s = document.createElement('span');
+                s.className = 'shop-equipped';
+                s.textContent = '✓ Надето';
+                action.appendChild(s);
+                const btn = document.createElement('button');
+                btn.className = 'shop-equip-btn';
+                btn.textContent = 'Снять';
+                btn.onclick = () => equipFromInventory(item.slot, null, btn, null);
+                action.appendChild(btn);
+            } else {
+                const btn = document.createElement('button');
+                btn.className = 'shop-equip-btn';
+                btn.textContent = 'Надеть';
+                btn.onclick = () => equipFromInventory(item.slot, item.item_code, btn, item.render_payload);
+                action.appendChild(btn);
+            }
+
+            // Витрина — независимое состояние: предмет может быть надет и не стоять на витрине
+            // и наоборот. Поэтому кнопка отдельная и экипировку не переписывает.
+            const showcaseBtn = document.createElement('button');
+            showcaseBtn.className = 'shop-equip-btn inventory-showcase-btn';
+            showcaseBtn.textContent = item.showcase_position ? 'С витрины' : 'На витрину';
+            showcaseBtn.onclick = () => toggleInventoryShowcase(item, showcaseBtn);
+            action.appendChild(showcaseBtn);
+
+            row.appendChild(action);
+            return row;
+        }
+
+        // Надеть/снять из инвентаря. Владение проверяет сервер (equip_item), клиент только
+        // просит. Глобальный фон применяется сразу — он лежит на #app-bg-layer и виден на всех
+        // экранах, а не только в профиле.
+        async function equipFromInventory(slot, itemCode, btn, renderPayload) {
+            if (btn) btn.disabled = true;
+            try {
+                const { error } = studentSecurePathActive()
+                    ? await db.rpc('equip_item_self', { p_slot: slot, p_item_code: itemCode })
+                    : await db.rpc('equip_item', {
+                        p_student_id: currentUser.id, p_slot: slot, p_item_code: itemCode
+                    });
+                if (error) throw error;
+                if (slot === 'background' && (!itemCode || renderPayload)) {
+                    applyAppBackground(itemCode ? { background: { payload: renderPayload } } : {});
+                }
+                await loadInventory();
+            } catch (e) {
+                alert('Не удалось: ' + (e.message || e));
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function toggleInventoryShowcase(item, btn) {
+            btn.disabled = true;
+            try {
+                if (item.showcase_position) {
+                    await setShowcaseRpc(item.showcase_position, null, null);
+                } else {
+                    let free = null;
+                    for (let p = 1; p <= 3; p++) {
+                        if (!inventoryShowcaseUsed.has(p)) { free = p; break; }
+                    }
+                    if (free === null) {
+                        alert('Витрина заполнена — освободи слот в профиле.');
+                        btn.disabled = false;
+                        return;
+                    }
+                    await setShowcaseRpc(free, 'item', item.item_code);
+                }
+                await loadInventory();
+            } catch (e) {
+                alert('Не удалось: ' + (e.message || e));
+                btn.disabled = false;
+            }
+        }
+
+        // Один вызов витрины для профиля и инвентаря (владение проверяет set_showcase).
+        async function setShowcaseRpc(position, kind, refCode) {
+            const { error } = studentSecurePathActive()
+                ? await db.rpc('set_showcase_self', {
+                    p_position: position, p_kind: kind, p_ref_code: refCode
+                })
+                : await db.rpc('set_showcase', {
+                    p_student_id: currentUser.id, p_position: position, p_kind: kind, p_ref_code: refCode
+                });
+            if (error) throw error;
         }
 

@@ -91,6 +91,10 @@ CRITICAL_CLASSES = [
     "leaderboard-list", "lb-item", "lb-me", "lb-promote", "lb-demote", "lb-rank",
     "lb-avatar", "lb-name-wrap", "lb-name-line", "lb-title", "lb-score", "league-badge",
     "league-note", "league-standing", "league-ladder", "ladder-step",
+    # заголовок когорты в полном списке лиги (создаётся только когда групп больше одной)
+    "league-group-title",
+    # инвентарь во вкладке «Ещё»
+    "inventory-item", "inventory-showcase-state", "inventory-showcase-btn",
     # косметика
     "nick-gold", "nick-status", "nick-crown", "avatar-img", "avatar-placeholder",
     "bg-grid", "bg-space", "bg-aurora", "bg-draft",

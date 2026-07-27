@@ -101,6 +101,15 @@
         // --- ПРОФИЛЬ И ИСТОРИЯ ---
         async function loadProfile(isRetryAfterInsert) {
             try {
+                // Плановый переход сезонов (миграция 051) — ленивый, на обращении: cron в
+                // проекте нет, поэтому ensure_current_season сначала выполняет
+                // ensure_season_schedule (завершить сезон с истёкшим ends_at, активировать
+                // подошедший запланированный), а потом возвращает id текущего. Делается ДО
+                // чтения students: завершение сезона обнуляет rating, и профиль должен
+                // показать данные уже после перехода. Повторные открытия приложения второй раз
+                // сезон не завершают — гейт по seasons.status внутри finish_season.
+                if (!isRetryAfterInsert) await ensureSeasonTick();
+
                 let { data, error } = await db.from('students').select('*').eq('telegram_id', currentUser.id).single();
 
                 if (error && error.code === 'PGRST116') {
@@ -603,33 +612,41 @@
         // товаров бандла, который был назначен сезону N (season_bundles, S1/S4) — тот же источник
         // данных, что и витрина ротации (S4), не отдельный список (риск из карточки S6).
         // --- ЛИДЕРБОРД ---
-        // students.rating = очки ТЕКУЩЕГО сезона (database/migrations/005) — лидерборд сортирует
-        // по нему без изменений с этапа, когда rating было мёртвым полем.
-        //
-        // Номер сезона для подписи берётся из seasons.id (открытая строка, end_date is null).
-        // Строку создаёт первый, кто открыл лидерборд после применения миграции 005 или после
-        // закрытия предыдущего сезона (G8) — тот же паттерн, что loadProfile() уже использует
-        // для ленивого создания записи students при первом входе. Гонку двух одновременных
-        // созданий предотвращает частичный уникальный индекс idx_seasons_one_active (миграция
-        // 005): при конфликте просто перечитываем уже созданную кем-то строку.
+        // Строку сезона создаёт сервер: ensure_current_season (definer, T10-08B) — seasons
+        // закрыт RLS от прямой записи. С миграции 051 та же RPC ещё и выполняет плановый
+        // переход (ensure_season_schedule): завершает сезон, у которого истёк ends_at, и
+        // активирует подошедший запланированный. Это и есть механизм активации по расписанию —
+        // ленивый, на обращении, потому что cron в инфраструктуре проекта нет. Гонку
+        // одновременных вызовов снимает advisory-lock внутри функции, двойное завершение —
+        // гейт по seasons.status.
+        let currentSeasonTick = null;
+
         async function getCurrentSeasonId() {
-            // Ленивое создание сезона теперь на сервере (T10-08B): seasons закрыт RLS от прямой
-            // записи. ensure_current_season (definer) возвращает открытый сезон, создаёт при
-            // отсутствии; гонку ловит partial-unique idx_seasons_one_active.
             const { data, error } = await db.rpc('ensure_current_season');
             if (error) return null;
-            return data ?? null;
+            currentSeasonTick = data ?? null;
+            return currentSeasonTick;
+        }
+
+        // Один «тик» расписания за загрузку экрана: profile и лидерборд вызывают его оба,
+        // повторный вызов дешёвый (переход уже выполнен), но и лишним его делать не нужно.
+        async function ensureSeasonTick() {
+            try { return await getCurrentSeasonId(); } catch (e) { return null; }
         }
 
         // --- ЛИГИ (L03) ---
-        // Вкладка «Лидеры» имеет два режима: «Моя лига» (по умолчанию) и «Общий топ»
-        // (прежний сезонный топ-10, где топ-3 получают 100/60/30). loadLeaderboard остаётся
-        // точкой входа из switchTab и просто открывает режим лиги. Места и переходы НЕ считаются
-        // на клиенте: их отдаёт сервер (get_student_league_snapshot / preview_league_close, L01).
+        // Вкладка «Лидеры» имеет два режима: «Моя лига» (по умолчанию) и «Общий топ» — теперь
+        // накопительный за ВСЕ сезоны (миграция 051), а не сезонный топ-10. loadLeaderboard
+        // остаётся точкой входа из switchTab. Места, переходы и общий рейтинг НЕ считаются на
+        // клиенте: их отдаёт сервер (get_student_league_snapshot_self /
+        // get_student_league_standings_self / get_global_top_self).
         // Названия семи лиг — снимок league_tiers (миграция 019), для лестницы без запроса.
         const LEAGUE_LADDER = ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Мастер', 'Легенда'];
 
         async function loadLeaderboard() {
+            // Тик расписания сезонов до отрисовки любого режима: и место в лиге, и общий топ
+            // зависят от того, не сменился ли сезон прямо сейчас.
+            await ensureSeasonTick();
             switchLbMode('league');
         }
 
@@ -702,18 +719,33 @@
             return li;
         }
 
+        // Подпись сезона в шапке лиги: название из планирования (миграция 051) + номер.
+        function leagueSeasonLabel(snap) {
+            if (!snap || !snap.season_id) return '';
+            return snap.season_title
+                ? `«${esc(snap.season_title)}» (сезон №${snap.season_id})`
+                : `Сезон №${snap.season_id}`;
+        }
+
+        // Полный список своей лиги. Раньше он строился из preview_league_close, который отдаёт
+        // только обычные когорты (`is_late_entry = false`), поэтому вступившие по ходу сезона
+        // пропадали из выдачи; сам late-entry ученик вообще получал ранний выход без списка; а
+        // имена и косметика остальных тянулись прямыми select из students/student_equipment,
+        // закрытых RLS «своя строка» (миграции 042/043) — у ученика возвращалась одна строка.
+        // Теперь один RPC get_student_league_standings_self (миграция 052) отдаёт ВСЕХ
+        // фактических участников своей лиги с именами, косметикой, местом внутри когорты и
+        // проекцией перехода. Никакого LIMIT и никакой клиентской фильтрации: сколько пришло —
+        // столько и рисуем, когорты идут отдельными группами (места считаются внутри когорты).
         async function loadLeague() {
             const box = document.getElementById('league-content');
-            box.innerHTML = '<div class="summary-empty">Загрузка...</div>';
+            box.innerHTML = '<div class="ca-state ca-state--loading">Загрузка...</div>';
             try {
-                // claim-based self-обёртки (T10-08B): identity из JWT; preview — leaderboard
-                // (student+teacher), definer, без раскрытия telegram_username.
-                const [{ data: snap, error: snapErr }, { data: preview, error: prevErr }] = await Promise.all([
+                const [{ data: snap, error: snapErr }, { data: rows, error: rowsErr }] = await Promise.all([
                     db.rpc('get_student_league_snapshot_self'),
-                    db.rpc('preview_league_close_self')
+                    db.rpc('get_student_league_standings_self')
                 ]);
                 if (snapErr) throw snapErr;
-                if (prevErr) throw prevErr;
+                if (rowsErr) throw rowsErr;
 
                 const tier = snap && snap.tier ? snap.tier : 1;
                 const tierName = (snap && snap.tier_name) || LEAGUE_LADDER[tier - 1];
@@ -724,73 +756,87 @@
                 html += '</div>';
 
                 if (!snap || !snap.in_season) {
-                    // Нет membership в текущем сезоне (ещё не заработал очков) либо сезон не идёт.
-                    html += '<div class="league-note">Вы ещё не в сезоне. Заработайте очки сезона (принятая домашка, пробники) — и попадёте в лигу.</div>';
+                    // Участия в текущем сезоне нет: с миграции 052 оно появляется не при
+                    // регистрации, а после первого фактического начисления очков за домашку.
+                    html += '<div class="league-note">Ты ещё не в битве лиг этого сезона. Участие открывается сразу после первого начисления очков сезона — за принятую учителем домашку.</div>';
                     html += renderLeagueLadder(tier);
                     box.innerHTML = html;
                     return;
                 }
 
-                if (snap.season_id) html += `<div class="league-note">Сезон №${snap.season_id} идёт. Места, переходы и Корона фиксируются при закрытии сезона учителем.</div>`;
+                html += `<div class="league-note">${leagueSeasonLabel(snap)} идёт. Места, переходы и Корона фиксируются при закрытии сезона.</div>`;
 
                 if (snap.is_late_entry) {
-                    // Поздний вход: видит место, но в этот неполный сезон без повышения/понижения.
-                    html += '<div class="league-note">Вы присоединились в середине сезона: ваше место видно, но повышения и понижения в этом неполном сезоне не будет — они начнутся со следующего сезона.</div>';
-                    if (snap.place && snap.cohort_size) {
-                        html += `<div class="league-standing">Ваше место: <b>${snap.place}</b> из ${snap.cohort_size}</div>`;
-                    }
-                    html += renderLeagueLadder(tier);
-                    box.innerHTML = html;
-                    return;
+                    html += '<div class="league-note">Ты присоединился в середине сезона: место видно, но повышения и понижения в этом неполном сезоне не будет — они начнутся со следующего сезона.</div>';
                 }
 
-                // Обычный участник: standings своей когорты из preview (серверные места/переходы).
-                const myRow = (preview || []).find(r => r.student_id === currentUser.id);
-                const cohort = myRow
-                    ? (preview || []).filter(r => r.tier === myRow.tier && r.cohort_index === myRow.cohort_index)
-                        .sort((a, b) => a.place - b.place)
-                    : [];
                 const active = snap.active_in_cohort || 0;
+                const myGroup = (rows || []).filter(r => r.is_me);
+                const promote = (rows || []).filter(r => !r.is_late_entry && r.projected_movement === 'promote').length;
+                const demote = (rows || []).filter(r => !r.is_late_entry && r.projected_movement === 'demote').length;
 
                 // Пояснение зон переходов по фактическому числу активных (SPEC_STAGE3 §4).
-                if (active < 5) {
-                    html += `<div class="league-note">В когорте ${active} активных (нужно 5+). В этом сезоне переходов между лигами не будет.</div>`;
+                if (snap.is_late_entry) {
+                    // у late-entry когорты переходов нет по правилу — счётчики зон не показываем
+                } else if (active < 5) {
+                    html += `<div class="league-note">В группе ${active} активных (нужно 5+). В этом сезоне переходов между лигами не будет.</div>`;
                 } else {
-                    const up = cohort.filter(r => r.projected_movement === 'promote').length;
-                    const down = cohort.filter(r => r.projected_movement === 'demote').length;
-                    html += `<div class="league-note">Активных в когорте: ${active}. Сейчас повышаются <b>${up}</b> сверху, понижаются <b>${down}</b> снизу (по текущим очкам).</div>`;
+                    html += `<div class="league-note">Активных в группе: ${active}. Сейчас повышаются <b>${promote}</b> сверху, понижаются <b>${demote}</b> снизу (по текущим очкам).</div>`;
+                }
+
+                if (snap.place && snap.cohort_size) {
+                    html += `<div class="league-standing">Твоё место: <b>${snap.place}</b> из ${snap.cohort_size}</div>`;
                 }
 
                 box.innerHTML = html;
 
-                if (cohort.length) {
+                // Группировка по когортам. Обычная когорта и late_entry — разные соревновательные
+                // группы (SPEC_STAGE3 §3), поэтому они не смешиваются в один нумерованный список.
+                const groups = [];
+                (rows || []).forEach(r => {
+                    const key = (r.is_late_entry ? 'L' : 'R') + ':' + r.cohort_index;
+                    let g = groups.find(x => x.key === key);
+                    if (!g) {
+                        g = { key, isLate: r.is_late_entry, index: r.cohort_index, rows: [] };
+                        groups.push(g);
+                    }
+                    g.rows.push(r);
+                });
+
+                groups.forEach(g => {
+                    if (groups.length > 1) {
+                        const title = document.createElement('div');
+                        title.className = 'league-group-title';
+                        title.textContent = g.isLate
+                            ? `Присоединились по ходу сезона${g.index > 1 ? ' — группа ' + g.index : ''}`
+                            : `Основная группа${g.index > 1 ? ' ' + g.index : ''}`;
+                        box.appendChild(title);
+                    }
                     const listEl = document.createElement('ul');
                     listEl.className = 'leaderboard-list';
-
-                    // Имена и косметика участников когорты — батчами (не N+1), как в общем топе.
-                    const ids = cohort.map(r => r.student_id);
-                    const nameById = {};
-                    const { data: studs } = await db.from('students').select('name, telegram_id').in('telegram_id', ids);
-                    (studs || []).forEach(s => { nameById[s.telegram_id] = s.name || ''; });
-                    const eqByStudent = {};
-                    const { data: eqAll } = await equipmentQuery(ids, true);
-                    (eqAll || []).forEach(r => { (eqByStudent[r.student_id] = eqByStudent[r.student_id] || []).push(r); });
-
-                    cohort.forEach(r => {
-                        const isMe = r.student_id === currentUser.id;
-                        const eq = buildEquipMap(eqByStudent[r.student_id] || []);
-                        const arrow = r.projected_movement === 'promote' ? ' ↑' : (r.projected_movement === 'demote' ? ' ↓' : '');
+                    g.rows.forEach(r => {
+                        const arrow = r.projected_movement === 'promote' ? ' ↑'
+                            : (r.projected_movement === 'demote' ? ' ↓' : '');
                         listEl.appendChild(buildLeaderboardRow({
                             rankText: `#${r.place}`,
-                            name: nameById[r.student_id] || '',
-                            eq,
-                            isMe,
+                            name: r.name || '',
+                            eq: r.equipment || {},
+                            isMe: !!r.is_me,
                             scoreText: `${r.points} ⭐${arrow}`,
                             modifiers: (r.projected_movement === 'promote' ? 'lb-promote' : '') +
                                 (r.projected_movement === 'demote' ? 'lb-demote' : '')
                         }));
                     });
                     box.appendChild(listEl);
+                });
+
+                if (!myGroup.length) {
+                    // Инвариант: свою строку ученик обязан видеть. Если её нет — это рассинхрон
+                    // снимка и выдачи, о котором лучше сказать, чем молча показать чужой список.
+                    const note = document.createElement('div');
+                    note.className = 'league-note is-warning';
+                    note.textContent = 'Не удалось найти тебя в списке — открой экран заново.';
+                    box.appendChild(note);
                 }
 
                 // Предупреждение о неактивных сезонах (второй пустой сезон подряд — понижение).
@@ -805,54 +851,89 @@
                 ladder.innerHTML = renderLeagueLadder(tier);
                 box.appendChild(ladder);
             } catch (e) {
-                box.innerHTML = '<div class="summary-empty is-error">Ошибка лиги</div>';
+                box.innerHTML = '<div class="ca-state ca-state--error">Ошибка лиги</div>';
                 log('❌ Лига: ' + (e.message || e));
             }
         }
 
+        // --- ОБЩИЙ ТОП ЗА ВСЁ ВРЕМЯ ---
+        // Раньше здесь был прямой select из students с сортировкой по rating и limit(10):
+        // rating — очки ТЕКУЩЕГО сезона (обнуляются при закрытии, миграция 006), поэтому топ
+        // забывал все прошлые достижения; а после включения RLS на students (миграция 042)
+        // такой select у ученика возвращал вообще одну строку — его собственную.
+        // Теперь считает сервер: get_global_top_self (миграция 051) = сумма итогов всех
+        // закрытых сезонов (season_results) + очки текущего, стабильный tie-break, все
+        // зарегистрированные ученики. Страницами по GLOBAL_TOP_PAGE до total_students —
+        // скрытого «первых 10» больше нет.
+        const GLOBAL_TOP_PAGE = 50;
+        let globalTopLoaded = 0, globalTopTotal = 0, globalTopBusy = false;
+
         async function loadGlobalTop() {
             const list = document.getElementById('lb-list');
-            list.innerHTML = '<li class="summary-empty">Загрузка...</li>';
+            list.innerHTML = '<li class="ca-state ca-state--loading">Загрузка...</li>';
+            document.getElementById('lb-load-more').style.display = 'none';
+            globalTopLoaded = 0;
+            globalTopTotal = 0;
+            await fetchGlobalTopPage(true);
+        }
 
+        async function loadMoreGlobalTop() {
+            await fetchGlobalTopPage(false);
+        }
+
+        async function fetchGlobalTopPage(isFirst) {
+            if (globalTopBusy) return;
+            globalTopBusy = true;
+            const list = document.getElementById('lb-list');
+            const moreBtn = document.getElementById('lb-load-more');
+            moreBtn.disabled = true;
             try {
-                const [{ data, error }, seasonId] = await Promise.all([
-                    db.from('students').select('name, rating, telegram_id').order('rating', { ascending: false }).limit(10),
-                    getCurrentSeasonId()
-                ]);
-                document.getElementById('lb-season-label').innerText = seasonId ? `Сезон №${seasonId}` : '';
-
+                const { data, error } = await db.rpc('get_global_top_self', {
+                    p_limit: GLOBAL_TOP_PAGE, p_offset: globalTopLoaded
+                });
                 if (error) throw error;
+                const rows = data || [];
 
-                // Экипировка всех из топ-10 ОДНИМ запросом (не N+1) → карта по ученику
-                const ids = data.map(s => s.telegram_id);
-                const eqByStudent = {};
-                if (ids.length) {
-                    const { data: eqAll } = await equipmentQuery(ids, true);
-                    (eqAll || []).forEach(r => { (eqByStudent[r.student_id] = eqByStudent[r.student_id] || []).push(r); });
+                if (isFirst) {
+                    list.innerHTML = '';
+                    globalTopTotal = rows.length ? rows[0].total_students : 0;
+                }
+                if (isFirst && !rows.length) {
+                    list.innerHTML = '<li class="ca-state ca-state--empty">Пока никого нет</li>';
                 }
 
-                list.innerHTML = '';
-                data.forEach((student, index) => {
-                    const isMe = student.telegram_id === currentUser.id;
-                    const eq = buildEquipMap(eqByStudent[student.telegram_id] || []);
-
-                    let rankDisplay = `#${index + 1}`;
-                    if (index === 0) rankDisplay = '🥇';
-                    if (index === 1) rankDisplay = '🥈';
-                    if (index === 2) rankDisplay = '🥉';
+                rows.forEach(row => {
+                    // Медали — только у первых трёх мест общего топа (их считает сервер).
+                    let rankDisplay = `#${row.place}`;
+                    if (row.place === 1) rankDisplay = '🥇';
+                    if (row.place === 2) rankDisplay = '🥈';
+                    if (row.place === 3) rankDisplay = '🥉';
 
                     list.appendChild(buildLeaderboardRow({
                         rankText: rankDisplay,
-                        name: student.name || '',
-                        eq,
-                        isMe,
-                        scoreText: `${student.rating} ⭐`
+                        name: row.name || '',
+                        eq: row.equipment || {},
+                        isMe: row.student_id === currentUser.id,
+                        scoreText: `${row.lifetime_points} ⭐`
                     }));
                 });
+                globalTopLoaded += rows.length;
 
+                document.getElementById('lb-season-label').innerText = globalTopTotal
+                    ? `За все сезоны · учеников: ${globalTopTotal}`
+                    : 'За все сезоны';
+
+                const hasMore = globalTopLoaded < globalTopTotal;
+                moreBtn.style.display = hasMore ? '' : 'none';
+                moreBtn.textContent = hasMore
+                    ? `Показать ещё (${globalTopTotal - globalTopLoaded})`
+                    : 'Показать ещё';
             } catch (e) {
-                list.innerHTML = '<li class="summary-empty is-error">Ошибка</li>';
+                if (isFirst) list.innerHTML = '<li class="ca-state ca-state--error">Ошибка</li>';
                 log('❌ Лидерборд: ' + (e.message || e));
+            } finally {
+                moreBtn.disabled = false;
+                globalTopBusy = false;
             }
         }
 
