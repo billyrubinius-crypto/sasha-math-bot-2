@@ -1,4 +1,173 @@
-// teacher-students.js — ученики, закрытие сезона, индивидуальные задания, пробники (R02)
+// teacher-students.js — ученики, сезоны, индивидуальные задания, пробники (R02)
+
+        // --- ПЛАНИРОВАНИЕ СЕЗОНОВ (миграция 051) ---
+        // Проектный часовой пояс — Europe/Moscow (МСК = UTC+3 круглый год, как и в
+        // moscowDateTimeToInstant ученического приложения). Учитель вводит время в МСК, на
+        // сервер уходит явный timestamptz со смещением +03:00 — часовой пояс устройства и UTC
+        // здесь не участвуют вообще. Обратно значения печатаются тоже в МСК.
+        const MSK_OFFSET = '+03:00';
+
+        // 'YYYY-MM-DDTHH:mm' из <input type="datetime-local"> → ISO с московским смещением.
+        function mskLocalToIso(value) {
+            if (!value) return null;
+            const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+            if (!m) return null;
+            return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00${MSK_OFFSET}`;
+        }
+
+        function formatMsk(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleString('ru-RU', {
+                timeZone: 'Europe/Moscow',
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            }) + ' МСК';
+        }
+
+        // Точное плановое время, если оно есть (сезоны с миграции 051); у исторических сезонов
+        // окна нет — тогда показываем только календарную дату из start_date/end_date, а не
+        // придумываем время.
+        function seasonMoment(iso, fallbackDate) {
+            if (iso) return formatMsk(iso);
+            if (!fallbackDate) return '—';
+            const d = new Date(fallbackDate);
+            return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ru-RU');
+        }
+
+        const SEASON_STATUS_LABELS = {
+            planned:   { text: 'Запланирован', color: '#1565c0', bg: '#e3f2fd' },
+            active:    { text: 'Текущий',      color: '#2e7d32', bg: '#e8f5e9' },
+            completed: { text: 'Завершён',     color: '#666',    bg: '#eee'    }
+        };
+
+        // Коды ошибок валидации приходят из RPC (admin_create_season_self/admin_update_season_self);
+        // текст для учителя живёт здесь, чтобы сообщения были на русском и в одном месте.
+        const SEASON_ERROR_TEXT = {
+            season_number_required:   'Укажите номер сезона.',
+            season_number_taken:      'Сезон с таким номером уже существует.',
+            season_number_too_small:  'Номер должен быть больше номера последнего сезона.',
+            title_required:           'Укажите название сезона (до 60 символов).',
+            window_required:          'Укажите и дату начала, и дату окончания.',
+            window_order:             'Окончание должно быть позже начала.',
+            start_in_past:            'Начало должно быть в будущем.',
+            season_overlap:           'Даты пересекаются с другим сезоном — сезоны идут последовательно.',
+            season_not_planned:       'Изменять и удалять можно только запланированный сезон.',
+            season_not_found:         'Сезон не найден.',
+            season_has_data:          'К сезону уже привязаны данные — удалить нельзя.',
+            forbidden:                'Недостаточно прав.'
+        };
+
+        function seasonErrorText(e) {
+            const raw = (e && (e.message || e.code)) ? String(e.message || e.code) : '';
+            const key = Object.keys(SEASON_ERROR_TEXT).find(k => raw.includes(k));
+            return key ? SEASON_ERROR_TEXT[key] : (raw || 'Не удалось сохранить сезон');
+        }
+
+        function showSeasonFormError(text) {
+            const box = document.getElementById('season-form-error');
+            if (!box) return;
+            box.textContent = text || '';
+            box.style.display = text ? 'block' : 'none';
+        }
+
+        async function loadSeasons() {
+            const box = document.getElementById('season-list');
+            if (!box) return;
+            box.innerHTML = '<div style="font-size:13px; color:#999;">Загрузка сезонов…</div>';
+            try {
+                const { data, error } = await db.rpc('admin_list_seasons_self');
+                if (error) throw error;
+                const rows = data || [];
+                if (!rows.length) {
+                    box.innerHTML = '<div style="font-size:13px; color:#999;">Сезонов пока нет.</div>';
+                    return;
+                }
+
+                let html = '';
+                rows.forEach(s => {
+                    const meta = SEASON_STATUS_LABELS[s.status] || { text: s.status, color: '#666', bg: '#eee' };
+                    html += `<div style="border:1px solid #eee; border-radius:8px; padding:10px; margin-bottom:8px;">`;
+                    html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">`;
+                    html += `<b style="word-break:break-word;">№${s.season_id}${s.title ? ' — ' + esc(s.title) : ''}</b>`;
+                    html += `<span class="badge" style="background:${meta.bg}; color:${meta.color}; flex-shrink:0;">${meta.text}</span>`;
+                    html += `</div>`;
+                    html += `<div class="card-meta" style="margin-top:6px;">Начало: ${esc(seasonMoment(s.starts_at, s.start_date))}</div>`;
+                    html += `<div class="card-meta">Окончание: ${esc(seasonMoment(s.ends_at, s.end_date))}</div>`;
+                    if (s.status === 'active') {
+                        html += `<div class="card-meta">Участников в лигах: ${s.participants}</div>`;
+                    }
+                    if (s.status === 'completed') {
+                        html += `<div class="card-meta">Итогов в архиве: ${s.archived}</div>`;
+                    }
+                    if (s.is_overdue) {
+                        html += `<div class="warning-text" style="text-align:left; margin-top:6px;">Срок вышел — сезон завершится при следующем открытии приложения.</div>`;
+                    }
+                    if (s.status === 'planned') {
+                        html += `<button class="btn-secondary" style="margin-top:8px;" onclick="deleteSeason(${Number(s.season_id)})">🗑 Отменить план</button>`;
+                    }
+                    html += `</div>`;
+                });
+                box.innerHTML = html;
+            } catch (e) {
+                box.innerHTML = '<div style="font-size:13px; color:#b00;">Не удалось загрузить сезоны.</div>';
+            }
+        }
+
+        // Создание сезона. Клиентская проверка — только чтобы не гонять заведомо неверную форму;
+        // настоящая валидация (номер, уникальность, порядок дат, пересечение окон, роль) живёт
+        // в admin_create_season_self. Скрытая кнопка правами не является: ученик, вызвав RPC
+        // напрямую, получит forbidden — app_role проверяется на сервере, а прямая запись в
+        // seasons отозвана у anon/authenticated (миграция 043).
+        async function createSeason() {
+            const btn = document.getElementById('btn-create-season');
+            if (btn.disabled) return;
+            showSeasonFormError('');
+
+            const number = Number(document.getElementById('season-number').value);
+            const title = document.getElementById('season-title').value.trim();
+            const startsAt = mskLocalToIso(document.getElementById('season-starts-at').value);
+            const endsAt = mskLocalToIso(document.getElementById('season-ends-at').value);
+
+            if (!Number.isInteger(number) || number <= 0) return showSeasonFormError(SEASON_ERROR_TEXT.season_number_required);
+            if (!title) return showSeasonFormError(SEASON_ERROR_TEXT.title_required);
+            if (!startsAt || !endsAt) return showSeasonFormError(SEASON_ERROR_TEXT.window_required);
+            if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) return showSeasonFormError(SEASON_ERROR_TEXT.window_order);
+            if (new Date(startsAt).getTime() <= Date.now()) return showSeasonFormError(SEASON_ERROR_TEXT.start_in_past);
+
+            btn.disabled = true;
+            try {
+                const { error } = await db.rpc('admin_create_season_self', {
+                    p_season_number: number,
+                    p_title: title,
+                    p_starts_at: startsAt,
+                    p_ends_at: endsAt
+                });
+                if (error) throw error;
+                document.getElementById('season-number').value = '';
+                document.getElementById('season-title').value = '';
+                document.getElementById('season-starts-at').value = '';
+                document.getElementById('season-ends-at').value = '';
+                await loadSeasons();
+            } catch (e) {
+                showSeasonFormError(seasonErrorText(e));
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function deleteSeason(seasonId) {
+            if (!confirm(`Отменить запланированный сезон №${seasonId}?`)) return;
+            try {
+                const { error } = await db.rpc('admin_delete_season_self', { p_season_id: seasonId });
+                if (error) throw error;
+                await loadSeasons();
+            } catch (e) {
+                alert(seasonErrorText(e));
+            }
+        }
+
         async function loadStudents() {
             const { data } = await db.from('students').select('telegram_id, name, group_name');
             studentsList = data || [];
@@ -118,12 +287,18 @@
                 }
                 const season = seasons[0];
                 const startText = new Date(season.start_date).toLocaleDateString('ru-RU');
-                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, лиговые переходы и Корона будут посчитаны сервером, очки всех учеников обнулятся. Действие необратимо.`)) return;
+                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, лиговые переходы и Корона будут посчитаны сервером, очки всех учеников обнулятся. Общий топ за все сезоны при этом не уменьшится.\n\nСразу откроется следующий сезон: подошедший по плану, либо новый, если запланированного на сейчас нет. Действие необратимо.`)) return;
 
                 const { data, error: rpcError } = await db.rpc('close_season_self');
                 if (rpcError) throw rpcError;
-                alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\nНовый сезон открыт.`);
+                if (data && data.already_completed) {
+                    // Сезон успел завершиться по расписанию (ends_at) между чтением и вызовом.
+                    alert('Сезон уже был завершён — повторное закрытие ничего не изменило.');
+                } else {
+                    alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\nТекущим стал сезон №${data.next_season_id}.`);
+                }
                 document.getElementById('season-preview').innerHTML = '';
+                await loadSeasons();
             } catch (e) {
                 alert('Ошибка: ' + e.message);
             } finally {

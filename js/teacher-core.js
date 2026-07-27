@@ -125,6 +125,7 @@
             document.getElementById('sub-tabs-container').style.display = tab === 'check' ? 'flex' : 'none';
             
             if (tab === 'check') loadSubmissions();
+            if (tab === 'plan') loadSeasons();
             if (tab === 'titles') loadCustomTitleRequests();
             if (tab === 'quests') loadQuestTemplates();
         }

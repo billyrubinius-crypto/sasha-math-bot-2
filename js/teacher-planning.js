@@ -112,7 +112,8 @@
             document.querySelectorAll('.plan-view').forEach(v => v.classList.remove('active'));
             document.getElementById('plan-' + view).classList.add('active');
 
-            if (view === 'draft') loadDrafts();
+            if (view === 'create') loadSeasons();
+            else if (view === 'draft') loadDrafts();
             else if (view === 'current') loadCurrentWeek();
             else if (view === 'archive') loadArchiveWeeks('daily', 'archive-daily');
         }

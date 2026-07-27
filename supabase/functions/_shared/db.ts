@@ -211,9 +211,14 @@ export async function fetchAlreadyNotifiedLeagueKeys(seasonId: number): Promise<
   return rows.map((r) => r.notification_key);
 }
 
+// «Последний закрытый сезон» = status = 'completed'. Раньше признаком служило end_date is not
+// null, но с миграции 051 у ЗАПЛАНИРОВАННОГО сезона end_date тоже заполнен (плановой датой
+// окончания — так сохраняется инвариант «end_date is null ⇔ сезон идёт» для всех остальных
+// селекторов проекта). Без фильтра по статусу сюда попал бы будущий сезон с большим id, и
+// лиговые уведомления main.py ушли бы по пустым итогам.
 export async function fetchLatestClosedSeasonId(): Promise<number | null> {
   const rows = await serviceRestGet<{ id: number }[]>("seasons", {
-    end_date: "not.is.null",
+    status: "eq.completed",
     order: "id.desc",
     limit: "1",
     select: "id",
@@ -227,9 +232,14 @@ export interface LeagueMembershipRow {
   place: number | null;
   movement: string | null;
 }
+// Только фактические участники: с миграции 052 строка membership с activated_at is null —
+// это заготовка посева (build_season_cohorts), ученик в лигу так и не вступил, и уведомление
+// об итогах ему отправлять не за что. У всех закрытых сезонов backfill проставил activated_at,
+// поэтому историческая рассылка не меняется.
 export function fetchLeagueMemberships(seasonId: number): Promise<LeagueMembershipRow[]> {
   return serviceRestGet<LeagueMembershipRow[]>("league_memberships", {
     season_id: `eq.${seasonId}`,
+    activated_at: "not.is.null",
     select: "student_id,tier,place,movement",
   });
 }

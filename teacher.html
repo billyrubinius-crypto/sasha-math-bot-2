@@ -111,9 +111,38 @@
                 <button class="btn-primary" id="btn-assign-indiv" onclick="assignIndividual()" style="margin-top:10px;">Назначить индивидуально</button>
             </div>
 
+            <!-- СЕЗОНЫ: планирование + список со статусами.
+                 Форма живёт в том же .week-planner, что и остальное планирование, и пользуется
+                 существующими .btn-primary/.btn-secondary/.btn-danger — отдельной страницы нет.
+                 Время вводится в МСК (проектный часовой пояс, Europe/Moscow) и уходит на сервер
+                 как timestamptz с явным смещением +03:00: локальное время устройства учителя и
+                 UTC не смешиваются. -->
             <div class="week-planner">
-                <h3 style="margin-top:0">🏁 Сезон</h3>
-                <p style="font-size:13px; color:#666; margin-bottom:15px;">Закрытие сезона: итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон. Лиговые переходы и Корона считаются сервером в той же операции. Делается вручную раз в 2 недели.</p>
+                <h3 style="margin-top:0">🗓️ Сезоны</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Сезон можно запланировать заранее. До даты начала он «Запланирован», в момент начала становится текущим, после даты окончания завершается автоматически: итоги уходят в архив, топ-3 получают 100/60/30 бубликов, считаются лиговые переходы и Корона, очки обнуляются. Всё это выполняется ровно один раз. Время — московское.</p>
+
+                <div id="season-list"><div style="font-size:13px; color:#999;">Загрузка сезонов…</div></div>
+
+                <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee;">
+                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Новый сезон</label>
+                    <input type="number" id="season-number" min="1" step="1" placeholder="Номер сезона"
+                        style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px;">
+                    <input type="text" id="season-title" maxlength="60" placeholder="Название сезона"
+                        style="width:100%; box-sizing:border-box; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px;">
+                    <label style="font-size:13px; color:#666; display:block; margin-bottom:4px;">Начало (МСК)</label>
+                    <input type="datetime-local" id="season-starts-at"
+                        style="width:100%; max-width:100%; box-sizing:border-box; -webkit-appearance:none; appearance:none; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                    <label style="font-size:13px; color:#666; display:block; margin-bottom:4px;">Окончание (МСК)</label>
+                    <input type="datetime-local" id="season-ends-at"
+                        style="width:100%; max-width:100%; box-sizing:border-box; -webkit-appearance:none; appearance:none; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                    <div id="season-form-error" class="warning-text" style="display:none; text-align:left;"></div>
+                    <button class="btn-primary" id="btn-create-season" onclick="createSeason()">🗓️ Запланировать сезон</button>
+                </div>
+            </div>
+
+            <div class="week-planner">
+                <h3 style="margin-top:0">🏁 Закрыть сезон вручную</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Досрочное закрытие текущего сезона. Итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются, сразу открывается следующий сезон: подошедший по плану, либо новый, если запланированного на сейчас нет. Лиговые переходы и Корона считаются сервером в той же операции.</p>
                 <button class="btn-secondary" id="btn-preview-season" onclick="previewSeasonClose()">📊 Превью закрытия (лиги)</button>
                 <div id="season-preview"></div>
                 <button class="btn-danger" id="btn-close-season" onclick="closeSeason()" style="width:100%;">🏁 Закрыть сезон</button>
