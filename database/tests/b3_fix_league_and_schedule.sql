@@ -50,34 +50,63 @@ $test$;
 do $test$
 declare
   v_student bigint := 995055001;
+  v_base bigint;
+  v_missed_1 bigint;
+  v_missed_2 bigint;
+  v_current bigint;
+  v_future bigint;
   v_season bigint;
   v_count integer;
+  v_before integer;
 begin
+  -- Isolate the scheduler inside this rollback-only transaction.
+  update public.seasons set status = 'completed', end_date = coalesce(end_date, current_date)
+   where status = 'active';
+  select coalesce(max(id), 0) + 1000 into v_base from public.seasons;
+  v_missed_1 := v_base;
+  v_missed_2 := v_base + 1;
+  v_current := v_base + 2;
+  v_future := v_base + 3;
+  insert into public.seasons (id, title, status, start_date, end_date, starts_at, ends_at)
+  values
+    (v_missed_1, 'B3 missed 1', 'planned', current_date - 5, current_date - 4, now() - interval '5 days', now() - interval '4 days'),
+    (v_missed_2, 'B3 missed 2', 'planned', current_date - 3, current_date - 2, now() - interval '3 days', now() - interval '2 days'),
+    (v_current, 'B3 current', 'planned', current_date, current_date + 1, now() - interval '1 hour', now() + interval '1 hour'),
+    (v_future, 'B3 future', 'planned', current_date + 2, current_date + 3, now() + interval '1 day', now() + interval '2 days');
+  select count(*) into v_before from public.seasons;
   select public.ensure_season_schedule() into v_season;
-  if v_season is not null then
-    insert into public.students (telegram_id, name, huikons, rating, lives, current_streak)
-    values (v_student, 'B3 enrollment', 0, 0, 3, 0);
-    perform public.award_season_points(v_student, 11, 'mock_exam_season', 'b3-mock');
-    select count(*) into v_count from public.league_memberships
-     where season_id = v_season and student_id = v_student and activated_at is not null;
-    if v_count <> 0 then raise exception 'FAIL: non-homework award activated membership'; end if;
-    perform public.add_homework_season_points(v_student, 10);
-    select count(*) into v_count from public.league_memberships
-     where season_id = v_season and student_id = v_student and activated_at is not null;
-    if v_count <> 1 then raise exception 'FAIL: homework award did not activate exactly once'; end if;
-    perform public.add_homework_season_points(v_student, 10);
-    if (select count(*) from public.league_memberships where season_id = v_season and student_id = v_student) <> 1 then
-      raise exception 'FAIL: repeated homework created a duplicate membership';
-    end if;
+  if v_season <> v_current then raise exception 'FAIL: scheduler returned an expired planned season'; end if;
+  if (select status from public.seasons where id = v_missed_1) <> 'completed'
+     or (select status from public.seasons where id = v_missed_2) <> 'completed' then
+    raise exception 'FAIL: missed planned seasons were not completed in one call';
   end if;
+  if (select count(*) from public.seasons) <> v_before then
+    raise exception 'FAIL: scheduler created an ad-hoc season';
+  end if;
+  insert into public.students (telegram_id, name, huikons, rating, lives, current_streak)
+  values (v_student, 'B3 enrollment', 0, 0, 3, 0);
+  perform public.award_season_points(v_student, 11, 'mock_exam_season', 'b3-mock');
+  select count(*) into v_count from public.league_memberships
+   where season_id = v_season and student_id = v_student and activated_at is not null;
+  if v_count <> 0 then raise exception 'FAIL: non-homework award activated membership'; end if;
+  perform public.add_homework_season_points(v_student, 10);
+  select count(*) into v_count from public.league_memberships
+   where season_id = v_season and student_id = v_student and activated_at is not null;
+  if v_count <> 1 then raise exception 'FAIL: homework award did not activate exactly once'; end if;
+  perform public.add_homework_season_points(v_student, 10);
+  if (select count(*) from public.league_memberships where season_id = v_season and student_id = v_student) <> 1 then
+    raise exception 'FAIL: repeated homework created a duplicate membership';
+  end if;
+  update public.seasons set status = 'completed', end_date = current_date where id = v_current;
+  if public.ensure_season_schedule() is not null then raise exception 'FAIL: future planned season activated early'; end if;
+  begin
+    perform public.add_season_points(v_student, 1);
+    raise exception 'FAIL: rating was accepted during a planned pause';
+  exception when sqlstate 'P0001' then null;
+  end;
+  if (select count(*) from public.seasons) <> v_before then raise exception 'FAIL: pause created an ad-hoc season'; end if;
 end
 $test$;
-
--- In an isolated dev database also exercise a pause and multiple missed planned windows:
--- create consecutive expired planned seasons plus one current window, call
--- ensure_season_schedule(), assert the expired rows are completed and only the current row is
--- active; then create a future-only plan and assert require_current_season_id() raises
--- no_active_season. This must be run after isolating existing seasonal data.
 
 select 'PASS b3_fix_league_and_schedule; transaction will be rolled back' as summary;
 rollback;
