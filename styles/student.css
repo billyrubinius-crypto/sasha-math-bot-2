@@ -17,104 +17,123 @@
            палитре Cosmic Academy.
            ===================================================================== */
         :root {
-            /* --- Сырая палитра: тёмная --- */
-            --ca-d-bg-deep: #0E1120;
-            --ca-d-bg-app: #12172A;
-            --ca-d-surface: #191E34;
-            --ca-d-surface-elevated: #202641;
-            --ca-d-surface-nested: #272E4C;
-            --ca-d-border: #343C60;
-            --ca-d-border-soft: #292F4C;
-            --ca-d-text: #F7F7FF;
-            --ca-d-text-secondary: #A9AEC8;
-            --ca-d-text-muted: #777D99;
-            --ca-d-violet: #8B72FF;
-            --ca-d-blue: #5D8BFF;
-            --ca-d-cyan: #58C7F3;
-            --ca-d-turquoise: #38D0C1;
-            --ca-d-success: #4BD391;
-            --ca-d-warning: #FFB85C;
-            --ca-d-error: #FF6F85;
-            --ca-d-currency: #F0A6C5;
-            --ca-d-reward: #F2C55C;
+            /* --- Сырая палитра: тёмная ---
+               Проход «усиление палитры» (после этапа 9): прежние значения были заметно
+               бледнее и «сероватее» примера Cosmic Academy — фон уходил в серо-синий,
+               акценты были размытыми, валюта розовой. Направление здесь: глубокий
+               тёмно-синий фон, индиго и фиолетовый как основная пара акцентов, чистый
+               cyan для информационных, тёплый янтарь для валюты и наград, розово-пурпурный
+               ТОЛЬКО как редкий выразительный акцент (--ca-d-magenta, см. .lb-me).
+               Меняются только сырые значения: семантические токены и все правила ниже
+               остались как были, поэтому DOM, ID и обработчики не затронуты. */
+            --ca-d-bg-deep: #080B1A;
+            --ca-d-bg-app: #0B1022;
+            --ca-d-surface: #10152B;
+            --ca-d-surface-elevated: #161C38;
+            --ca-d-surface-nested: #1D2445;
+            --ca-d-border: #2C3566;
+            --ca-d-border-soft: #212949;
+            --ca-d-text: #F4F6FF;
+            --ca-d-text-secondary: #A6AED4;
+            --ca-d-text-muted: #737B9F;
+            --ca-d-violet: #9575F7;
+            /* Индиго на тёмном берётся светлее фирменного #4F46E5: сам #4F46E5 даёт на
+               --ca-d-surface около 3.5:1 и для текста/ссылок не годится. Глубокий индиго
+               живёт в --ca-gradient-primary, где по нему идёт белый текст. */
+            --ca-d-blue: #818CF8;
+            --ca-d-cyan: #22D3EE;
+            --ca-d-turquoise: #2DD4BF;
+            --ca-d-magenta: #EC4899;
+            --ca-d-success: #34D399;
+            --ca-d-warning: #FBBF24;
+            --ca-d-error: #FB7185;
+            --ca-d-currency: #F59E0B;
+            --ca-d-reward: #FCD34D;
             --ca-d-on-accent: #FFFFFF;
-            --ca-d-on-warning: #2A1B05;
+            --ca-d-on-warning: #26190A;
             /* полупрозрачные производные тёмной палитры */
-            --ca-d-tint-accent: rgba(139,114,255,0.18);
-            --ca-d-accent-soft: rgba(139,114,255,0.42);
-            --ca-d-tint-info: rgba(93,139,255,0.18);
-            --ca-d-tint-success: rgba(75,211,145,0.16);
-            --ca-d-tint-warning: rgba(255,184,92,0.16);
-            --ca-d-tint-reward: rgba(242,197,92,0.14);
-            --ca-d-tint-error: rgba(255,111,133,0.16);
-            --ca-d-tint-currency: rgba(240,166,197,0.16);
-            --ca-d-tint-muted: rgba(169,174,200,0.12);
-            --ca-d-divider: rgba(169,174,200,0.14);
-            --ca-d-base-tint: rgba(18,23,42,0.86);
-            --ca-d-veil: rgba(14,17,32,0.30);
-            --ca-d-scrim: rgba(4,6,14,0.72);
-            --ca-d-glow-violet: rgba(118,87,240,0.30);
-            --ca-d-glow-blue: rgba(77,124,240,0.24);
-            --ca-d-glow-cyan: rgba(56,208,193,0.13);
-            --ca-d-star: rgba(233,238,255,0.55);
-            --ca-d-elev-1: 0 3px 12px rgba(4,6,14,0.35);
-            --ca-d-elev-2: 0 6px 18px rgba(4,6,14,0.45);
-            --ca-d-elev-modal: 0 18px 45px rgba(4,6,14,0.62);
+            --ca-d-tint-accent: rgba(149,117,247,0.20);
+            --ca-d-accent-soft: rgba(149,117,247,0.45);
+            --ca-d-tint-info: rgba(129,140,248,0.20);
+            --ca-d-tint-success: rgba(52,211,153,0.16);
+            --ca-d-tint-warning: rgba(251,191,36,0.16);
+            --ca-d-tint-reward: rgba(252,211,77,0.16);
+            --ca-d-tint-error: rgba(251,113,133,0.16);
+            --ca-d-tint-currency: rgba(245,158,11,0.16);
+            --ca-d-tint-magenta: rgba(236,72,153,0.18);
+            --ca-d-tint-muted: rgba(166,174,212,0.12);
+            --ca-d-divider: rgba(166,174,212,0.16);
+            --ca-d-base-tint: rgba(11,16,34,0.86);
+            --ca-d-veil: rgba(8,11,26,0.34);
+            --ca-d-scrim: rgba(3,5,13,0.74);
+            --ca-d-glow-violet: rgba(124,58,237,0.38);
+            --ca-d-glow-blue: rgba(79,70,229,0.30);
+            --ca-d-glow-cyan: rgba(34,211,238,0.16);
+            --ca-d-star: rgba(226,232,255,0.60);
+            --ca-d-elev-1: 0 3px 12px rgba(3,5,13,0.45);
+            --ca-d-elev-2: 0 8px 22px rgba(3,5,13,0.55);
+            --ca-d-elev-modal: 0 20px 50px rgba(3,5,13,0.70);
 
             /* --- Сырая палитра: светлая ---
-               Исправляющий проход «усиление светлой темы» (после этапов 1-6): исходные
-               значения были почти белыми и почти не передавали фирменный космический
-               характер Cosmic Academy. Ниже — более выраженная холодная сиренево-синяя
-               основа, различимые glow/звёзды и более глубокие тени; тёмная палитра
-               --ca-d-* этим проходом не затронута. */
-            --ca-l-bg-deep: #E5E8FF;
-            --ca-l-bg-app: #F0F2FF;
+               Тот же проход усиления, что и у тёмной: холодная сиренево-синяя основа стала
+               заметнее, акценты — теми же индиго/фиолетовым/cyan/янтарём, но затемнёнными
+               до читаемого контраста на белой карточке (у всех смысловых цветов ниже
+               >= 4.5:1 на --ca-l-surface; --ca-l-text-muted декоративный и намеренно ниже).
+               Валюта перестала быть розовой: розово-пурпурный остался только в
+               --ca-l-magenta как редкий акцент. */
+            --ca-l-bg-deep: #DFE3FF;
+            --ca-l-bg-app: #ECEEFF;
             --ca-l-surface: #FFFFFF;
-            --ca-l-surface-elevated: #F8F7FF;
-            --ca-l-surface-nested: #EAECFA;
-            --ca-l-border: #CDD2F0;
+            --ca-l-surface-elevated: #F7F6FF;
+            --ca-l-surface-nested: #E5E8FA;
+            --ca-l-border: #C4CAEE;
             /* мягкая граница светлой темы в спецификации не задана — производная от --ca-l-border */
-            --ca-l-border-soft: #DEE2F5;
-            --ca-l-text: #17192A;
-            --ca-l-text-secondary: #666C86;
-            --ca-l-text-muted: #9398AD;
-            --ca-l-violet: #7357F2;
-            --ca-l-blue: #476FFF;
+            --ca-l-border-soft: #D8DDF4;
+            --ca-l-text: #131629;
+            --ca-l-text-secondary: #5B6180;
+            --ca-l-text-muted: #767B94;
+            --ca-l-violet: #6D28D9;
+            --ca-l-blue: #4338CA;
             /* cyan/turquoise светлой темы в спецификации не заданы — затемнённые пары к тёмным */
-            --ca-l-cyan: #209DCE;
-            --ca-l-turquoise: #168F87;
-            --ca-l-success: #24875C;
-            --ca-l-warning: #B76A17;
-            --ca-l-error: #D94B62;
-            --ca-l-currency: #C96391;
-            --ca-l-reward: #A87512;
+            --ca-l-cyan: #0E7490;
+            --ca-l-turquoise: #0F766E;
+            --ca-l-magenta: #BE185D;
+            --ca-l-success: #146C34;
+            --ca-l-warning: #A44A07;
+            --ca-l-error: #BE123C;
+            --ca-l-currency: #A44A07;
+            --ca-l-reward: #925906;
             --ca-l-on-accent: #FFFFFF;
             --ca-l-on-warning: #FFFFFF;
             /* полупрозрачные производные светлой палитры */
-            --ca-l-tint-accent: rgba(115,87,242,0.14);
-            --ca-l-accent-soft: rgba(115,87,242,0.42);
-            --ca-l-tint-info: rgba(71,111,255,0.14);
-            --ca-l-tint-success: rgba(36,135,92,0.12);
-            --ca-l-tint-warning: rgba(183,106,23,0.12);
-            --ca-l-tint-reward: rgba(168,117,18,0.12);
-            --ca-l-tint-error: rgba(217,75,98,0.12);
-            --ca-l-tint-currency: rgba(201,99,145,0.12);
-            --ca-l-tint-muted: rgba(92,98,140,0.11);
-            --ca-l-divider: rgba(91,96,138,0.18);
-            --ca-l-base-tint: rgba(240,242,255,0.82);
-            --ca-l-veil: rgba(240,242,255,0.14);
-            --ca-l-scrim: rgba(23,25,42,0.52);
-            --ca-l-glow-violet: rgba(118,87,240,0.25);
-            --ca-l-glow-blue: rgba(77,124,240,0.21);
-            --ca-l-glow-cyan: rgba(56,208,193,0.14);
-            --ca-l-star: rgba(103,77,224,0.38);
-            --ca-l-elev-1: 0 4px 14px rgba(54,45,120,0.10);
-            --ca-l-elev-2: 0 8px 24px rgba(54,45,120,0.14);
-            --ca-l-elev-modal: 0 16px 40px rgba(38,31,92,0.24);
+            --ca-l-tint-accent: rgba(109,40,217,0.13);
+            --ca-l-accent-soft: rgba(109,40,217,0.42);
+            --ca-l-tint-info: rgba(67,56,202,0.13);
+            --ca-l-tint-success: rgba(20,108,52,0.12);
+            --ca-l-tint-warning: rgba(164,74,7,0.12);
+            --ca-l-tint-reward: rgba(146,89,6,0.13);
+            --ca-l-tint-error: rgba(190,18,60,0.11);
+            --ca-l-tint-currency: rgba(164,74,7,0.12);
+            --ca-l-tint-magenta: rgba(190,24,93,0.11);
+            --ca-l-tint-muted: rgba(91,97,128,0.11);
+            --ca-l-divider: rgba(85,92,132,0.20);
+            --ca-l-base-tint: rgba(236,238,255,0.84);
+            --ca-l-veil: rgba(236,238,255,0.16);
+            --ca-l-scrim: rgba(19,22,41,0.55);
+            --ca-l-glow-violet: rgba(109,40,217,0.26);
+            --ca-l-glow-blue: rgba(67,56,202,0.22);
+            --ca-l-glow-cyan: rgba(14,116,144,0.16);
+            --ca-l-star: rgba(88,60,214,0.40);
+            --ca-l-elev-1: 0 4px 14px rgba(46,38,110,0.11);
+            --ca-l-elev-2: 0 8px 24px rgba(46,38,110,0.15);
+            --ca-l-elev-modal: 0 16px 40px rgba(32,26,84,0.26);
 
             /* --- Не зависят от темы --- */
-            /* Основной градиент Cosmic Academy (фирменный, одинаков в обеих темах) */
-            --ca-gradient-primary: linear-gradient(135deg, #7657F0 0%, #4D7CF0 100%);
+            /* Основной градиент Cosmic Academy (фирменный, одинаков в обеих темах).
+               Индиго → фиолетовый вместо прежней фиолетово-синей пары: пара насыщеннее и
+               по ней всё так же идёт белый текст (>= 5.9:1 на обоих концах). Это ЕДИНСТВЕННЫЙ
+               градиент интерфейса — каждый блок своим случайным градиентом не красится. */
+            --ca-gradient-primary: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
 
             --ca-radius-xs: 8px;
             --ca-radius-sm: 10px;
@@ -183,6 +202,7 @@
             --ca-accent-blue: var(--ca-l-blue);
             --ca-accent-cyan: var(--ca-l-cyan);
             --ca-accent-turquoise: var(--ca-l-turquoise);
+            --ca-accent-magenta: var(--ca-l-magenta);
             --ca-on-accent: var(--ca-l-on-accent);
             --ca-success: var(--ca-l-success);
             --ca-warning: var(--ca-l-warning);
@@ -198,6 +218,7 @@
             --ca-tint-reward: var(--ca-l-tint-reward);
             --ca-tint-error: var(--ca-l-tint-error);
             --ca-tint-currency: var(--ca-l-tint-currency);
+            --ca-tint-magenta: var(--ca-l-tint-magenta);
             --ca-tint-muted: var(--ca-l-tint-muted);
             --ca-base-tint: var(--ca-l-base-tint);
             --ca-veil: var(--ca-l-veil);
@@ -229,6 +250,7 @@
                 --ca-accent-blue: var(--ca-d-blue);
                 --ca-accent-cyan: var(--ca-d-cyan);
                 --ca-accent-turquoise: var(--ca-d-turquoise);
+                --ca-accent-magenta: var(--ca-d-magenta);
                 --ca-on-accent: var(--ca-d-on-accent);
                 --ca-success: var(--ca-d-success);
                 --ca-warning: var(--ca-d-warning);
@@ -244,6 +266,7 @@
                 --ca-tint-reward: var(--ca-d-tint-reward);
                 --ca-tint-error: var(--ca-d-tint-error);
                 --ca-tint-currency: var(--ca-d-tint-currency);
+                --ca-tint-magenta: var(--ca-d-tint-magenta);
                 --ca-tint-muted: var(--ca-d-tint-muted);
                 --ca-base-tint: var(--ca-d-base-tint);
                 --ca-veil: var(--ca-d-veil);
@@ -276,6 +299,7 @@
             --ca-accent-blue: var(--ca-d-blue);
             --ca-accent-cyan: var(--ca-d-cyan);
             --ca-accent-turquoise: var(--ca-d-turquoise);
+            --ca-accent-magenta: var(--ca-d-magenta);
             --ca-on-accent: var(--ca-d-on-accent);
             --ca-success: var(--ca-d-success);
             --ca-warning: var(--ca-d-warning);
@@ -291,6 +315,7 @@
             --ca-tint-reward: var(--ca-d-tint-reward);
             --ca-tint-error: var(--ca-d-tint-error);
             --ca-tint-currency: var(--ca-d-tint-currency);
+            --ca-tint-magenta: var(--ca-d-tint-magenta);
             --ca-tint-muted: var(--ca-d-tint-muted);
             --ca-base-tint: var(--ca-d-base-tint);
             --ca-veil: var(--ca-d-veil);
@@ -320,6 +345,7 @@
             --ca-accent-blue: var(--ca-l-blue);
             --ca-accent-cyan: var(--ca-l-cyan);
             --ca-accent-turquoise: var(--ca-l-turquoise);
+            --ca-accent-magenta: var(--ca-l-magenta);
             --ca-on-accent: var(--ca-l-on-accent);
             --ca-success: var(--ca-l-success);
             --ca-warning: var(--ca-l-warning);
@@ -335,6 +361,7 @@
             --ca-tint-reward: var(--ca-l-tint-reward);
             --ca-tint-error: var(--ca-l-tint-error);
             --ca-tint-currency: var(--ca-l-tint-currency);
+            --ca-tint-magenta: var(--ca-l-tint-magenta);
             --ca-tint-muted: var(--ca-l-tint-muted);
             --ca-base-tint: var(--ca-l-base-tint);
             --ca-veil: var(--ca-l-veil);
@@ -998,12 +1025,17 @@
         /* flex-column с gap заменяет прежние точечные margin-bottom, которые JS
            расставлял инлайновым style (renderShopItem) — теперь верстается только CSS. */
         .shop-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ca-space-1); text-align: right; }
+        /* Кнопка покупки — единственное «сильное» действие в списке: фирменный
+           индиго→фиолетовый градиент плюс мягкое свечение той же гаммы. Обычные действия
+           (.shop-equip-btn, .lb-load-more, .inventory-showcase-btn) остались контурными,
+           поэтому «купить» и «надеть» не путаются. Геометрия и классы не менялись. */
         .shop-buy-btn {
             box-sizing: border-box; min-height: var(--ca-touch);
             background: var(--ca-gradient-primary); color: var(--ca-on-accent); border: none; border-radius: var(--ca-radius-sm);
             padding: 0 var(--ca-space-4); font-size: var(--text-small); font-weight: 800; cursor: pointer; white-space: nowrap;
+            box-shadow: 0 2px 10px var(--ca-glow-violet);
         }
-        .shop-buy-btn:disabled { opacity: 0.45; cursor: default; }
+        .shop-buy-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
         .shop-buy-btn:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
         .shop-state { font-size: var(--text-small); font-weight: 700; white-space: nowrap; }
         .shop-state.owned { color: var(--ca-success); }
@@ -1265,7 +1297,11 @@
         .lb-rank { min-width: 2.4em; text-align: center; font-weight: 800; color: var(--ca-text-secondary); font-size: var(--text-body); font-variant-numeric: tabular-nums; }
         .lb-name { flex: 1; font-weight: 600; font-size: 15px; }
         .lb-score { font-weight: 800; color: var(--ca-accent); font-size: var(--text-body); white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .lb-me { background: var(--ca-tint-accent); }
+        /* «Это ты» в рейтинге — единственное место, где применяется розово-пурпурный:
+           редкий выразительный акцент, который не конкурирует с фиолетовым и индиго
+           основного интерфейса. Модификаторы .lb-promote/.lb-demote красят левую границу
+           и с этим фоном не конфликтуют. */
+        .lb-me { background: var(--ca-tint-magenta); }
         .lb-promote { border-left-color: var(--ca-success); }
         .lb-demote { border-left-color: var(--ca-error); }
 
