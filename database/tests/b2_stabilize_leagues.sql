@@ -6,7 +6,7 @@
 -- Покрывает обязательные сценарии отчёта:
 --   ЛИГИ
 --     1. пустой аккаунт с рейтингом 0 отсутствует;
---     2. первое начисление рейтинга добавляет ученика (ровно одно участие);
+--     2. только начисление за подтверждённое ДЗ добавляет ученика (ровно одно участие);
 --     3. повторный вызов не создаёт дубль;
 --     4. участников больше 50 — все доступны (без скрытого лимита);
 --     5. участники другой лиги или сезона не попадают в список;
@@ -60,19 +60,24 @@ begin
     raise exception 'FAIL: пустой аккаунт получил непустой список лиги (% строк)', v_cnt;
   end if;
 
-  -- --- ЛИГИ 2: первое начисление создаёт ровно одно участие ----------------------------------
+  -- --- ЛИГИ 2: пробник/бонус/ручная дельта не активируют участие -----------------------------
   perform public.award_season_points(v_new, 10, 'test_first_award', 'stab_lg_first');
 
   select count(*) into v_cnt from public.league_memberships
    where season_id = v_season and student_id = v_new and activated_at is not null;
+  if v_cnt <> 0 then
+    raise exception 'FAIL: обычное положительное начисление активировало лигу';
+  end if;
+
+  perform public.add_homework_season_points(v_new, 10);
+  select count(*) into v_cnt from public.league_memberships
+   where season_id = v_season and student_id = v_new and activated_at is not null;
   if v_cnt <> 1 then
-    raise exception 'FAIL: после первого начисления участий % вместо 1', v_cnt;
+    raise exception 'FAIL: начисление за ДЗ не активировало ровно одно участие';
   end if;
 
   -- --- ЛИГИ 3: повторные вызовы (retry, перезагрузка, второе ДЗ) дубля не создают ------------
-  perform public.award_season_points(v_new, 40, 'test_second_award', 'stab_lg_second');
-  perform public.ensure_league_membership(v_new);
-  perform public.ensure_league_membership(v_new);
+  perform public.add_homework_season_points(v_new, 40);
 
   select count(*) into v_cnt from public.league_memberships
    where season_id = v_season and student_id = v_new;
@@ -108,19 +113,18 @@ begin
   -- --- ЛИГИ 9: legacy-путь приёмки ДЗ тоже заводит участие -----------------------------------
   insert into public.students (telegram_id, name, telegram_username, huikons, rating, lives, current_streak)
   values (v_legacy, 'STAB-LEGACY synthetic', 'stab_legacy', 0, 0, 3, 0);
-  -- settle_legacy_approval начисляет очки прямым add_season_points — именно этот путь раньше
-  -- лигу не трогал.
+  -- Общая ручная дельта не является ДЗ и не должна активировать лигу.
   perform public.add_season_points(v_legacy, 30);
-  if not exists (select 1 from public.league_memberships
-                  where season_id = v_season and student_id = v_legacy and activated_at is not null) then
-    raise exception 'FAIL: прямое add_season_points не завело участие в лиге';
+  if exists (select 1 from public.league_memberships
+              where season_id = v_season and student_id = v_legacy and activated_at is not null) then
+    raise exception 'FAIL: прямое add_season_points активировало участие в лиге';
   end if;
 
   -- --- ЛИГИ 7: восстановление ученика с рейтингом, но без участия ----------------------------
   -- Эмулируем «старые данные»: участие снимаем, рейтинг оставляем положительным.
   update public.league_memberships set activated_at = null
    where season_id = v_season and student_id = v_legacy;
-  perform public.ensure_league_membership(v_legacy);
+  perform public.add_homework_season_points(v_legacy, 10);
   if not exists (select 1 from public.league_memberships
                   where season_id = v_season and student_id = v_legacy and activated_at is not null) then
     raise exception 'FAIL: ученик с положительным рейтингом не восстановлен в лиге';
@@ -134,7 +138,7 @@ begin
   -- --- ЛИГИ 5: участники другой лиги в список не попадают ------------------------------------
   insert into public.students (telegram_id, name, telegram_username, huikons, rating, lives, current_streak)
   values (v_other, 'STAB-SILVER synthetic', 'stab_silver', 0, 0, 3, 0);
-  perform public.award_season_points(v_other, 70, 'test_other_tier', 'stab_lg_other');
+  perform public.add_homework_season_points(v_other, 70);
   -- Переводим его в Серебро (tier 2) и в собственную когорту этого сезона.
   update public.student_league_state set tier = 2 where student_id = v_other;
   insert into public.league_cohorts (season_id, tier, cohort_index, is_late_entry)
@@ -178,7 +182,7 @@ begin
     v_id := v_base + 100 + v_i;
     insert into public.students (telegram_id, name, telegram_username, huikons, rating, lives, current_streak)
     values (v_id, 'STAB-MASS ' || v_i, 'stab_mass_' || v_i, 0, 0, 3, 0);
-    perform public.award_season_points(v_id, 5 + v_i, 'test_mass', 'stab_lg_mass_' || v_i);
+    perform public.add_homework_season_points(v_id, 5 + v_i);
   end loop;
 
   select count(*) into v_cnt from public.league_memberships m
