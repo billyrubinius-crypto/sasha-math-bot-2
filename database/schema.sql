@@ -6025,3 +6025,1400 @@ begin
   end if;
 end
 $postcheck$;
+
+
+-- =============================================================================
+-- СТАБИЛИЗАЦИОННЫЙ ЭТАП (миграции 051–053). Полные шапки с мотивацией, разбором
+-- первопричин и rollback — в database/migrations/051_lifetime_rating_and_scheduled_seasons.sql,
+-- 052_league_enrollment_and_full_standings.sql и 053_permanent_cosmetic_inventory.sql.
+-- Здесь — только результирующая схема (DDL + определения функций), как и во всех
+-- предыдущих разделах этого снимка. Разовые backfill'ы данных сюда не переносятся.
+--
+-- Ключевые инварианты, которые легко нарушить при чтении этого файла:
+--   * seasons.status ∈ (planned, active, completed), активен ровно один
+--     (idx_seasons_one_active). У planned и completed end_date НЕ null — поэтому все
+--     существующие селекторы `end_date is null order by id desc limit 1` продолжают
+--     означать «текущий сезон» и переписывать их не потребовалось.
+--   * Общий (пожизненный) рейтинг НЕ хранится: он вычисляется как
+--     sum(season_results.points) + students.rating. Повторное завершение сезона поэтому
+--     физически не может прибавить один и тот же результат дважды.
+--   * league_memberships.activated_at отделяет ПЛАН участия (заготовка посева
+--     build_season_cohorts) от ФАКТА (первое положительное начисление рейтинга).
+--     close_league_season по-прежнему видит все memberships — счётчик неактивных сезонов
+--     и лестница переходов не изменились.
+--   * Купленная косметика носится всегда: equip_item проверяет владение
+--     (student_items), а не наличие предмета в продаже. Удалить каталожную строку, которой
+--     кто-то владеет, запрещено триггером shop_items_protect_owned.
+-- =============================================================================
+
+-- --- Миграция 051: пожизненный рейтинг и планирование сезонов ---------------------------------
+-- --- 1. seasons: название, плановое окно, статус --------------------------------------------
+alter table public.seasons add column if not exists title     text;
+alter table public.seasons add column if not exists starts_at timestamptz;
+alter table public.seasons add column if not exists ends_at   timestamptz;
+alter table public.seasons add column if not exists status    text;
+
+-- (разовый backfill статусов существующих сезонов — в самой миграции 051)
+
+alter table public.seasons alter column status set default 'active';
+alter table public.seasons alter column status set not null;
+
+alter table public.seasons drop constraint if exists seasons_status_check;
+alter table public.seasons add constraint seasons_status_check
+  check (status in ('planned', 'active', 'completed'));
+
+-- Ключевой инвариант совместимости: «идёт» ⇔ end_date is null (см. шапку).
+alter table public.seasons drop constraint if exists seasons_active_end_date;
+alter table public.seasons add constraint seasons_active_end_date
+  check ((status = 'active') = (end_date is null));
+
+-- Окно осмысленно: конец позже начала. Проверяется и на уровне RPC (понятный текст учителю).
+alter table public.seasons drop constraint if exists seasons_window_order;
+alter table public.seasons add constraint seasons_window_order
+  check (starts_at is null or ends_at is null or ends_at > starts_at);
+
+-- У запланированного сезона окно обязательно (иначе непонятно, когда его активировать).
+alter table public.seasons drop constraint if exists seasons_planned_window_required;
+alter table public.seasons add constraint seasons_planned_window_required
+  check (status <> 'planned' or (starts_at is not null and ends_at is not null));
+
+-- Название непустое, если задано (у исторических сезонов остаётся null — UI покажет «Сезон №N»).
+alter table public.seasons drop constraint if exists seasons_title_shape;
+alter table public.seasons add constraint seasons_title_shape
+  check (title is null or (char_length(btrim(title)) between 1 and 60 and title = btrim(title)));
+
+create index if not exists idx_seasons_status on public.seasons (status, starts_at);
+
+comment on column public.seasons.status is
+  'planned | active | completed. Ровно один active (idx_seasons_one_active). У planned и '
+  'completed end_date НЕ null (инвариант seasons_active_end_date), поэтому все существующие '
+  'селекторы "end_date is null" продолжают означать "текущий сезон".';
+comment on column public.seasons.starts_at is 'Плановое начало (timestamptz; учитель вводит в МСК).';
+comment on column public.seasons.ends_at   is 'Плановое окончание (timestamptz; учитель вводит в МСК).';
+comment on column public.seasons.title     is 'Название сезона для UI; null у исторических сезонов.';
+
+-- --- 2. current_season_id — канонический селектор для нового кода ---------------------------
+-- Существующие функции продолжают искать сезон как end_date is null (это то же самое, см.
+-- шапку); новый код пользуется этой функцией, чтобы намерение читалось однозначно.
+create or replace function public.current_season_id()
+ returns bigint
+ language sql
+ stable
+as $function$
+  select id from public.seasons where status = 'active' order by id desc limit 1
+$function$;
+
+revoke all on function public.current_season_id() from public, anon;
+grant execute on function public.current_season_id() to authenticated;
+
+-- --- 3. Пожизненный рейтинг ------------------------------------------------------------------
+-- Источник истины: season_results (архив закрытых сезонов, unique(season_id, student_id)) +
+-- students.rating (текущий сезон). Вычисляется, не хранится — см. шапку.
+create or replace function public.student_lifetime_points(p_student_id bigint)
+ returns integer
+ language sql
+ stable
+as $function$
+  select coalesce((select sum(points)::integer
+                     from public.season_results
+                    where student_id = p_student_id), 0)
+       + coalesce((select rating from public.students
+                    where telegram_id = p_student_id), 0)
+$function$;
+
+revoke all on function public.student_lifetime_points(bigint) from public, anon;
+grant execute on function public.student_lifetime_points(bigint) to authenticated;
+
+-- --- 4. Публичная косметика ученика ----------------------------------------------------------
+-- Лидерборду и лиге нужны ник/рамка/титул ЧУЖИХ участников, а student_equipment закрыт
+-- RLS «своя строка» (миграция 043). Отдельный select клиенту не вернёт ничего, поэтому
+-- косметика приезжает готовой картой slot → {item_code, variant, payload, name} внутри тех
+-- же definer-RPC. Формат совпадает с buildEquipMap() на клиенте, чтобы рендер (renderNick /
+-- applyAvatarFrame / equippedTitleText) не переписывать.
+-- Каталог берётся БЕЗ фильтра active: предмет снятого с продажи сезона надет и должен
+-- отображаться (см. миграцию 053).
+create or replace function public.student_public_cosmetics(p_student_id bigint)
+ returns jsonb
+ language sql
+ stable
+as $function$
+  select coalesce(
+           jsonb_object_agg(e.slot, jsonb_build_object(
+             'item_code', e.item_code,
+             'variant',   e.variant,
+             'payload',   si.render_payload,
+             'name',      si.name)),
+           '{}'::jsonb)
+    from public.student_equipment e
+    join public.shop_items si on si.item_code = e.item_code
+   where e.student_id = p_student_id
+$function$;
+
+revoke all on function public.student_public_cosmetics(bigint) from public, anon;
+grant execute on function public.student_public_cosmetics(bigint) to authenticated;
+
+-- --- 5. get_global_top_self — общий топ за всё время -----------------------------------------
+-- Все зарегистрированные ученики (в схеме нет ни статуса удаления, ни блокировки — фильтровать
+-- нечего и выдумывать статусы нельзя). Сортировка стабильная и полностью детерминированная:
+--   1) общий рейтинг за все сезоны;
+--   2) очки текущего сезона (существующий дополнительный критерий);
+--   3) имя;
+--   4) telegram_id.
+-- Пагинация есть (p_limit/p_offset) + total в каждой строке, чтобы клиент мог догрузить всё.
+-- Скрытого «первых 10» больше нет: клиент листает до total.
+create or replace function public.get_global_top_self(
+  p_limit  integer default 100,
+  p_offset integer default 0)
+ returns table(
+   place           integer,
+   student_id      bigint,
+   name            text,
+   lifetime_points integer,
+   season_points   integer,
+   equipment       jsonb,
+   total_students  integer)
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_limit  integer;
+  v_offset integer;
+begin
+  if private.current_app_role() not in ('student', 'teacher') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_limit  := least(greatest(coalesce(p_limit, 100), 1), 500);
+  v_offset := greatest(coalesce(p_offset, 0), 0);
+
+  return query
+  with totals as (
+    select s.telegram_id            as student_id,
+           coalesce(s.name, '')     as name,
+           coalesce(s.rating, 0)    as season_points,
+           coalesce(a.total, 0) + coalesce(s.rating, 0) as lifetime_points
+      from public.students s
+      left join (
+        select student_id, sum(points)::integer as total
+          from public.season_results
+         group by student_id) a on a.student_id = s.telegram_id
+  ),
+  ranked as (
+    select t.*,
+           (row_number() over (
+              order by t.lifetime_points desc,
+                       t.season_points   desc,
+                       t.name            asc,
+                       t.student_id      asc))::integer as place,
+           (count(*) over ())::integer as total_students
+      from totals t
+  )
+  select r.place, r.student_id, r.name, r.lifetime_points, r.season_points,
+         public.student_public_cosmetics(r.student_id),
+         r.total_students
+    from ranked r
+   order by r.place
+   limit v_limit offset v_offset;
+end;
+$function$;
+
+revoke all on function public.get_global_top_self(integer, integer) from public, anon;
+grant execute on function public.get_global_top_self(integer, integer) to authenticated;
+
+-- --- 6. Жизненный цикл сезона: примитивы ------------------------------------------------------
+
+-- start_next_season — активировать следующий сезон. Сначала подошедший по плану (starts_at <=
+-- now(), самый ранний), иначе — ad-hoc «сегодня» (прежнее поведение close_season /
+-- ensure_current_season, чтобы активный сезон существовал ВСЕГДА).
+-- p_seed_cohorts: посев лиговых когорт. finish_season передаёт false, потому что посев с
+-- правильным seed-сезоном делает close_league_season (шаг 10e миграции 019) — если посеять
+-- раньше с null, snake-seeding по месту прошлого сезона потерялся бы.
+create or replace function public.start_next_season(p_seed_cohorts boolean default true)
+ returns bigint
+ language plpgsql
+as $function$
+declare
+  v_today date := (now() at time zone 'Europe/Moscow')::date;
+  v_id    bigint;
+begin
+  select id into v_id
+    from public.seasons
+   where status = 'planned'
+     and starts_at <= now()
+   order by starts_at asc, id asc
+   limit 1
+   for update;
+
+  if v_id is not null then
+    -- end_date снимается (инвариант: active ⇔ end_date is null), start_date остаётся
+    -- ПЛАНОВОЙ датой начала по МСК даже если активация случилась позже (ленивый переход).
+    update public.seasons
+       set status     = 'active',
+           end_date   = null,
+           start_date = (starts_at at time zone 'Europe/Moscow')::date
+     where id = v_id;
+    if p_seed_cohorts then
+      perform public.build_season_cohorts(v_id, null);
+    end if;
+    return v_id;
+  end if;
+
+  insert into public.seasons (start_date, status) values (v_today, 'active')
+  returning id into v_id;
+  if p_seed_cohorts then
+    perform public.build_season_cohorts(v_id, null);
+  end if;
+  return v_id;
+end;
+$function$;
+
+revoke all on function public.start_next_season(boolean) from public, anon, authenticated;
+
+-- finish_season — завершение сезона ОДИН РАЗ (см. «идемпотентность» в шапке).
+-- Тело — прежний close_season (миграция 006, расширенный 019): архив итогов с тем же
+-- детерминированным tie-break, призы топ-3 (фонд <= 190), лиговое закрытие, обнуление
+-- rating. Новое: гейт по status + перевод в 'completed' первым действием, on conflict
+-- do nothing на архиве и активация следующего сезона через start_next_season.
+create or replace function public.finish_season(p_season_id bigint)
+ returns json
+ language plpgsql
+as $function$
+declare
+  v_status       text;
+  v_start_date   date;
+  v_start_ts     timestamptz;
+  v_today        date := (now() at time zone 'Europe/Moscow')::date;
+  v_new_season_id bigint;
+  v_archived     integer := 0;
+  v_awarded      integer := 0;
+  v_reward       integer;
+  r record;
+begin
+  select status, start_date into v_status, v_start_date
+    from public.seasons
+   where id = p_season_id
+   for update;
+
+  if v_status is null then
+    raise exception 'Сезон % не найден', p_season_id;
+  end if;
+
+  -- Уже завершён (повторный вызов, retry, параллельный клиент) — ничего не делаем.
+  if v_status <> 'active' then
+    return json_build_object(
+      'season_id', p_season_id,
+      'archived',  0,
+      'awarded',   0,
+      'next_season_id', public.current_season_id(),
+      'already_completed', true);
+  end if;
+
+  v_start_ts := (v_start_date::timestamp) at time zone 'Europe/Moscow';
+
+  -- Флип статуса ПЕРВЫМ действием: любой конкурент, ждавший for update, увидит 'completed'.
+  update public.seasons
+     set status = 'completed', end_date = v_today
+   where id = p_season_id;
+
+  -- Блокируем учеников до снимка очков (гонка с add_season_points, см. миграцию 006).
+  perform 1 from public.students for update;
+
+  insert into public.season_results (season_id, student_id, points, place)
+  select p_season_id, s.telegram_id, s.rating,
+         row_number() over (
+           order by s.rating desc,
+                    coalesce(pen.cnt, 0) asc,
+                    pts.last_scored asc nulls last,
+                    s.telegram_id asc)
+    from public.students s
+    left join (
+      select student_id, count(*) as cnt
+        from public.balance_history
+       where reason like 'penalty:%' and created_at >= v_start_ts
+       group by student_id) pen on pen.student_id = s.telegram_id
+    left join (
+      select student_id, max(created_at) as last_scored
+        from public.season_points_log
+       where season_id = p_season_id and amount <> 0
+       group by student_id) pts on pts.student_id = s.telegram_id
+  on conflict (season_id, student_id) do nothing;
+  get diagnostics v_archived = row_count;
+
+  for r in
+    select student_id, place
+      from public.season_results
+     where season_id = p_season_id and place <= 3 and points > 0
+     order by place
+  loop
+    v_reward := case r.place when 1 then 100 when 2 then 60 else 30 end;
+    perform public.add_huikons(r.student_id, v_reward, 'season_place_' || r.place);
+    v_awarded := v_awarded + 1;
+  end loop;
+
+  -- Следующий сезон открывается ДО лигового закрытия: короне и посеву когорт нужен его id.
+  -- Посев когорт делает close_league_season с правильным seed-сезоном (см. start_next_season).
+  v_new_season_id := public.start_next_season(false);
+
+  perform public.close_league_season(p_season_id, v_new_season_id);
+
+  update public.students set rating = 0 where rating <> 0;
+
+  return json_build_object(
+    'season_id', p_season_id,
+    'archived',  v_archived,
+    'awarded',   v_awarded,
+    'next_season_id', v_new_season_id,
+    'already_completed', false);
+end;
+$function$;
+
+revoke all on function public.finish_season(bigint) from public, anon, authenticated;
+
+-- close_season — РУЧНОЕ закрытие учителем. Формат ответа сохранён (season_id/archived/
+-- awarded); next_season_id/already_completed добавлены, старые вызовы их просто не читают.
+-- Защита «сезон, открытый сегодня, закрыть нельзя» остаётся только здесь (плановое
+-- завершение управляется ends_at и не должно упираться в календарный день).
+create or replace function public.close_season()
+ returns json
+ language plpgsql
+as $function$
+declare
+  v_season_id  bigint;
+  v_start_date date;
+  v_today      date := (now() at time zone 'Europe/Moscow')::date;
+begin
+  select id, start_date into v_season_id, v_start_date
+    from public.seasons
+   where status = 'active'
+   order by id desc
+   limit 1
+   for update;
+
+  if v_season_id is null then
+    raise exception 'Нет открытого сезона';
+  end if;
+
+  if v_start_date >= v_today then
+    raise exception 'Сезон №% открыт сегодня — закрывать можно не раньше следующего дня', v_season_id;
+  end if;
+
+  return public.finish_season(v_season_id);
+end;
+$function$;
+
+-- --- 7. ensure_season_schedule — ленивый плановый переход -------------------------------------
+-- Единственный механизм активации/завершения по расписанию (cron в проекте нет, см. шапку).
+-- Вызывается из ensure_current_season, то есть на любом обращении Mini App/учителя.
+-- Транзакционный advisory-lock сериализует одновременные вызовы: второй ждёт и застаёт уже
+-- выполненный переход, поэтому двойного завершения не происходит даже без гонки на строке.
+create or replace function public.ensure_season_schedule()
+ returns bigint
+ language plpgsql
+as $function$
+declare
+  v_active     bigint;
+  v_active_end timestamptz;
+  v_due_planned bigint;
+begin
+  perform pg_advisory_xact_lock(hashtext('sasha_math_season_schedule'));
+
+  select id, ends_at into v_active, v_active_end
+    from public.seasons
+   where status = 'active'
+   order by id desc
+   limit 1;
+
+  select id into v_due_planned
+    from public.seasons
+   where status = 'planned' and starts_at <= now()
+   order by starts_at asc, id asc
+   limit 1;
+
+  if v_active is not null then
+    -- Активный сезон перестаёт быть активным, если истекло плановое окончание ИЛИ подошёл
+    -- старт следующего запланированного (перекрытие окон запрещено при создании, поэтому
+    -- второй случай — это legacy-сезон без ends_at, которому нашёлся плановый преемник).
+    if (v_active_end is not null and v_active_end <= now()) or v_due_planned is not null then
+      perform public.finish_season(v_active);
+    end if;
+  elsif v_due_planned is not null then
+    perform public.start_next_season(true);
+  end if;
+
+  return public.current_season_id();
+end;
+$function$;
+
+revoke all on function public.ensure_season_schedule() from public, anon, authenticated;
+
+-- ensure_current_season — прежний контракт (returns bigint, создаёт сезон при отсутствии),
+-- теперь сначала выполняет плановый переход. Ad-hoc создание сохранено внутри
+-- start_next_season, поэтому «сезон появится, когда кто-то откроет лидерборд» работает как было.
+create or replace function public.ensure_current_season()
+ returns bigint
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+declare v_id bigint;
+begin
+  if private.current_app_role() not in ('student', 'teacher') then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  v_id := public.ensure_season_schedule();
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  -- Активного сезона нет и планового перехода не случилось — открываем ad-hoc, как до 051.
+  begin
+    v_id := public.start_next_season(true);
+  exception when unique_violation then
+    v_id := public.current_season_id();
+  end;
+  return v_id;
+end;
+$function$;
+
+revoke all on function public.ensure_current_season() from public, anon;
+grant execute on function public.ensure_current_season() to authenticated;
+
+-- --- 8. Административные RPC планирования сезонов ---------------------------------------------
+-- Только app_role='teacher' из JWT (прямой insert/update/delete в seasons у anon/authenticated
+-- отозван миграцией 043 — ученик не может ни создать сезон, ни изменить чужой итог).
+
+-- admin_list_seasons_self — текущий + запланированные + завершённые, с однозначным статусом.
+create or replace function public.admin_list_seasons_self()
+ returns table(
+   season_id    bigint,
+   title        text,
+   status       text,
+   starts_at    timestamptz,
+   ends_at      timestamptz,
+   start_date   date,
+   end_date     date,
+   is_overdue   boolean,
+   participants integer,
+   archived     integer)
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+begin
+  if private.current_app_role() is distinct from 'teacher' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  return query
+  select s.id,
+         s.title,
+         s.status,
+         s.starts_at,
+         s.ends_at,
+         s.start_date,
+         s.end_date,
+         (s.status = 'active' and s.ends_at is not null and s.ends_at <= now()) as is_overdue,
+         -- Участники лиг сезона. Миграция 052 переопределяет эту функцию так, чтобы
+         -- считались только реально вступившие (activated_at is not null) — здесь колонки
+         -- ещё нет, поэтому считаем все memberships.
+         (select count(*)::integer from public.league_memberships m
+           where m.season_id = s.id) as participants,
+         (select count(*)::integer from public.season_results r where r.season_id = s.id) as archived
+    from public.seasons s
+   order by s.id desc;
+end;
+$function$;
+
+-- admin_create_season_self — запланировать сезон.
+-- Валидация (сообщения короткими кодами, текст показывает учительский UI):
+--   season_number_required / season_number_taken / season_number_too_small
+--   title_required / window_required / window_order / start_in_past / season_overlap
+create or replace function public.admin_create_season_self(
+  p_season_number bigint,
+  p_title         text,
+  p_starts_at     timestamptz,
+  p_ends_at       timestamptz)
+ returns json
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_princ    uuid;
+  v_title    text;
+  v_max_id   bigint;
+  v_boundary timestamptz;
+begin
+  if private.current_app_role() is distinct from 'teacher' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  if p_season_number is null or p_season_number <= 0 then
+    raise exception 'season_number_required' using errcode = '22023';
+  end if;
+
+  v_title := btrim(coalesce(p_title, ''));
+  if char_length(v_title) = 0 or char_length(v_title) > 60 then
+    raise exception 'title_required' using errcode = '22023';
+  end if;
+
+  if p_starts_at is null or p_ends_at is null then
+    raise exception 'window_required' using errcode = '22023';
+  end if;
+  if p_ends_at <= p_starts_at then
+    raise exception 'window_order' using errcode = '22023';
+  end if;
+  if p_starts_at <= now() then
+    raise exception 'start_in_past' using errcode = '22023';
+  end if;
+
+  -- Номер обязан быть свободным и больше последнего: весь проект считает `order by id`
+  -- хронологией сезонов (см. шапку).
+  if exists (select 1 from public.seasons where id = p_season_number) then
+    raise exception 'season_number_taken' using errcode = '23505';
+  end if;
+  select max(id) into v_max_id from public.seasons;
+  if v_max_id is not null and p_season_number <= v_max_id then
+    raise exception 'season_number_too_small' using errcode = '22023';
+  end if;
+
+  -- Перекрытие временных рамок запрещено: сезоны в этом проекте строго последовательны
+  -- (одновременно активен ровно один). Сверяем и с объявленными окнами, и с границей
+  -- текущего/запланированных сезонов (у legacy-сезона окна нет — берём день после старта).
+  if exists (
+    select 1 from public.seasons s
+     where s.starts_at is not null and s.ends_at is not null
+       and tstzrange(s.starts_at, s.ends_at) && tstzrange(p_starts_at, p_ends_at)) then
+    raise exception 'season_overlap' using errcode = '22023';
+  end if;
+
+  select max(coalesce(s.ends_at, ((s.start_date + 1)::timestamp at time zone 'Europe/Moscow')))
+    into v_boundary
+    from public.seasons s
+   where s.status in ('active', 'planned');
+  if v_boundary is not null and p_starts_at < v_boundary then
+    raise exception 'season_overlap' using errcode = '22023';
+  end if;
+
+  v_princ := private.current_principal();
+
+  insert into public.seasons (id, title, status, start_date, end_date, starts_at, ends_at)
+  values (p_season_number,
+          v_title,
+          'planned',
+          (p_starts_at at time zone 'Europe/Moscow')::date,
+          (p_ends_at   at time zone 'Europe/Moscow')::date,
+          p_starts_at,
+          p_ends_at);
+
+  -- id вставлен явно (колонка identity BY DEFAULT) — подтягиваем последовательность, иначе
+  -- следующий ad-hoc сезон попробует занять уже использованный номер.
+  perform setval(pg_get_serial_sequence('public.seasons', 'id'),
+                 (select max(id) from public.seasons));
+
+  perform public.security_audit('teacher_create_season', 'teacher', v_princ, null,
+    json_build_object('season_id', p_season_number,
+                      'starts_at', p_starts_at, 'ends_at', p_ends_at)::jsonb);
+
+  return json_build_object('season_id', p_season_number, 'status', 'planned');
+end;
+$function$;
+
+-- admin_update_season_self — изменить ТОЛЬКО запланированный сезон (у идущего и завершённого
+-- окно менять нельзя: у первого от start_date зависят начисления и витрина, у второго — архив).
+create or replace function public.admin_update_season_self(
+  p_season_id bigint,
+  p_title     text,
+  p_starts_at timestamptz,
+  p_ends_at   timestamptz)
+ returns json
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_princ  uuid;
+  v_status text;
+  v_title  text;
+begin
+  if private.current_app_role() is distinct from 'teacher' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_season_id is null then
+    raise exception 'season_required' using errcode = '22023';
+  end if;
+
+  select status into v_status from public.seasons where id = p_season_id for update;
+  if v_status is null then
+    raise exception 'season_not_found' using errcode = 'P0002';
+  end if;
+  if v_status <> 'planned' then
+    raise exception 'season_not_planned' using errcode = '22023';
+  end if;
+
+  v_title := btrim(coalesce(p_title, ''));
+  if char_length(v_title) = 0 or char_length(v_title) > 60 then
+    raise exception 'title_required' using errcode = '22023';
+  end if;
+  if p_starts_at is null or p_ends_at is null then
+    raise exception 'window_required' using errcode = '22023';
+  end if;
+  if p_ends_at <= p_starts_at then
+    raise exception 'window_order' using errcode = '22023';
+  end if;
+  if p_starts_at <= now() then
+    raise exception 'start_in_past' using errcode = '22023';
+  end if;
+  if exists (
+    select 1 from public.seasons s
+     where s.id <> p_season_id
+       and s.starts_at is not null and s.ends_at is not null
+       and tstzrange(s.starts_at, s.ends_at) && tstzrange(p_starts_at, p_ends_at)) then
+    raise exception 'season_overlap' using errcode = '22023';
+  end if;
+
+  v_princ := private.current_principal();
+
+  update public.seasons
+     set title      = v_title,
+         starts_at  = p_starts_at,
+         ends_at    = p_ends_at,
+         start_date = (p_starts_at at time zone 'Europe/Moscow')::date,
+         end_date   = (p_ends_at   at time zone 'Europe/Moscow')::date
+   where id = p_season_id;
+
+  perform public.security_audit('teacher_update_season', 'teacher', v_princ, null,
+    json_build_object('season_id', p_season_id,
+                      'starts_at', p_starts_at, 'ends_at', p_ends_at)::jsonb);
+
+  return json_build_object('season_id', p_season_id, 'status', 'planned');
+end;
+$function$;
+
+-- admin_delete_season_self — снять запланированный сезон. Только 'planned' и только пока к
+-- нему ничего не привязано: исторические данные не удаляются никогда.
+create or replace function public.admin_delete_season_self(p_season_id bigint)
+ returns json
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_princ  uuid;
+  v_status text;
+begin
+  if private.current_app_role() is distinct from 'teacher' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_season_id is null then
+    raise exception 'season_required' using errcode = '22023';
+  end if;
+
+  select status into v_status from public.seasons where id = p_season_id for update;
+  if v_status is null then
+    raise exception 'season_not_found' using errcode = 'P0002';
+  end if;
+  if v_status <> 'planned' then
+    raise exception 'season_not_planned' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.season_results   where season_id = p_season_id)
+     or exists (select 1 from public.league_cohorts   where season_id = p_season_id)
+     or exists (select 1 from public.season_bundles   where season_id = p_season_id)
+     or exists (select 1 from public.season_points_log where season_id = p_season_id) then
+    raise exception 'season_has_data' using errcode = '22023';
+  end if;
+
+  v_princ := private.current_principal();
+  delete from public.seasons where id = p_season_id;
+
+  perform public.security_audit('teacher_delete_season', 'teacher', v_princ, null,
+    json_build_object('season_id', p_season_id)::jsonb);
+
+  return json_build_object('season_id', p_season_id, 'deleted', true);
+end;
+$function$;
+
+revoke all on function public.admin_list_seasons_self() from public, anon;
+revoke all on function public.admin_create_season_self(bigint, text, timestamptz, timestamptz) from public, anon;
+revoke all on function public.admin_update_season_self(bigint, text, timestamptz, timestamptz) from public, anon;
+revoke all on function public.admin_delete_season_self(bigint) from public, anon;
+grant execute on function public.admin_list_seasons_self() to authenticated;
+grant execute on function public.admin_create_season_self(bigint, text, timestamptz, timestamptz) to authenticated;
+grant execute on function public.admin_update_season_self(bigint, text, timestamptz, timestamptz) to authenticated;
+grant execute on function public.admin_delete_season_self(bigint) to authenticated;
+
+-- --- Миграция 052: вступление в лигу по первому начислению и полный список ---------------------
+-- --- 1. Факт участия: league_memberships.activated_at -----------------------------------------
+alter table public.league_memberships add column if not exists activated_at timestamptz;
+
+create index if not exists idx_league_memberships_activated
+  on public.league_memberships (season_id, activated_at);
+
+comment on column public.league_memberships.activated_at is
+  'Момент фактического вступления в лигу = первое положительное начисление рейтинга в этом '
+  'сезоне. NULL = заготовка посева (build_season_cohorts): в списках/снимке/превью не '
+  'показывается, но участвует в бухгалтерии неактивных сезонов close_league_season.';
+
+-- --- 2. ensure_league_membership — активация участия по факту начисления -----------------------
+-- Было (019): создать late_entry membership, если его нет. Стало: активировать заготовку
+-- посева, если она есть; иначе создать late_entry membership уже активированным.
+create or replace function public.ensure_league_membership(p_student_id bigint)
+ returns void
+ language plpgsql
+as $function$
+declare
+  v_season   bigint;
+  v_cohort   bigint;
+  v_count    integer;
+  v_next_idx integer;
+  v_exists   boolean;
+begin
+  select id into v_season
+    from public.seasons where end_date is null order by id desc limit 1;
+  if v_season is null then
+    return;                                  -- нет открытого сезона — нечего наполнять
+  end if;
+
+  -- Постоянное состояние (Бронза по умолчанию).
+  insert into public.student_league_state (student_id)
+    values (p_student_id)
+    on conflict (student_id) do nothing;
+
+  -- Участие на этот сезон уже есть: активируем заготовку посева (или ничего не делаем,
+  -- если ученик уже соревнуется). Никакой смены лиги/когорты при каждом новом ДЗ.
+  v_exists := exists (
+    select 1 from public.league_memberships
+     where season_id = v_season and student_id = p_student_id);
+
+  if v_exists then
+    update public.league_memberships
+       set activated_at = now()
+     where season_id = v_season
+       and student_id = p_student_id
+       and activated_at is null;
+    return;
+  end if;
+
+  -- Новичок без заготовки: отдельная late_entry-когорта Бронзы (до 30, при переполнении —
+  -- следующая). Обычные когорты не трогаем и уже соревнующихся не двигаем (SPEC_STAGE3 §3).
+  select c.id, count(m.id) into v_cohort, v_count
+    from public.league_cohorts c
+    left join public.league_memberships m on m.cohort_id = c.id
+   where c.season_id = v_season and c.tier = 1 and c.is_late_entry = true
+   group by c.id
+   having count(m.id) < 30
+   order by c.id
+   limit 1;
+
+  if v_cohort is null then
+    select coalesce(max(cohort_index), 0) + 1 into v_next_idx
+      from public.league_cohorts
+     where season_id = v_season and tier = 1 and is_late_entry = true;
+
+    insert into public.league_cohorts (season_id, tier, cohort_index, is_late_entry)
+      values (v_season, 1, v_next_idx, true)
+      on conflict (season_id, tier, cohort_index, is_late_entry) do nothing
+      returning id into v_cohort;
+
+    -- Гонка двух первых начислений: когорту успел создать конкурент — берём её.
+    if v_cohort is null then
+      select id into v_cohort
+        from public.league_cohorts
+       where season_id = v_season and tier = 1 and is_late_entry = true
+         and cohort_index = v_next_idx;
+    end if;
+  end if;
+
+  -- on conflict — защита от гонки двух первых начислений: второй не создаёт второе участие,
+  -- а лишь дозаполняет activated_at (в DO UPDATE к текущей строке обращаемся по имени таблицы).
+  insert into public.league_memberships as lm
+    (season_id, cohort_id, student_id, tier, is_late_entry, activated_at)
+    values (v_season, v_cohort, p_student_id, 1, true, now())
+    on conflict (season_id, student_id) do update
+      set activated_at = coalesce(lm.activated_at, now());
+end;
+$function$;
+
+-- --- 3. add_season_points — единственная точка роста rating, здесь же и вступление в лигу ------
+-- Раньше вступление висело только на award_season_points, из-за чего legacy-приёмка ДЗ
+-- (settle_legacy_approval → add_season_points) начисляла очки, не заводя участия.
+-- Теперь любое фактическое ПОЛОЖИТЕЛЬНОЕ начисление гарантирует участие в текущем сезоне.
+-- Отрицательные корректировки и нулевые дельты участия не создают и не снимают.
+create or replace function public.add_season_points(p_student_id bigint, p_amount integer)
+ returns integer
+ language plpgsql
+as $function$
+declare
+  v_new integer;
+begin
+  update public.students
+    set rating = greatest(0, rating + p_amount)
+    where telegram_id = p_student_id
+    returning rating into v_new;
+
+  if v_new is null then
+    raise exception 'Student % not found', p_student_id;
+  end if;
+
+  -- Та же транзакция, что и начисление: рейтинг не может вырасти без участия в лиге.
+  if p_amount > 0 then
+    perform public.ensure_league_membership(p_student_id);
+  end if;
+
+  return v_new;
+end;
+$function$;
+
+-- --- 4. get_student_league_snapshot — место/размер когорты по ФАКТИЧЕСКИМ участникам ----------
+-- Изменения против 019: in_season/place/cohort_size/active_in_cohort считаются только по
+-- activated_at is not null; добавлены cohort_index и season_title (UI показывает название
+-- сезона из планирования). Остальные ключи ответа сохранены — клиент не ломается.
+create or replace function public.get_student_league_snapshot(p_student_id bigint)
+ returns json
+ language plpgsql
+ stable
+as $function$
+declare
+  v_season      bigint;
+  v_season_title text;
+  v_tier        integer;
+  v_inactive    integer;
+  v_cohort      bigint;
+  v_cohort_index integer;
+  v_late        boolean;
+  v_place       integer;
+  v_cohort_size integer;
+  v_active      integer;
+  v_has_crown   boolean := false;
+begin
+  select id, title into v_season, v_season_title
+    from public.seasons where end_date is null order by id desc limit 1;
+
+  select tier, inactive_seasons into v_tier, v_inactive
+    from public.student_league_state where student_id = p_student_id;
+
+  if v_tier is null then
+    -- ученик ещё не в лигах (не начислял очков) — показываем Бронзу как стартовую ступень
+    v_tier := 1;
+    v_inactive := 0;
+  end if;
+
+  -- Только фактическое участие: заготовка посева (activated_at is null) сезоном не считается.
+  select m.cohort_id, m.is_late_entry, c.cohort_index
+    into v_cohort, v_late, v_cohort_index
+    from public.league_memberships m
+    join public.league_cohorts c on c.id = m.cohort_id
+   where m.season_id = v_season
+     and m.student_id = p_student_id
+     and m.activated_at is not null;
+
+  if v_cohort is not null then
+    select place, size, active into v_place, v_cohort_size, v_active from (
+      select m.student_id,
+             row_number() over (
+               order by s.rating desc, s.telegram_id asc) as place,
+             count(*) over () as size,
+             count(*) filter (where s.rating > 0) over () as active
+        from public.league_memberships m
+        join public.students s on s.telegram_id = m.student_id
+       where m.cohort_id = v_cohort
+         and m.activated_at is not null
+    ) q where q.student_id = p_student_id;
+  end if;
+
+  select exists (
+    select 1 from public.league_season_awards
+     where award_code = 'legend_crown'
+       and student_id = p_student_id
+       and active_season_id = v_season) into v_has_crown;
+
+  return json_build_object(
+    'season_id',        v_season,
+    'season_title',     v_season_title,
+    'tier',             v_tier,
+    'tier_name',        (select name from public.league_tiers where tier = v_tier),
+    'next_tier',        case when v_tier < 7 then v_tier + 1 end,
+    'next_tier_name',   (select name from public.league_tiers where tier = v_tier + 1),
+    'inactive_seasons', v_inactive,
+    'is_late_entry',    coalesce(v_late, false),
+    'in_season',        v_cohort is not null,
+    'cohort_index',     v_cohort_index,
+    'place',            v_place,
+    'cohort_size',      v_cohort_size,
+    'active_in_cohort', v_active,
+    'has_crown',        v_has_crown
+  );
+end;
+$function$;
+
+-- --- 5. get_student_league_standings_self — ПОЛНЫЙ список своей лиги --------------------------
+-- Все фактические участники своей лиги (tier) текущего сезона: и обычная когорта, и
+-- late_entry. Места считаются ВНУТРИ когорты тем же tie-break, что close_season/
+-- preview_league_close (очки → меньше штрафов в сезоне → раньше набрал → telegram_id), поэтому
+-- когорты не смешиваются. Имена и косметика приезжают тут же (student_public_cosmetics,
+-- миграция 051) — прямые select их не отдают из-за RLS. Никакого LIMIT: сколько участников
+-- есть, столько и вернётся, текущий ученик присутствует всегда (иначе выдача пустая и клиент
+-- показывает «вы ещё не в сезоне»).
+create or replace function public.get_student_league_standings_self()
+ returns table(
+   student_id         bigint,
+   name               text,
+   tier               integer,
+   tier_name          text,
+   cohort_index       integer,
+   is_late_entry      boolean,
+   place              integer,
+   points             integer,
+   projected_movement text,
+   active_in_cohort   integer,
+   cohort_size        integer,
+   is_me              boolean,
+   equipment          jsonb)
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+#variable_conflict use_column
+declare
+  v_tid        bigint;
+  v_season     bigint;
+  v_my_tier    integer;
+  v_season_start timestamptz;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501';
+  end if;
+
+  v_season := public.current_season_id();
+  if v_season is null then
+    return;
+  end if;
+
+  select (s.start_date::timestamp) at time zone 'Europe/Moscow'
+    into v_season_start
+    from public.seasons s where s.id = v_season;
+
+  select m.tier into v_my_tier
+    from public.league_memberships m
+   where m.season_id = v_season
+     and m.student_id = v_tid
+     and m.activated_at is not null;
+  if v_my_tier is null then
+    return;                                   -- ещё не вступил — список пуст по определению
+  end if;
+
+  return query
+  with live as (
+    select s.telegram_id as sid,
+           coalesce(s.rating, 0) as pts,
+           row_number() over (
+             order by s.rating desc,
+                      coalesce(pen.cnt, 0) asc,
+                      lg.last_scored asc nulls last,
+                      s.telegram_id asc) as global_place
+      from public.students s
+      left join (
+        select bh.student_id, count(*) as cnt
+          from public.balance_history bh
+         where bh.reason like 'penalty:%'
+           and bh.created_at >= v_season_start
+         group by bh.student_id) pen on pen.student_id = s.telegram_id
+      left join (
+        select l.student_id, max(l.created_at) as last_scored
+          from public.season_points_log l
+         where l.season_id = v_season and l.amount <> 0
+         group by l.student_id) lg on lg.student_id = s.telegram_id
+  ),
+  members as (
+    select m.student_id as sid,
+           m.cohort_id  as cid,
+           m.tier       as mtier,
+           m.is_late_entry as late,
+           c.cohort_index  as cidx,
+           coalesce(lv.pts, 0) as pts,
+           lv.global_place    as gplace
+      from public.league_memberships m
+      join public.league_cohorts c on c.id = m.cohort_id
+      left join live lv on lv.sid = m.student_id
+     where m.season_id = v_season
+       and m.tier = v_my_tier
+       and m.activated_at is not null
+  ),
+  ranked as (
+    select mb.*,
+           row_number() over (partition by mb.cid
+                              order by mb.gplace asc nulls last, mb.sid asc) as rplace,
+           count(*) over (partition by mb.cid) as csize,
+           count(*) filter (where mb.pts > 0) over (partition by mb.cid) as cactive
+      from members mb
+  ),
+  moved as (
+    select rk.*,
+           case when rk.pts > 0 then
+             row_number() over (partition by rk.cid, (rk.pts > 0) order by rk.rplace asc)
+           end as arank,
+           case when rk.cactive between 5 and 9   then 1
+                when rk.cactive between 10 and 19 then 3
+                when rk.cactive between 20 and 30 then 5
+                else 0 end as move_n
+      from ranked rk
+  )
+  select mv.sid,
+         coalesce(st.name, ''),
+         mv.mtier,
+         lt.name,
+         mv.cidx,
+         mv.late,
+         mv.rplace::integer,
+         mv.pts,
+         case
+           when mv.late then 'stayed'
+           when mv.pts > 0 and mv.arank <= mv.move_n and mv.mtier < 7 then 'promote'
+           when mv.pts > 0 and mv.arank > mv.cactive - mv.move_n and mv.mtier > 1 then 'demote'
+           else 'stayed'
+         end,
+         mv.cactive::integer,
+         mv.csize::integer,
+         (mv.sid = v_tid),
+         public.student_public_cosmetics(mv.sid)
+    from moved mv
+    join public.students st on st.telegram_id = mv.sid
+    join public.league_tiers lt on lt.tier = mv.mtier
+   order by mv.late asc, mv.cidx asc, mv.rplace asc;
+end;
+$function$;
+
+revoke all on function public.get_student_league_standings_self() from public, anon;
+grant execute on function public.get_student_league_standings_self() to authenticated;
+
+-- --- 6. preview_league_close — только фактические участники ------------------------------------
+-- Тело 019 сохранено дословно, добавлено единственное условие m.activated_at is not null:
+-- заготовки посева, которые ещё никто не активировал, не должны попадать в учительское
+-- превью переходов (они и раньше проецировались как 'stayed' с 0 очками — модель переходов
+-- не меняется, из выдачи уходит только шум).
+create or replace function public.preview_league_close()
+ returns table(
+   student_id      bigint,
+   tier            integer,
+   tier_name       text,
+   cohort_index    integer,
+   points          integer,
+   place           integer,
+   active_in_cohort integer,
+   projected_movement text,
+   projected_tier  integer)
+ language sql
+ stable
+as $function$
+  with season as (
+    select id from public.seasons where end_date is null order by id desc limit 1
+  ),
+  live as (
+    select s.telegram_id as student_id,
+           s.rating       as points,
+           row_number() over (
+             order by s.rating desc,
+                      coalesce(pen.cnt, 0) asc,
+                      pts.last_scored asc nulls last,
+                      s.telegram_id asc) as global_place
+      from public.students s
+      left join (
+        select student_id, count(*) as cnt
+          from public.balance_history
+         where reason like 'penalty:%'
+           and created_at >= (
+             (select start_date from public.seasons where end_date is null order by id desc limit 1)::timestamp
+             at time zone 'Europe/Moscow')
+         group by student_id) pen on pen.student_id = s.telegram_id
+      left join (
+        select l.student_id, max(l.created_at) as last_scored
+          from public.season_points_log l
+         where l.season_id = (select id from season) and l.amount <> 0
+         group by l.student_id) pts on pts.student_id = s.telegram_id
+  ),
+  ranked as (
+    select m.student_id,
+           m.tier,
+           c.cohort_index,
+           m.cohort_id,
+           m.is_late_entry,
+           coalesce(lv.points, 0) as points,
+           row_number() over (
+             partition by m.cohort_id
+             order by lv.global_place asc nulls last, m.student_id asc) as place
+      from public.league_memberships m
+      join season se on se.id = m.season_id
+      join public.league_cohorts c on c.id = m.cohort_id
+      left join live lv on lv.student_id = m.student_id
+     where m.is_late_entry = false
+       and m.activated_at is not null
+  ),
+  active_ranked as (
+    select r.*,
+           count(*) filter (where r.points > 0) over (partition by r.cohort_id) as active_in_cohort,
+           case when r.points > 0 then
+             row_number() over (
+               partition by r.cohort_id, (r.points > 0) order by r.place asc)
+           end as active_rank
+      from ranked r
+  ),
+  moved as (
+    select ar.*,
+           case when ar.active_in_cohort between 5 and 9 then 1
+                when ar.active_in_cohort between 10 and 19 then 3
+                when ar.active_in_cohort between 20 and 30 then 5
+                else 0 end as promote_n,
+           case when ar.active_in_cohort between 5 and 9 then 1
+                when ar.active_in_cohort between 10 and 19 then 3
+                when ar.active_in_cohort between 20 and 30 then 5
+                else 0 end as demote_n
+      from active_ranked ar
+  ),
+  projected as (
+    select m.*,
+           case
+             when m.points > 0 and m.active_rank <= m.promote_n and m.tier < 7 then 'promote'
+             when m.points > 0 and m.active_rank > m.active_in_cohort - m.demote_n and m.tier > 1 then 'demote'
+             else 'stayed'
+           end as projected_movement
+      from moved m
+  )
+  select p.student_id,
+         p.tier,
+         t.name as tier_name,
+         p.cohort_index,
+         p.points,
+         p.place::integer,
+         p.active_in_cohort::integer,
+         p.projected_movement,
+         case p.projected_movement
+           when 'promote' then p.tier + 1
+           when 'demote'  then p.tier - 1
+           else p.tier
+         end as projected_tier
+    from projected p
+    join public.league_tiers t on t.tier = p.tier
+$function$;
+
+revoke all on function public.preview_league_close() from public, anon, authenticated;
+
+-- --- 7. admin_list_seasons_self — участники = только фактические ------------------------------
+-- Переопределение версии 051 (там колонки activated_at ещё не существовало).
+create or replace function public.admin_list_seasons_self()
+ returns table(
+   season_id    bigint,
+   title        text,
+   status       text,
+   starts_at    timestamptz,
+   ends_at      timestamptz,
+   start_date   date,
+   end_date     date,
+   is_overdue   boolean,
+   participants integer,
+   archived     integer)
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+#variable_conflict use_column
+begin
+  if private.current_app_role() is distinct from 'teacher' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  return query
+  select s.id,
+         s.title,
+         s.status,
+         s.starts_at,
+         s.ends_at,
+         s.start_date,
+         s.end_date,
+         (s.status = 'active' and s.ends_at is not null and s.ends_at <= now()) as is_overdue,
+         (select count(*)::integer from public.league_memberships m
+           where m.season_id = s.id and m.activated_at is not null) as participants,
+         (select count(*)::integer from public.season_results r where r.season_id = s.id) as archived
+    from public.seasons s
+   order by s.id desc;
+end;
+$function$;
+
+revoke all on function public.admin_list_seasons_self() from public, anon;
+grant execute on function public.admin_list_seasons_self() to authenticated;
+
+-- (разовый backfill activated_at и восстановление участий — в самой миграции 052)
+
+
+-- --- Миграция 053: постоянное владение косметикой и инвентарь ----------------------------------
+-- --- 1. equip_item — экипировка по ВЛАДЕНИЮ, а не по наличию в продаже -----------------------
+-- Единственное смысловое изменение против 008: каталожная строка читается без фильтра active.
+-- Проверка владения (student_items) остаётся серверной и обязательной — подменой запроса
+-- надеть чужой или некупленный предмет нельзя. Остальные правила сохранены дословно:
+-- status_emoji меняется только покупкой смены, персональный титул — только после approved,
+-- в одном слоте один предмет (unique(student_id, slot)), p_item_code = null снимает слот.
+create or replace function public.equip_item(
+  p_student_id bigint, p_slot text, p_item_code text default null)
+ returns void
+ language plpgsql
+as $function$
+declare
+  v_slot         text;
+  v_kind         text;
+  v_custom_title text;
+begin
+  if p_item_code is null then
+    delete from public.student_equipment where student_id = p_student_id and slot = p_slot;
+    return;
+  end if;
+
+  if p_slot = 'status_emoji' then
+    raise exception 'Эмодзи-статус меняется только покупкой смены';
+  end if;
+
+  -- Без `and active`: предмет завершённого сезона снят с ПРОДАЖИ, но принадлежит ученику
+  -- и обязан надеваться (задача 5, п.1).
+  select slot, item_kind into v_slot, v_kind
+    from public.shop_items where item_code = p_item_code;
+  if v_slot is null or v_slot <> p_slot then
+    raise exception 'Товар % не подходит слоту %', p_item_code, p_slot;
+  end if;
+  if v_kind not in ('cosmetic', 'service') then
+    raise exception 'Товар % не является косметикой', p_item_code;
+  end if;
+
+  if not exists (select 1 from public.student_items
+                   where student_id = p_student_id and item_code = p_item_code) then
+    raise exception 'Сначала нужно купить этот предмет';
+  end if;
+
+  if p_item_code = 'title_custom' then
+    select title_text into v_custom_title
+      from public.student_custom_titles
+      where student_id = p_student_id and status = 'approved';
+    if v_custom_title is null then
+      raise exception 'Персональный титул ещё не одобрен';
+    end if;
+
+    insert into public.student_equipment (student_id, slot, item_code, variant)
+      values (p_student_id, p_slot, p_item_code, v_custom_title)
+      on conflict (student_id, slot)
+      do update set item_code = excluded.item_code,
+                    variant = excluded.variant,
+                    updated_at = now();
+    return;
+  end if;
+
+  insert into public.student_equipment (student_id, slot, item_code)
+    values (p_student_id, p_slot, p_item_code)
+    on conflict (student_id, slot)
+    do update set item_code = excluded.item_code, variant = null, updated_at = now();
+end;
+$function$;
+
+-- --- 2. Запрет физического удаления косметики, которой уже владеют ---------------------------
+-- «Убрать из магазина» = active = false. Удаление каталожной строки сделало бы купленный
+-- предмет невоспроизводимым (пропал бы render_payload) — теперь это невозможно.
+create or replace function public.trg_shop_items_protect_owned()
+ returns trigger
+ language plpgsql
+as $function$
+begin
+  if exists (select 1 from public.student_items      where item_code = old.item_code)
+     or exists (select 1 from public.student_equipment where item_code = old.item_code)
+     or exists (select 1 from public.student_showcase  where kind = 'item' and ref_code = old.item_code) then
+    raise exception
+      'Предмет % принадлежит ученикам: снимайте с продажи через active = false, удалять нельзя',
+      old.item_code using errcode = '23503';
+  end if;
+  return old;
+end;
+$function$;
+
+drop trigger if exists shop_items_protect_owned on public.shop_items;
+create trigger shop_items_protect_owned
+  before delete on public.shop_items
+  for each row execute function public.trg_shop_items_protect_owned();
+
+-- --- 3. get_student_inventory_self — весь инвентарь ученика ------------------------------------
+-- Отдаёт ВСЁ, чем ученик владеет, независимо от сезона получения, наличия предмета в текущем
+-- магазине, активности предложения и ротации. Источник владения — student_items (постоянный),
+-- каталожные атрибуты — shop_items без фильтра active. Щит (item_kind='shield') и разовые
+-- услуги без слота в инвентарь косметики не попадают — у них свой виджет.
+-- Флаги is_equipped / showcase_position считаются сервером, чтобы клиент не сверял состояние
+-- сам. has_render_payload — факт, а НЕ признак поломки: у титулов и короны render_payload
+-- пустой по устройству каталога (миграции 008/010), их превью строится по слоту. Флаг нужен
+-- для слотов, где payload действительно несёт оформление (frame/background/name_color): если
+-- он там пуст, UI даёт нейтральный fallback и ничего не выдумывает.
+create or replace function public.get_student_inventory_self()
+ returns table(
+   item_code          text,
+   name               text,
+   slot               text,
+   item_kind          text,
+   render_payload     text,
+   has_render_payload boolean,
+   available_now      boolean,
+   season_id          bigint,
+   is_equipped        boolean,
+   equipped_variant   text,
+   showcase_position  smallint,
+   sort_order         integer)
+ language plpgsql
+ security definer
+ set search_path = public, pg_temp
+as $function$
+#variable_conflict use_column
+declare
+  v_tid    bigint;
+  v_bundle integer;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501';
+  end if;
+
+  -- Бандл текущего сезона — только чтобы пометить «ещё продаётся»; на возможность
+  -- экипировки он не влияет (задача 5, п.9).
+  select b.bundle into v_bundle
+    from public.season_bundles b
+   where b.season_id = public.current_season_id();
+
+  return query
+  select si.item_code,
+         si.name,
+         si.slot,
+         si.item_kind,
+         si.render_payload,
+         (si.render_payload is not null and btrim(si.render_payload) <> ''),
+         (si.active and (si.availability = 'always'
+                         or (v_bundle is not null and si.rotation_bundle = v_bundle))),
+         sb.season_id,
+         (eq.item_code is not null),
+         eq.variant,
+         sc.position,
+         si.sort_order
+    from public.student_items own
+    join public.shop_items si on si.item_code = own.item_code
+    left join public.season_bundles sb on sb.bundle = si.rotation_bundle
+    left join public.student_equipment eq
+           on eq.student_id = v_tid and eq.slot = si.slot and eq.item_code = si.item_code
+    left join public.student_showcase sc
+           on sc.student_id = v_tid and sc.kind = 'item' and sc.ref_code = si.item_code
+   where own.student_id = v_tid
+     and si.slot is not null
+     and si.item_kind in ('cosmetic', 'service')
+   order by si.slot asc, si.sort_order asc, si.name asc;
+end;
+$function$;
+
+revoke all on function public.get_student_inventory_self() from public, anon;
+grant execute on function public.get_student_inventory_self() to authenticated;
