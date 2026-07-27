@@ -55,13 +55,13 @@ INLINE_IGNORED = {
 # стилей. Список ведётся вручную (§6 аудита) и пополняется по этапам редизайна.
 CRITICAL_CLASSES = [
     # неделя
-    "week-day-chip", "wd-not_assigned", "wd-submitted", "wd-revision",
+    "week-day-chip", "wd-not_assigned", "wd-assigned", "wd-submitted", "wd-revision",
     "wd-approved", "wd-missed", "wd-shielded", "week-day-name", "week-day-mark",
     "week-day-detail-main", "week-day-detail-title", "week-day-detail-note",
     "week-shield-btn", "week-weekly-row", "week-totals", "week-forecast",
     # «сделать сейчас»
     "now-item", "now-icon", "now-main", "now-item-title", "now-item-meta", "now-arrow",
-    "summary-empty",
+    "summary-empty", "ca-state", "ca-state--loading", "ca-state--empty", "ca-state--error",
     # квесты
     "quest-row", "quest-row-icon", "quest-row-main", "quest-row-title", "quest-row-meta",
     "quest-row-note", "quest-row-trailing", "quest-badge", "quest-badge-paid",
@@ -80,6 +80,8 @@ CRITICAL_CLASSES = [
     "shop-section-title", "shop-section-note", "shop-item", "shop-preview", "shop-body",
     "shop-name", "shop-desc", "shop-leaving", "shop-action", "shop-buy-btn", "shop-state",
     "shop-equip-btn", "shop-equipped", "shop-emoji-chips", "shop-emoji-chip",
+    "shop-preview-name-sample", "shop-preview-avatar-demo", "shop-preview-title-demo",
+    "shop-preview-title-demo-icon", "shop-preview-title-demo-bar",
     "custom-title-text", "custom-title-reason",
     # архив домашки
     "my-hw-item", "hw-header", "hw-variant", "hw-pages", "hw-date", "hw-badge",
@@ -111,6 +113,16 @@ COMPOSITE_CLASSES = [
     ("coll-tile", "locked"),
     ("showcase-tile", "empty"),
     ("shop-state", "owned"),
+    ("shop-state", "locked"),
+    ("shop-preview", "shop-preview-frame"),
+    ("shop-preview", "bg-grid"),
+    ("shop-preview", "bg-space"),
+    ("shop-preview", "bg-aurora"),
+    ("shop-preview", "bg-draft"),
+    ("summary-empty", "is-error"),
+    ("chart-empty", "is-error"),
+    ("my-hw-item", "status-submitted"),
+    ("my-hw-item", "status-checked"),
     ("ladder-step", "achieved"),
     ("ladder-step", "current"),
     ("hw-comment", "rejected"),
@@ -130,12 +142,7 @@ HOOK_CLASSES_NO_CSS = {
 # Держим их в отдельном списке, чтобы чек не падал и одновременно не забывал о долге.
 # Скрипт сам проверяет, не появилось ли правило в CSS раньше срока (см. check_known_debt) —
 # тогда запись помечается как устранённую, а не остаётся ложным «неисправленным долгом».
-KNOWN_MISSING_CLASSES = {
-    "status-submitted": "фактический класс архива работ; CSS добавляется на этапе 5 (R15)",
-    "status-checked": "фактический класс архива работ; CSS добавляется на этапе 5 (R15)",
-    "wd-assigned": "день «назначено» намеренно рисуется нейтральной меткой по умолчанию; "
-                   "отдельное правило появится на этапе 3",
-}
+KNOWN_MISSING_CLASSES = {}
 
 
 try:  # чтобы русский текст отчёта не падал на консолях с не-UTF-8 кодировкой

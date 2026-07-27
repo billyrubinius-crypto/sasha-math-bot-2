@@ -47,11 +47,19 @@
 
         function setupAvatar(user) {
             const container = document.getElementById('user-avatar-container');
+            container.textContent = '';
             if (user.photo_url) {
-                container.innerHTML = `<img src="${user.photo_url}" class="avatar-img">`;
+                const img = document.createElement('img');
+                img.src = normalizeUrl(user.photo_url);
+                img.className = 'avatar-img';
+                img.alt = user.first_name ? `Аватар ${user.first_name}` : 'Аватар ученика';
+                container.appendChild(img);
             } else {
                 const initial = user.first_name ? user.first_name[0].toUpperCase() : '?';
-                container.innerHTML = `<div class="avatar-placeholder">${esc(initial)}</div>`;
+                const placeholder = document.createElement('div');
+                placeholder.className = 'avatar-placeholder';
+                placeholder.textContent = initial;
+                container.appendChild(placeholder);
             }
         }
 

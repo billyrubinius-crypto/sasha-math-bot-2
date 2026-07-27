@@ -345,7 +345,7 @@
             const box = document.getElementById('exam-info-box');
             if (!p || !box) return;
             const [y, m, d] = p.week_start.split('-');
-            box.innerHTML = `Неделя от ${d}.${m}.${y} • ${esc(p.score)} баллов`;
+            box.textContent = `Неделя от ${d}.${m}.${y} • ${p.score} баллов`;
         }
 
         // Не используются с U05B (трактория читается из get_mock_exam_trajectory, delta/summary

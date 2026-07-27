@@ -65,6 +65,7 @@
             const pausedNote = !state.generation_active
                 ? '<span class="quest-row-note">Действия временно недоступны</span>'
                 : '';
+            const replacementsLeft = esc(String(state.replacements_left ?? 0));
 
             return `
                 <div class="quest-row">
@@ -78,7 +79,7 @@
                         <button class="quest-claim-btn" onclick="claimTodayLife(${slot})"
                             ${claimDisabled ? 'disabled' : ''}>Выполнил честно</button>
                         <button class="quest-replace-btn" onclick="replaceTodayLife(${slot})"
-                            title="Осталось замен на сегодня: ${state.replacements_left}"
+                            title="Осталось замен на сегодня: ${replacementsLeft}"
                             ${replaceDisabled ? 'disabled' : ''}>🔁</button>
                     </div>
                 </div>
