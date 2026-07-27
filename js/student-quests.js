@@ -15,7 +15,7 @@
                 if (error) throw error;
                 renderTodayQuests(data);
             } catch (e) {
-                content.innerHTML = '<div class="summary-empty">Не удалось загрузить сегодняшние квесты</div>';
+                content.innerHTML = '<div class="summary-empty is-error">Не удалось загрузить сегодняшние квесты</div>';
                 log('❌ Ошибка квестов дня: ' + (e.message || e));
             }
         }

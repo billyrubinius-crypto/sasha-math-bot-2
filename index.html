@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <!-- viewport-fit=cover — чтобы работали env(safe-area-inset-*) (нижняя gesture bar, вырезы).
-         maximum-scale/user-scalable=no: решение по плану принимается на этапе 8, после
-         проверки реального поведения жестов/зума в Telegram WebView. В этой среде нет
-         доступа к настоящему Telegram-клиенту на устройстве, поэтому решение — оставить
-         метатег как есть до появления возможности проверить жесты (двойной тап, зум,
-         скролл) в реальном WebView; снятие блокировки масштабирования без такой проверки
-         рискует непроверенно изменить поведение жестов внутри Mini App. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+         Масштабирование не блокируется: доступность браузерного zoom важнее сохранения
+         прежнего maximum-scale/user-scalable=no; жесты Telegram WebView не переопределяются. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <title>Sasha Math Bot</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>

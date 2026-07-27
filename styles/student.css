@@ -750,6 +750,7 @@
             text-align: center; padding: var(--ca-space-5) var(--ca-space-2);
             color: var(--ca-text-muted); font-size: 13px; line-height: 1.4;
         }
+        .ca-state--loading, .ca-state--empty { color: var(--ca-text-muted); }
         .ca-state--error { color: var(--ca-error); }
 
         /* =====================================================================
@@ -998,7 +999,7 @@
            расставлял инлайновым style (renderShopItem) — теперь верстается только CSS. */
         .shop-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ca-space-1); text-align: right; }
         .shop-buy-btn {
-            box-sizing: border-box; min-height: 36px;
+            box-sizing: border-box; min-height: var(--ca-touch);
             background: var(--ca-gradient-primary); color: var(--ca-on-accent); border: none; border-radius: var(--ca-radius-sm);
             padding: 0 var(--ca-space-4); font-size: var(--text-small); font-weight: 800; cursor: pointer; white-space: nowrap;
         }
@@ -1009,7 +1010,7 @@
         .shop-state.locked { color: var(--ca-text-secondary); }
         .shop-emoji-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ca-space-2); margin-top: 8px; }
         .shop-emoji-chip {
-            box-sizing: border-box; min-width: 40px; min-height: 40px;
+            box-sizing: border-box; min-width: var(--ca-touch); min-height: var(--ca-touch);
             font-size: var(--text-screen); padding: var(--ca-space-1) 8px; border-radius: var(--ca-radius-sm); cursor: pointer;
             background: var(--ca-surface-nested); border: 1px solid var(--ca-border);
         }
@@ -1029,14 +1030,17 @@
            поддержки фон просто остаётся прокручиваемым, как раньше).
            ===================================================================== */
         #custom-title-modal {
-            display: none; position: fixed; inset: 0; z-index: 2000; padding: var(--ca-space-6);
-            background: var(--ca-scrim); align-items: center; justify-content: center;
+            box-sizing: border-box; display: none; position: fixed; inset: 0; z-index: 2000;
+            padding: max(var(--ca-space-6), var(--ca-safe-top)) var(--ca-space-6)
+                max(var(--ca-space-6), var(--ca-safe-bottom));
+            background: var(--ca-scrim); align-items: flex-start; justify-content: center; overflow-y: auto;
         }
         #custom-title-modal.active { display: flex; }
         body:has(#custom-title-modal.active) { overflow: hidden; }
         .custom-title-dialog {
             width: 100%; max-width: 380px; background: var(--ca-surface-elevated); color: var(--tg-text);
-            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-lg); padding: var(--ca-space-6); box-shadow: var(--ca-elev-modal);
+            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-lg); padding: var(--ca-space-6);
+            margin-block: auto; box-shadow: var(--ca-elev-modal);
         }
         .custom-title-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; }
         .custom-title-help { font-size: var(--text-small); color: var(--ca-text-secondary); margin-top: 5px; line-height: 1.4; }
@@ -1098,8 +1102,8 @@
                (align-items:stretch) — без явной width элемент садится по
                содержимому вместо заполнения доступной ширины, и max-width с
                margin:auto не центрируют 480px-колонку, а более узкую. */
-            .screen { width: 100%; max-width: 480px; margin-left: auto; margin-right: auto; }
-            .bottom-nav { width: 480px; max-width: 480px; margin-left: auto; margin-right: auto; }
+            .screen { box-sizing: border-box; width: 100%; max-width: 480px; margin-left: auto; margin-right: auto; }
+            .bottom-nav { width: auto; max-width: 480px; margin-left: auto; margin-right: auto; }
         }
 
         /* =====================================================================
@@ -1485,7 +1489,7 @@
         /* Экипировка в магазине (кнопки Надеть/Снять на купленном). display/margin-bottom
            не нужны: .shop-action теперь flex-колонка с собственным gap (этап 7). */
         .shop-equip-btn {
-            box-sizing: border-box; min-height: 36px;
+            box-sizing: border-box; min-height: var(--ca-touch);
             background: transparent; color: var(--ca-accent); border: 1px solid var(--ca-accent);
             border-radius: var(--ca-radius-sm); padding: 0 var(--ca-space-3); font-size: var(--text-small); font-weight: 700; cursor: pointer; white-space: nowrap;
         }

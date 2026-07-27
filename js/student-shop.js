@@ -57,7 +57,7 @@
                         await grantCollectionBonus(b.season_id);
                     }
                 }
-                section.style.display = '';
+                section.style.display = wrap.childElementCount ? '' : 'none';
 
             } catch (e) {
                 section.style.display = 'none';
@@ -148,6 +148,15 @@
                             const name = document.createElement('div');
                             name.className = 'showcase-name';
                             name.textContent = item.name;
+                            tile.appendChild(name);
+                        } else {
+                            const icon = document.createElement('div');
+                            icon.className = 'showcase-icon';
+                            icon.textContent = '🥯';
+                            const name = document.createElement('div');
+                            name.className = 'showcase-name';
+                            name.textContent = 'Неизвестный предмет';
+                            tile.appendChild(icon);
                             tile.appendChild(name);
                         }
                     }
