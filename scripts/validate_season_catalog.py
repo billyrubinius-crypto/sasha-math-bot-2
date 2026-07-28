@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict offline validator for the 2026–2027 Cosmic Academy catalog."""
+"""Strict offline validator for the calendar-based 2026–2027 season catalog."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -21,44 +21,44 @@ CONTENT_DOC_PATH = ROOT / "docs" / "SEASON_V2_CONTENT_CATALOG.md"
 VISUAL_DOC_PATH = ROOT / "docs" / "SEASON_V2_VISUAL_GUIDE.md"
 
 ROOT_FIELDS = {
-    "catalog_version",
+    "schema_version",
+    "catalog_code",
     "academic_year",
     "timezone",
-    "generated_at",
+    "calendar_policy",
+    "regular_season_duration_days",
     "currency",
-    "cadence",
-    "price_profile",
+    "price_profiles",
     "rarity_rotation",
-    "collections",
     "presets",
 }
-CADENCE_FIELDS = {"regular_days", "summer_interseason_months"}
-PRICE_PROFILE_FIELDS = {"currency", "regular", "summer_provisional", "collection_bonus"}
+PRICE_PROFILE_FIELDS = {"regular", "summer", "collection_completion_bonus"}
 PRICE_TIER_FIELDS = {"common", "rare", "epic", "legendary"}
 ROTATION_FIELDS = {"cycle_length", "by_sequence_mod_4"}
-COLLECTION_FIELDS = {
-    "sequence",
-    "preset_id",
-    "bundle_id",
-    "collection_id",
-    "completion_bonus",
-}
 PRESET_FIELDS = {
-    "preset_id",
-    "sequence",
-    "bundle_id",
-    "collection_id",
-    "name",
-    "description",
+    "preset_code",
+    "sequence_no",
+    "competition_season_no",
+    "bundle_code",
+    "collection_code",
+    "season_type",
+    "start_date",
+    "end_date",
+    "duration_days",
+    "suggested_name",
+    "short_description",
     "theme_key",
-    "schedule_type",
-    "recommended_duration",
+    "economy_profile",
     "pricing_status",
+    "palette",
+    "primary_motif",
+    "secondary_motif",
     "badge_key",
     "avatar_key",
-    "palette",
+    "flagship_slot",
     "flagship_item_code",
     "collection_total_target",
+    "collection_bonus",
     "items",
 }
 ITEM_REQUIRED_FIELDS = {
@@ -82,7 +82,47 @@ SLOTS = ("avatar", "frame", "title", "background")
 RARITIES = ("common", "rare", "epic", "legendary")
 SNAKE_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 HEX_RE = re.compile(r"^#[0-9A-F]{6}$")
-YEAR_RE = re.compile(r"^\d{4}-\d{4}$")
+EXTERNAL_URL_RE = re.compile(r"""(?:href|src)\s*=\s*["'](?:https?:)?//""", re.IGNORECASE)
+
+REGULAR_PRICES = {"common": 100, "rare": 140, "epic": 180, "legendary": 320}
+SUMMER_PRICES = {"common": 90, "rare": 130, "epic": 170, "legendary": 300}
+RARITY_ROTATION = {
+    "1": {"avatar": "legendary", "frame": "rare", "title": "common", "background": "epic"},
+    "2": {"avatar": "rare", "frame": "common", "title": "epic", "background": "legendary"},
+    "3": {"avatar": "common", "frame": "epic", "title": "legendary", "background": "rare"},
+    "0": {"avatar": "epic", "frame": "legendary", "title": "rare", "background": "common"},
+}
+TITLE_TIER_BY_RARITY = {
+    "common": "plain",
+    "rare": "outlined",
+    "epic": "accent",
+    "legendary": "radiant",
+}
+CALENDAR = (
+    (1, None, "interseason", "2026-07-28", "2026-08-01", 4, "Летняя практика"),
+    (2, None, "interseason", "2026-08-01", "2026-09-03", 33, "Перед стартом"),
+    (3, 1, "regular", "2026-09-03", "2026-09-17", 14, "Новый маршрут"),
+    (4, 2, "regular", "2026-09-17", "2026-10-01", 14, "Осенний старт"),
+    (5, 3, "regular", "2026-10-01", "2026-10-15", 14, "Геометрия листопада"),
+    (6, 4, "regular", "2026-10-15", "2026-10-29", 14, "Дождливые задачи"),
+    (7, 5, "regular", "2026-10-29", "2026-11-12", 14, "Точки связи"),
+    (8, 6, "regular", "2026-11-12", "2026-11-26", 14, "Свет в окне"),
+    (9, 7, "regular", "2026-11-26", "2026-12-10", 14, "Первый снег"),
+    (10, 8, "regular", "2026-12-10", "2026-12-24", 14, "Предновогодний отсчёт"),
+    (11, 9, "regular", "2026-12-24", "2027-01-07", 14, "Новогодняя мастерская"),
+    (12, 10, "regular", "2027-01-07", "2027-01-21", 14, "Морозный старт"),
+    (13, 11, "regular", "2027-01-21", "2027-02-04", 14, "Чистый лист"),
+    (14, 12, "regular", "2027-02-04", "2027-02-18", 14, "Февральский ритм"),
+    (15, 13, "regular", "2027-02-18", "2027-03-04", 14, "Сила характера"),
+    (16, 14, "regular", "2027-03-04", "2027-03-18", 14, "Весеннее вдохновение"),
+    (17, 15, "regular", "2027-03-18", "2027-04-01", 14, "Точка равновесия"),
+    (18, 16, "regular", "2027-04-01", "2027-04-15", 14, "Время первых"),
+    (19, 17, "regular", "2027-04-15", "2027-04-29", 14, "Апрельская геометрия"),
+    (20, 18, "regular", "2027-04-29", "2027-05-13", 14, "Майская весна"),
+    (21, 19, "regular", "2027-05-13", "2027-05-27", 14, "Последний звонок"),
+    (22, 20, "regular", "2027-05-27", "2027-06-10", 14, "Экзаменационный рывок"),
+    (23, 21, "regular", "2027-06-10", "2027-06-24", 14, "Начало лета"),
+)
 
 
 class Validation:
@@ -95,331 +135,281 @@ class Validation:
 
     def exact_keys(self, value: Any, expected: set[str], path: str) -> None:
         if not isinstance(value, dict):
-            self.errors.append(f"{path}: ожидался объект")
+            self.errors.append(f"{path}: expected object")
             return
         actual = set(value)
-        unknown = actual - expected
-        missing = expected - actual
-        if unknown:
-            self.errors.append(f"{path}: неизвестные поля: {', '.join(sorted(unknown))}")
-        if missing:
-            self.errors.append(f"{path}: отсутствуют поля: {', '.join(sorted(missing))}")
+        if actual - expected:
+            self.errors.append(f"{path}: unknown fields: {', '.join(sorted(actual - expected))}")
+        if expected - actual:
+            self.errors.append(f"{path}: missing fields: {', '.join(sorted(expected - actual))}")
 
     def snake(self, value: Any, path: str) -> None:
         self.require(
             isinstance(value, str) and bool(SNAKE_RE.fullmatch(value)),
-            f"{path}: нужен ASCII snake_case",
+            f"{path}: expected ASCII snake_case",
         )
 
 
 def load_catalog(check: Validation) -> dict[str, Any]:
     try:
-        raw = CATALOG_PATH.read_text(encoding="utf-8")
-    except OSError as exc:
-        check.errors.append(f"catalog: не удалось прочитать {CATALOG_PATH}: {exc}")
-        return {}
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        check.errors.append(f"catalog: некорректный JSON: {exc}")
+        parsed = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        check.errors.append(f"catalog: cannot load valid JSON: {exc}")
         return {}
     if not isinstance(parsed, dict):
-        check.errors.append("catalog: корень JSON должен быть объектом")
+        check.errors.append("catalog: root must be an object")
         return {}
     return parsed
 
 
 def css_class_from_payload(payload: str) -> str:
     if payload.startswith("season_frame_"):
-        prefix = "season-frame-"
-        tail = payload.removeprefix("season_frame_")
-    elif payload.startswith("season_bg_"):
-        prefix = "season-bg-"
-        tail = payload.removeprefix("season_bg_")
-    else:
-        return ""
-    return prefix + tail.replace("_", "-")
+        return "season-frame-" + payload.removeprefix("season_frame_").replace("_", "-")
+    if payload.startswith("season_bg_"):
+        return "season-bg-" + payload.removeprefix("season_bg_").replace("_", "-")
+    return ""
 
 
-def validate_structure(catalog: dict[str, Any], check: Validation) -> None:
+def validate_root(catalog: dict[str, Any], check: Validation) -> None:
     check.exact_keys(catalog, ROOT_FIELDS, "catalog")
-    if check.errors and not catalog:
-        return
-
-    check.require(catalog.get("catalog_version") == "2.0.0", "catalog.catalog_version: ожидалось 2.0.0")
+    check.require(catalog.get("schema_version") == 2, "catalog.schema_version: expected 2")
     check.require(
-        isinstance(catalog.get("academic_year"), str)
-        and bool(YEAR_RE.fullmatch(catalog["academic_year"])),
-        "catalog.academic_year: ожидался формат YYYY-YYYY",
+        catalog.get("catalog_code") == "cosmic_academy_2026_2027_v2",
+        "catalog.catalog_code: unexpected value",
     )
-    check.require(catalog.get("timezone") == "Europe/Moscow", "catalog.timezone: ожидалось Europe/Moscow")
-    check.require(catalog.get("currency") == "gears", "catalog.currency: ожидалось gears")
-    try:
-        datetime.fromisoformat(str(catalog.get("generated_at")))
-    except ValueError:
-        check.errors.append("catalog.generated_at: нужна ISO-8601 дата")
+    check.require(catalog.get("academic_year") == "2026-2027", "catalog.academic_year: expected 2026-2027")
+    check.require(catalog.get("timezone") == "Europe/Moscow", "catalog.timezone: expected Europe/Moscow")
+    check.require(catalog.get("calendar_policy") == "fixed_2026_2027", "catalog.calendar_policy: unexpected value")
+    check.require(catalog.get("regular_season_duration_days") == 14, "catalog.regular_season_duration_days: expected 14")
+    check.require(catalog.get("currency") == "gears", "catalog.currency: expected gears")
 
-    cadence = catalog.get("cadence")
-    check.exact_keys(cadence, CADENCE_FIELDS, "catalog.cadence")
-    if isinstance(cadence, dict):
-        check.require(cadence.get("regular_days") == 14, "catalog.cadence.regular_days: ожидалось 14")
-        check.require(
-            cadence.get("summer_interseason_months") == ["july", "august"],
-            "catalog.cadence.summer_interseason_months: ожидались july, august",
-        )
-
-    price_profile = catalog.get("price_profile")
-    check.exact_keys(price_profile, PRICE_PROFILE_FIELDS, "catalog.price_profile")
-    if isinstance(price_profile, dict):
-        check.require(price_profile.get("currency") == "gears", "price_profile.currency: ожидалось gears")
-        check.require(price_profile.get("collection_bonus") == 50, "price_profile.collection_bonus: ожидалось 50")
-        for key, expected in (
-            ("regular", {"common": 100, "rare": 140, "epic": 180, "legendary": 320}),
-            ("summer_provisional", {"common": 90, "rare": 130, "epic": 170, "legendary": 300}),
-        ):
-            tiers = price_profile.get(key)
-            check.exact_keys(tiers, PRICE_TIER_FIELDS, f"price_profile.{key}")
-            check.require(tiers == expected, f"price_profile.{key}: профиль цен изменён")
+    prices = catalog.get("price_profiles")
+    check.exact_keys(prices, PRICE_PROFILE_FIELDS, "catalog.price_profiles")
+    if isinstance(prices, dict):
+        check.exact_keys(prices.get("regular"), PRICE_TIER_FIELDS, "catalog.price_profiles.regular")
+        check.exact_keys(prices.get("summer"), PRICE_TIER_FIELDS, "catalog.price_profiles.summer")
+        check.require(prices.get("regular") == REGULAR_PRICES, "regular price profile changed")
+        check.require(prices.get("summer") == SUMMER_PRICES, "summer price profile changed")
+        check.require(prices.get("collection_completion_bonus") == 50, "collection completion bonus must be 50")
 
     rotation = catalog.get("rarity_rotation")
     check.exact_keys(rotation, ROTATION_FIELDS, "catalog.rarity_rotation")
-    expected_rotation = {
-        "1": {"avatar": "legendary", "frame": "rare", "title": "common", "background": "epic"},
-        "2": {"avatar": "rare", "frame": "common", "title": "epic", "background": "legendary"},
-        "3": {"avatar": "common", "frame": "epic", "title": "legendary", "background": "rare"},
-        "0": {"avatar": "epic", "frame": "legendary", "title": "rare", "background": "common"},
-    }
     if isinstance(rotation, dict):
-        check.require(rotation.get("cycle_length") == 4, "rarity_rotation.cycle_length: ожидалось 4")
-        check.require(
-            rotation.get("by_sequence_mod_4") == expected_rotation,
-            "rarity_rotation.by_sequence_mod_4: схема ротации изменена",
-        )
+        check.require(rotation.get("cycle_length") == 4, "rarity rotation cycle must be 4")
+        check.require(rotation.get("by_sequence_mod_4") == RARITY_ROTATION, "rarity rotation map changed")
 
 
-def validate_collections(catalog: dict[str, Any], check: Validation) -> dict[int, dict[str, Any]]:
-    rows = catalog.get("collections")
-    check.require(isinstance(rows, list), "catalog.collections: ожидался массив")
-    if not isinstance(rows, list):
-        return {}
-    check.require(len(rows) == 23, f"catalog.collections: ожидалось 23, получено {len(rows)}")
-    by_sequence: dict[int, dict[str, Any]] = {}
-    ids: list[str] = []
-    for index, row in enumerate(rows):
-        path = f"collections[{index}]"
-        check.exact_keys(row, COLLECTION_FIELDS, path)
-        if not isinstance(row, dict):
+def validate_calendar(presets: list[dict[str, Any]], check: Validation) -> None:
+    check.require(len(presets) == len(CALENDAR), f"presets: expected 23, got {len(presets)}")
+    parsed_ranges: list[tuple[date, date]] = []
+    for index, expected in enumerate(CALENDAR):
+        if index >= len(presets) or not isinstance(presets[index], dict):
             continue
-        sequence = row.get("sequence")
-        check.require(isinstance(sequence, int), f"{path}.sequence: ожидалось целое число")
-        if isinstance(sequence, int):
-            check.require(sequence not in by_sequence, f"{path}.sequence: дубль {sequence}")
-            by_sequence[sequence] = row
-        for key in ("preset_id", "bundle_id", "collection_id"):
-            check.snake(row.get(key), f"{path}.{key}")
-        if isinstance(row.get("collection_id"), str):
-            ids.append(row["collection_id"])
-        check.require(row.get("completion_bonus") == 50, f"{path}.completion_bonus: ожидалось 50")
-    check.require(set(by_sequence) == set(range(1, 24)), "collections.sequence: нужна непрерывная последовательность 1..23")
-    check.require(len(ids) == len(set(ids)), "collections.collection_id: найдены дубли")
-    return by_sequence
+        sequence, competition, kind, start, end, duration, name = expected
+        preset = presets[index]
+        path = f"presets[{index}]"
+        for key, expected_value in (
+            ("sequence_no", sequence),
+            ("competition_season_no", competition),
+            ("season_type", kind),
+            ("start_date", start),
+            ("end_date", end),
+            ("duration_days", duration),
+            ("suggested_name", name),
+        ):
+            check.require(preset.get(key) == expected_value, f"{path}.{key}: expected {expected_value!r}")
+        try:
+            start_date = date.fromisoformat(str(preset.get("start_date")))
+            end_date = date.fromisoformat(str(preset.get("end_date")))
+        except ValueError:
+            check.errors.append(f"{path}: invalid ISO calendar date")
+            continue
+        check.require((end_date - start_date).days == duration, f"{path}: date range is not {duration} days")
+        if kind == "regular":
+            check.require(start_date.weekday() == 3, f"{path}.start_date: regular boundary must be Thursday")
+            check.require(end_date.weekday() == 3, f"{path}.end_date: regular boundary must be Thursday")
+        parsed_ranges.append((start_date, end_date))
+
+    for index in range(len(parsed_ranges) - 1):
+        check.require(
+            parsed_ranges[index][1] == parsed_ranges[index + 1][0],
+            f"calendar: gap or overlap between sequences {index + 1} and {index + 2}",
+        )
+    if len(parsed_ranges) == 23:
+        check.require(parsed_ranges[2][0].isoformat() == "2026-09-03", "regular calendar must start on 2026-09-03")
+        check.require(parsed_ranges[-1][1].isoformat() == "2027-06-24", "regular calendar must end on 2027-06-24")
 
 
-def validate_presets(
-    catalog: dict[str, Any],
-    collection_by_sequence: dict[int, dict[str, Any]],
-    check: Validation,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def validate_presets(catalog: dict[str, Any], check: Validation) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     presets = catalog.get("presets")
-    check.require(isinstance(presets, list), "catalog.presets: ожидался массив")
+    check.require(isinstance(presets, list), "catalog.presets: expected array")
     if not isinstance(presets, list):
         return [], []
-    check.require(len(presets) == 23, f"catalog.presets: ожидалось 23, получено {len(presets)}")
+    validate_calendar(presets, check)
 
+    prices = catalog.get("price_profiles", {})
     all_items: list[dict[str, Any]] = []
-    ids: defaultdict[str, list[str]] = defaultdict(list)
-    schedule_counts: Counter[str] = Counter()
-    price_profile = catalog.get("price_profile", {})
-    rarity_rotation = catalog.get("rarity_rotation", {}).get("by_sequence_mod_4", {})
+    unique_values: defaultdict[str, list[str]] = defaultdict(list)
+    type_counts: Counter[str] = Counter()
 
     for index, preset in enumerate(presets):
         path = f"presets[{index}]"
         check.exact_keys(preset, PRESET_FIELDS, path)
         if not isinstance(preset, dict):
             continue
-        sequence = preset.get("sequence")
-        check.require(sequence == index + 1, f"{path}.sequence: ожидалось {index + 1}")
-        for key in ("preset_id", "bundle_id", "collection_id", "theme_key", "badge_key", "avatar_key", "flagship_item_code"):
-            check.snake(preset.get(key), f"{path}.{key}")
-            if isinstance(preset.get(key), str):
-                ids[key].append(preset[key])
+        sequence = preset.get("sequence_no")
+        kind = preset.get("season_type")
+        is_summer = kind == "interseason"
+        type_counts[str(kind)] += 1
 
-        for key in ("name", "description"):
+        for key in (
+            "preset_code",
+            "bundle_code",
+            "collection_code",
+            "theme_key",
+            "economy_profile",
+            "badge_key",
+            "avatar_key",
+            "flagship_slot",
+            "flagship_item_code",
+            "primary_motif",
+            "secondary_motif",
+        ):
+            check.snake(preset.get(key), f"{path}.{key}")
+            if key in {"preset_code", "bundle_code", "collection_code", "theme_key", "badge_key"}:
+                if isinstance(preset.get(key), str):
+                    unique_values[key].append(preset[key])
+
+        for key in ("suggested_name", "short_description"):
             check.require(
                 isinstance(preset.get(key), str) and bool(preset[key].strip()),
-                f"{path}.{key}: требуется непустая строка",
+                f"{path}.{key}: expected non-empty string",
             )
-
-        schedule_type = preset.get("schedule_type")
-        schedule_counts[str(schedule_type)] += 1
-        is_summer = schedule_type == "summer_interseason"
-        check.require(schedule_type in {"regular", "summer_interseason"}, f"{path}.schedule_type: неизвестное значение")
+        check.require(kind in {"regular", "interseason"}, f"{path}.season_type: unexpected value")
         check.require(
-            preset.get("recommended_duration") == (31 if is_summer else 14),
-            f"{path}.recommended_duration: неверная длительность",
+            preset.get("economy_profile") == ("summer" if is_summer else "regular"),
+            f"{path}.economy_profile: does not match season type",
         )
         check.require(
             preset.get("pricing_status") == ("provisional" if is_summer else "recommended"),
-            f"{path}.pricing_status: неверный статус",
+            f"{path}.pricing_status: does not match season type",
         )
         expected_total = 690 if is_summer else 740
-        check.require(
-            preset.get("collection_total_target") == expected_total,
-            f"{path}.collection_total_target: ожидалось {expected_total}",
-        )
+        check.require(preset.get("collection_total_target") == expected_total, f"{path}: collection total must be {expected_total}")
+        check.require(preset.get("collection_bonus") == 50, f"{path}.collection_bonus: expected 50")
+        check.require(preset.get("flagship_slot") in SLOTS, f"{path}.flagship_slot: unexpected value")
 
         palette = preset.get("palette")
-        check.require(isinstance(palette, list) and len(palette) >= 5, f"{path}.palette: нужно не меньше 5 цветов")
+        check.require(isinstance(palette, list) and len(palette) == 5, f"{path}.palette: expected 5 colors")
         if isinstance(palette, list):
-            check.require(len(palette) == len(set(palette)), f"{path}.palette: цвета должны различаться")
+            check.require(len(palette) == len(set(palette)), f"{path}.palette: colors must be unique")
             for color_index, color in enumerate(palette):
                 check.require(
                     isinstance(color, str) and bool(HEX_RE.fullmatch(color)),
-                    f"{path}.palette[{color_index}]: нужен HEX #RRGGBB в верхнем регистре",
-                )
-
-        collection_row = collection_by_sequence.get(sequence) if isinstance(sequence, int) else None
-        if collection_row:
-            for key in ("preset_id", "bundle_id", "collection_id"):
-                check.require(
-                    preset.get(key) == collection_row.get(key),
-                    f"{path}.{key}: не совпадает с collections[{sequence}]",
+                    f"{path}.palette[{color_index}]: expected uppercase #RRGGBB",
                 )
 
         items = preset.get("items")
-        check.require(isinstance(items, list), f"{path}.items: ожидался массив")
+        check.require(isinstance(items, list), f"{path}.items: expected array")
         if not isinstance(items, list):
             continue
-        check.require(len(items) == 4, f"{path}.items: ожидалось 4, получено {len(items)}")
-        slot_counter = Counter(item.get("slot") for item in items if isinstance(item, dict))
+        check.require(len(items) == 4, f"{path}.items: expected 4")
         check.require(
-            slot_counter == Counter({slot: 1 for slot in SLOTS}),
-            f"{path}.items: нужен ровно один предмет каждого слота",
+            Counter(item.get("slot") for item in items if isinstance(item, dict))
+            == Counter({slot: 1 for slot in SLOTS}),
+            f"{path}.items: expected each slot exactly once",
         )
-        rarity_counter = Counter(item.get("rarity") for item in items if isinstance(item, dict))
         check.require(
-            rarity_counter == Counter({rarity: 1 for rarity in RARITIES}),
-            f"{path}.items: нужны четыре разные редкости",
+            Counter(item.get("rarity") for item in items if isinstance(item, dict))
+            == Counter({rarity: 1 for rarity in RARITIES}),
+            f"{path}.items: expected each rarity exactly once",
         )
 
-        expected_rarities = rarity_rotation.get(str(sequence % 4)) if isinstance(sequence, int) else None
-        price_key = "summer_provisional" if is_summer else "regular"
-        expected_prices = price_profile.get(price_key, {}) if isinstance(price_profile, dict) else {}
+        rotation_key = str(sequence % 4) if isinstance(sequence, int) else ""
+        expected_rarities = RARITY_ROTATION.get(rotation_key, {})
+        expected_prices = prices.get("summer" if is_summer else "regular", {}) if isinstance(prices, dict) else {}
         total = 0
-        flagship_count = 0
+        flagship_matches = 0
 
         for item_index, item in enumerate(items):
             item_path = f"{path}.items[{item_index}]"
             if not isinstance(item, dict):
-                check.errors.append(f"{item_path}: ожидался объект")
+                check.errors.append(f"{item_path}: expected object")
                 continue
             actual_fields = set(item)
             unknown = actual_fields - ITEM_REQUIRED_FIELDS - ITEM_OPTIONAL_FIELDS
             missing = ITEM_REQUIRED_FIELDS - actual_fields
             if unknown:
-                check.errors.append(f"{item_path}: неизвестные поля: {', '.join(sorted(unknown))}")
+                check.errors.append(f"{item_path}: unknown fields: {', '.join(sorted(unknown))}")
             if missing:
-                check.errors.append(f"{item_path}: отсутствуют поля: {', '.join(sorted(missing))}")
+                check.errors.append(f"{item_path}: missing fields: {', '.join(sorted(missing))}")
 
             for key in ("item_code", "asset_key", "render_payload"):
                 check.snake(item.get(key), f"{item_path}.{key}")
                 if isinstance(item.get(key), str):
-                    ids[key].append(item[key])
+                    unique_values[key].append(item[key])
             for key in ("name", "description"):
                 check.require(
                     isinstance(item.get(key), str) and bool(item[key].strip()),
-                    f"{item_path}.{key}: требуется непустая строка",
+                    f"{item_path}.{key}: expected non-empty string",
                 )
-                if key == "name" and isinstance(item.get(key), str):
-                    ids["item_name"].append(item[key])
 
             slot = item.get("slot")
             rarity = item.get("rarity")
-            check.require(slot in SLOTS, f"{item_path}.slot: неизвестный слот")
-            check.require(rarity in RARITIES, f"{item_path}.rarity: неизвестная редкость")
-            if isinstance(expected_rarities, dict) and slot in SLOTS:
-                check.require(
-                    rarity == expected_rarities.get(slot),
-                    f"{item_path}.rarity: нарушена ротация для sequence={sequence}, slot={slot}",
-                )
-            check.require(item.get("item_kind") == "cosmetic", f"{item_path}.item_kind: ожидалось cosmetic")
-            check.require(item.get("currency") == "gears", f"{item_path}.currency: ожидалось gears")
-            check.require(item.get("availability") == "rotation", f"{item_path}.availability: ожидалось rotation")
-            check.require(item.get("is_active") is True, f"{item_path}.is_active: ожидалось true")
-            check.require(item.get("sort_order") == (item_index + 1) * 10, f"{item_path}.sort_order: неверный порядок")
+            check.require(slot in SLOTS, f"{item_path}.slot: unexpected value")
+            check.require(rarity in RARITIES, f"{item_path}.rarity: unexpected value")
+            if slot in SLOTS:
+                check.require(rarity == expected_rarities.get(slot), f"{item_path}.rarity: rotation mismatch")
+            check.require(item.get("item_kind") == "cosmetic", f"{item_path}.item_kind: expected cosmetic")
+            check.require(item.get("currency") == "gears", f"{item_path}.currency: expected gears")
+            check.require(item.get("availability") == "rotation", f"{item_path}.availability: expected rotation")
+            check.require(item.get("is_active") is True, f"{item_path}.is_active: expected true")
+            check.require(item.get("sort_order") == (item_index + 1) * 10, f"{item_path}.sort_order: unexpected value")
             if rarity in expected_prices:
-                check.require(
-                    item.get("price") == expected_prices[rarity],
-                    f"{item_path}.price: для {rarity} ожидалось {expected_prices[rarity]}",
-                )
+                check.require(item.get("price") == expected_prices[rarity], f"{item_path}.price: profile mismatch")
             if isinstance(item.get("price"), int):
                 total += item["price"]
 
             if slot == "title":
+                check.require(ITEM_OPTIONAL_FIELDS <= actual_fields, f"{item_path}: title fields are required")
                 check.require(
-                    ITEM_OPTIONAL_FIELDS <= actual_fields,
-                    f"{item_path}: у title нужны title_visual_tier и title_icon_hint",
+                    item.get("title_visual_tier") == TITLE_TIER_BY_RARITY.get(rarity),
+                    f"{item_path}.title_visual_tier: rarity tier mismatch",
                 )
-                check.snake(item.get("title_visual_tier"), f"{item_path}.title_visual_tier")
                 check.snake(item.get("title_icon_hint"), f"{item_path}.title_icon_hint")
             else:
-                check.require(
-                    not (actual_fields & ITEM_OPTIONAL_FIELDS),
-                    f"{item_path}: title-поля разрешены только слоту title",
-                )
+                check.require(not actual_fields & ITEM_OPTIONAL_FIELDS, f"{item_path}: title fields only belong to title slot")
 
             if item.get("item_code") == preset.get("flagship_item_code"):
-                flagship_count += 1
-                check.require(rarity == "legendary", f"{item_path}: flagship должен быть legendary")
-
+                flagship_matches += 1
+                check.require(item.get("slot") == preset.get("flagship_slot"), f"{item_path}: flagship slot mismatch")
+                check.require(rarity == "legendary", f"{item_path}: flagship item must be legendary")
             all_items.append(item)
 
-        check.require(total == expected_total, f"{path}.items: сумма цен {total}, ожидалось {expected_total}")
-        check.require(flagship_count == 1, f"{path}.flagship_item_code: должен указывать ровно на один предмет")
-        avatar_items = [item for item in items if isinstance(item, dict) and item.get("slot") == "avatar"]
-        if avatar_items:
-            check.require(
-                preset.get("avatar_key") == avatar_items[0].get("asset_key"),
-                f"{path}.avatar_key: не совпадает с avatar asset_key",
-            )
+        check.require(total == expected_total, f"{path}.items: total {total}, expected {expected_total}")
+        check.require(flagship_matches == 1, f"{path}.flagship_item_code: expected one matching item")
+        avatars = [item for item in items if isinstance(item, dict) and item.get("slot") == "avatar"]
+        if avatars:
+            check.require(preset.get("avatar_key") == avatars[0].get("asset_key"), f"{path}.avatar_key: avatar asset mismatch")
 
-    check.require(
-        [preset.get("sequence") for preset in presets if isinstance(preset, dict)] == list(range(1, 24)),
-        "presets.sequence: нужна непрерывная последовательность 1..23",
-    )
-    check.require(schedule_counts == Counter({"regular": 21, "summer_interseason": 2}), "presets: нужно 21 regular и 2 summer_interseason")
-    if len(presets) >= 23:
-        check.require(presets[21].get("name") == "Летнее межсезонье I — июль", "preset 22: неверное рабочее название")
-        check.require(presets[22].get("name") == "Летнее межсезонье II — август", "preset 23: неверное рабочее название")
-
-    for key, values in ids.items():
-        duplicates = sorted(name for name, count in Counter(values).items() if count > 1)
-        check.require(not duplicates, f"{key}: найдены дубли: {', '.join(duplicates)}")
+    check.require(type_counts == Counter({"regular": 21, "interseason": 2}), "presets: expected 21 regular and 2 interseason")
+    for key, values in unique_values.items():
+        duplicates = sorted(value for value, count in Counter(values).items() if count > 1)
+        check.require(not duplicates, f"{key}: duplicates: {', '.join(duplicates)}")
     return presets, all_items
 
 
 def validate_counts(presets: list[dict[str, Any]], items: list[dict[str, Any]], check: Validation) -> None:
+    check.require(len(items) == 92, f"items: expected 92, got {len(items)}")
     slot_counts = Counter(item.get("slot") for item in items)
+    check.require(slot_counts == Counter({slot: 23 for slot in SLOTS}), f"items: bad slot totals {dict(slot_counts)}")
     rarity_counts = Counter(item.get("rarity") for item in items)
-    check.require(len(items) == 92, f"items: ожидалось 92, получено {len(items)}")
     check.require(
-        slot_counts == Counter({slot: 23 for slot in SLOTS}),
-        f"items: распределение слотов неверно: {dict(slot_counts)}",
+        rarity_counts == Counter({rarity: 23 for rarity in RARITIES}),
+        f"items: bad rarity totals {dict(rarity_counts)}",
     )
-    expected_rarity_totals = {"common": 23, "rare": 23, "epic": 23, "legendary": 23}
-    check.require(dict(rarity_counts) == expected_rarity_totals, f"items: распределение редкостей неверно: {dict(rarity_counts)}")
 
-    matrix: dict[str, Counter[str]] = {slot: Counter() for slot in SLOTS}
+    matrix = {slot: Counter() for slot in SLOTS}
     for item in items:
         if item.get("slot") in matrix:
             matrix[item["slot"]][item.get("rarity")] += 1
@@ -430,61 +420,56 @@ def validate_counts(presets: list[dict[str, Any]], items: list[dict[str, Any]], 
         "background": {"common": 5, "rare": 6, "epic": 6, "legendary": 6},
     }
     for slot, expected in expected_matrix.items():
-        check.require(dict(matrix[slot]) == expected, f"rarity matrix {slot}: {dict(matrix[slot])}, ожидалось {expected}")
-
-    unique_theme_keys = {preset.get("theme_key") for preset in presets}
-    check.require(len(unique_theme_keys) == 23, "presets.theme_key: ожидалось 23 уникальных значения")
+        check.require(dict(matrix[slot]) == expected, f"rarity matrix {slot}: got {dict(matrix[slot])}")
+    check.require(len({preset.get("theme_key") for preset in presets}) == 23, "presets.theme_key: expected 23 unique values")
 
 
 def validate_assets_and_preview(items: list[dict[str, Any]], check: Validation) -> None:
     avatar_items = [item for item in items if item.get("slot") == "avatar"]
-    expected_avatar_files = {f"{item.get('asset_key')}.svg" for item in avatar_items}
-    actual_avatar_files = {path.name for path in AVATAR_DIR.glob("*.svg")} if AVATAR_DIR.exists() else set()
-    check.require(
-        actual_avatar_files == expected_avatar_files,
-        "assets/season-avatars: набор SVG не совпадает с 23 avatar asset_key",
-    )
-    for filename in sorted(expected_avatar_files & actual_avatar_files):
+    expected_files = {f"{item.get('asset_key')}.svg" for item in avatar_items}
+    actual_files = {path.name for path in AVATAR_DIR.glob("*.svg")} if AVATAR_DIR.exists() else set()
+    check.require(actual_files == expected_files, "assets/season-avatars: SVG set does not match the 23 avatar keys")
+    for filename in sorted(expected_files & actual_files):
         path = AVATAR_DIR / filename
         try:
             svg = path.read_text(encoding="utf-8")
         except OSError as exc:
-            check.errors.append(f"{path}: не удалось прочитать SVG: {exc}")
+            check.errors.append(f"{path}: cannot read SVG: {exc}")
             continue
-        check.require("<svg" in svg and 'viewBox="0 0 512 512"' in svg, f"{path}: нужен SVG viewBox 0 0 512 512")
-        check.require("<title>" in svg and "<desc>" in svg, f"{path}: нужны доступные title и desc")
+        lowered = svg.lower()
+        check.require("<svg" in lowered and 'viewbox="0 0 512 512"' in lowered, f"{path}: expected viewBox 0 0 512 512")
+        check.require("<title>" in lowered and "<desc>" in lowered, f"{path}: expected accessible title and desc")
+        check.require("<script" not in lowered, f"{path}: scripts are forbidden")
+        check.require(not EXTERNAL_URL_RE.search(svg), f"{path}: external href/src is forbidden")
 
     try:
         css = CSS_PATH.read_text(encoding="utf-8")
     except OSError as exc:
-        check.errors.append(f"styles: не удалось прочитать {CSS_PATH}: {exc}")
+        check.errors.append(f"styles: cannot read {CSS_PATH}: {exc}")
         css = ""
+    check.require(not re.search(r"url\(\s*['\"]?https?://", css, re.IGNORECASE), "styles: external CSS URLs are forbidden")
     for item in items:
-        slot = item.get("slot")
-        if slot not in {"frame", "background"}:
+        if item.get("slot") not in {"frame", "background"}:
             continue
         payload = item.get("render_payload")
         if not isinstance(payload, str):
             continue
         class_name = css_class_from_payload(payload)
-        check.require(
-            bool(class_name) and f".{class_name}" in css,
-            f"styles: нет selector .{class_name} для {item.get('item_code')}",
-        )
-        if slot == "background":
+        check.require(bool(class_name) and f".{class_name}" in css, f"styles: missing .{class_name}")
+        if item.get("slot") == "background":
             check.require(
                 f'html[data-ca-theme="light"] .{class_name}' in css,
-                f"styles: нет light selector для .{class_name}",
+                f"styles: missing light selector for .{class_name}",
             )
             check.require(
                 f'html[data-ca-theme="dark"] .{class_name}' in css,
-                f"styles: нет dark selector для .{class_name}",
+                f"styles: missing dark selector for .{class_name}",
             )
 
     try:
         preview = PREVIEW_PATH.read_text(encoding="utf-8")
     except OSError as exc:
-        check.errors.append(f"preview: не удалось прочитать {PREVIEW_PATH}: {exc}")
+        check.errors.append(f"preview: cannot read {PREVIEW_PATH}: {exc}")
         preview = ""
     for marker in (
         "../styles/student.css",
@@ -493,40 +478,42 @@ def validate_assets_and_preview(items: list[dict[str, Any]], check: Validation) 
         "themeToggle",
         "seasonFilter",
         "rarityFilter",
+        "viewportFilter",
+        "nextPeriodButton",
         "previewModal",
     ):
-        check.require(marker in preview, f"preview: отсутствует обязательный marker {marker}")
+        check.require(marker in preview, f"preview: missing required marker {marker}")
 
-    for doc_path in (CONTENT_DOC_PATH, VISUAL_DOC_PATH):
-        check.require(doc_path.is_file(), f"docs: отсутствует {doc_path.name}")
+    try:
+        content_doc = CONTENT_DOC_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        check.errors.append(f"docs: cannot read {CONTENT_DOC_PATH}: {exc}")
+        content_doc = ""
+    try:
+        visual_doc = VISUAL_DOC_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        check.errors.append(f"docs: cannot read {VISUAL_DOC_PATH}: {exc}")
+        visual_doc = ""
+    check.require("## Версия 2: календарно-сезонная концепция" in content_doc, "content doc: missing V2 heading")
+    check.require("50% реальный сезон" in visual_doc, "visual doc: missing 50/30/20 formula")
 
 
 def print_summary(presets: list[dict[str, Any]], items: list[dict[str, Any]]) -> None:
     slot_counts = Counter(item.get("slot") for item in items)
-    schedule_counts = Counter(preset.get("schedule_type") for preset in presets)
-    matrix: dict[str, Counter[str]] = {slot: Counter() for slot in SLOTS}
+    type_counts = Counter(preset.get("season_type") for preset in presets)
+    matrix = {slot: Counter() for slot in SLOTS}
     for item in items:
-        slot = item.get("slot")
-        rarity = item.get("rarity")
-        if slot in matrix:
-            matrix[slot][rarity] += 1
-
-    print(f"OK: presets={len(presets)}, collections={len(presets)}, items={len(items)}")
-    print(
-        "Schedules: "
-        f"regular={schedule_counts['regular']}, "
-        f"summer_interseason={schedule_counts['summer_interseason']}"
-    )
+        if item.get("slot") in matrix:
+            matrix[item["slot"]][item.get("rarity")] += 1
+    print(f"OK: schema=2, presets={len(presets)}, items={len(items)}")
+    print("Calendar: 2026-07-28 .. 2027-06-24 (end exclusive), timezone=Europe/Moscow")
+    print(f"Periods: interseason={type_counts['interseason']}, regular={type_counts['regular']}")
     print("Slots: " + ", ".join(f"{slot}={slot_counts[slot]}" for slot in SLOTS))
-    print("Rarity distribution by slot:")
     print("slot        common  rare  epic  legendary")
     for slot in SLOTS:
         print(
-            f"{slot:<10}"
-            f"{matrix[slot]['common']:>7}"
-            f"{matrix[slot]['rare']:>6}"
-            f"{matrix[slot]['epic']:>6}"
-            f"{matrix[slot]['legendary']:>11}"
+            f"{slot:<10}{matrix[slot]['common']:>7}{matrix[slot]['rare']:>6}"
+            f"{matrix[slot]['epic']:>6}{matrix[slot]['legendary']:>11}"
         )
 
 
@@ -534,20 +521,17 @@ def main() -> int:
     check = Validation()
     catalog = load_catalog(check)
     if catalog:
-        validate_structure(catalog, check)
-        collection_by_sequence = validate_collections(catalog, check)
-        presets, items = validate_presets(catalog, collection_by_sequence, check)
+        validate_root(catalog, check)
+        presets, items = validate_presets(catalog, check)
         validate_counts(presets, items, check)
         validate_assets_and_preview(items, check)
     else:
         presets, items = [], []
-
     if check.errors:
         print(f"FAILED: {len(check.errors)} error(s)", file=sys.stderr)
         for error in check.errors:
             print(f"- {error}", file=sys.stderr)
         return 1
-
     print_summary(presets, items)
     return 0
 
