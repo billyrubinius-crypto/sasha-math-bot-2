@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Хронометрический агент</title>
+  <desc>Агент с часовым визором и меткой текущего этапа.</desc>
+  <defs>
+    <linearGradient id="bg" x1="58" y1="45" x2="455" y2="464" gradientUnits="userSpaceOnUse"><stop stop-color="#0F766E"/><stop offset=".48" stop-color="#2563EB"/><stop offset="1" stop-color="#10272B"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#F0FDFA"/><stop offset="1" stop-color="#F59E0B"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="195" fill="none" stroke="#F0FDFA" stroke-width="7" stroke-dasharray="4 22" opacity=".62"/>
+  <path d="M120 439c21-86 66-131 136-131s115 45 136 131" fill="#10272B" stroke="#0F766E" stroke-width="12"/>
+  <path d="M149 212c0-70 46-117 107-117s107 47 107 117v66c0 63-45 103-107 103s-107-40-107-103z" fill="#163752" stroke="#F0FDFA" stroke-width="12"/>
+  <path d="M169 173h174v119H169z" fill="url(#glass)"/>
+  <circle cx="256" cy="232" r="48" fill="none" stroke="#2563EB" stroke-width="10"/>
+  <path d="M256 232v-31m0 31 31 18" stroke="#0F766E" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="256" cy="232" r="10" fill="#F59E0B"/>
+  <path d="M218 332h76" stroke="#F59E0B" stroke-width="11" stroke-linecap="round"/>
+  <path d="M226 73h60" stroke="#F0FDFA" stroke-width="15" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Полярный навигатор</title>
+  <desc>Полярный навигатор с компасом и северным сиянием.</desc>
+  <defs>
+    <linearGradient id="bg" x1="61" y1="44" x2="450" y2="466" gradientUnits="userSpaceOnUse"><stop stop-color="#0EA5E9"/><stop offset=".45" stop-color="#2DD4BF"/><stop offset="1" stop-color="#10243B"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#F0FDFF"/><stop offset="1" stop-color="#A5B4FC"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <path d="M57 166c72-63 130-63 175 0s103 63 174 0c18-16 34-25 49-29" fill="none" stroke="#A5B4FC" stroke-width="18" opacity=".5"/>
+  <path d="M115 440c25-88 72-132 141-132s116 44 141 132" fill="#10243B" stroke="#2DD4BF" stroke-width="12"/>
+  <path d="M139 218c0-79 50-129 117-129s117 50 117 129v60c0 64-49 103-117 103s-117-39-117-103z" fill="#17344F" stroke="#F0FDFF" stroke-width="14"/>
+  <path d="M164 172h184v121H164z" fill="url(#glass)"/>
+  <circle cx="256" cy="232" r="48" fill="none" stroke="#0EA5E9" stroke-width="10"/>
+  <path d="m256 184 15 48-15 48-15-48z" fill="#0F766E"/>
+  <path d="M215 330h82" stroke="#A5B4FC" stroke-width="11" stroke-linecap="round"/>
+  <path d="M139 148 98 117M373 148l41-31" stroke="#F0FDFF" stroke-width="13" stroke-linecap="round"/>
+</svg>

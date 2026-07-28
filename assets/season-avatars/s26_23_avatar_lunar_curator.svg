@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Лунный куратор</title>
+  <desc>Куратор августовской смены с полумесяцем на визоре.</desc>
+  <defs>
+    <linearGradient id="bg" x1="57" y1="44" x2="455" y2="465" gradientUnits="userSpaceOnUse"><stop stop-color="#6366F1"/><stop offset=".5" stop-color="#0EA5E9"/><stop offset="1" stop-color="#14172F"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#EEF2FF"/><stop offset="1" stop-color="#F472B6"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <path d="M94 355c64-33 125-33 183 0s115 33 171 0M76 391c72-34 139-34 201 0s120 34 177 0" fill="none" stroke="#EEF2FF" stroke-width="8" opacity=".45"/>
+  <g fill="#EEF2FF"><circle cx="95" cy="111" r="8"/><circle cx="148" cy="70" r="5"/><circle cx="411" cy="154" r="7"/><circle cx="427" cy="95" r="4"/></g>
+  <path d="M119 439c22-85 67-130 137-130s115 45 137 130" fill="#14172F" stroke="#6366F1" stroke-width="12"/>
+  <path d="M147 213c0-71 47-118 109-118s109 47 109 118v65c0 63-46 103-109 103s-109-40-109-103z" fill="#20254F" stroke="#EEF2FF" stroke-width="12"/>
+  <path d="M168 174h176v118H168z" fill="url(#glass)"/>
+  <path d="M277 192a48 48 0 1 0 0 82 41 41 0 1 1 0-82" fill="#6366F1"/>
+  <path d="M216 332h80" stroke="#F472B6" stroke-width="11" stroke-linecap="round"/>
+  <path d="M168 415c34-25 65-25 94 0s57 25 84 0" fill="none" stroke="#0EA5E9" stroke-width="10"/>
+</svg>

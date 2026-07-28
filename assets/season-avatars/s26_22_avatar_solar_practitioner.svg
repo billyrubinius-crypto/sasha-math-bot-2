@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Солнечный практик</title>
+  <desc>Летний курсант с солнечным визором и полевым модулем.</desc>
+  <defs>
+    <linearGradient id="bg" x1="57" y1="46" x2="455" y2="463" gradientUnits="userSpaceOnUse"><stop stop-color="#F59E0B"/><stop offset=".48" stop-color="#38BDF8"/><stop offset="1" stop-color="#15313A"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#FFFBEB"/><stop offset="1" stop-color="#14B8A6"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <circle cx="395" cy="117" r="49" fill="#F59E0B" stroke="#FFFBEB" stroke-width="9"/>
+  <path d="M395 44v25m0 96v25m-73-73h25m96 0h25M344 66l18 18m66 66 18 18m0-102-18 18m-66 66-18 18" stroke="#FFFBEB" stroke-width="8" stroke-linecap="round"/>
+  <path d="M117 439c24-83 70-126 139-126s115 43 139 126" fill="#15313A" stroke="#14B8A6" stroke-width="12"/>
+  <path d="M143 218c0-75 48-123 113-123s113 48 113 123v61c0 63-47 102-113 102s-113-39-113-102z" fill="#1D4450" stroke="#FFFBEB" stroke-width="12"/>
+  <path d="M165 176h182v116H165z" fill="url(#glass)"/>
+  <circle cx="256" cy="233" r="39" fill="#F59E0B"/>
+  <path d="M199 233h114M256 184v98" stroke="#15313A" stroke-width="8" opacity=".48"/>
+  <path d="M214 331h84" stroke="#38BDF8" stroke-width="11" stroke-linecap="round"/>
+  <path d="M126 407 89 370M386 407l37-37" stroke="#FFFBEB" stroke-width="11" stroke-linecap="round"/>
+</svg>

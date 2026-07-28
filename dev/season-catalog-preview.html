@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ru" data-ca-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Cosmic Academy — Season V2 Catalog Preview</title>
+  <link rel="stylesheet" href="../styles/student.css">
+  <link rel="stylesheet" href="../styles/season-cosmetics-preview.css">
+</head>
+<body class="season-catalog-preview">
+  <main class="season-preview-shell">
+    <header class="season-preview-header">
+      <p class="season-preview-kicker">Local dev preview · 2026–2027</p>
+      <h1>Космическая академия: 23 сезона</h1>
+      <p class="season-preview-lead">
+        Локальная витрина аватаров, рамок, титулов и фонов. Данные загружаются из JSON,
+        а примерка работает без Telegram, Supabase и внешних ресурсов.
+      </p>
+      <div class="season-preview-stats" aria-label="Сводка каталога">
+        <span class="season-preview-stat" id="presetStat">23 пресета</span>
+        <span class="season-preview-stat" id="itemStat">92 предмета</span>
+        <span class="season-preview-stat">21 × 14 дней</span>
+        <span class="season-preview-stat">2 межсезонья</span>
+      </div>
+    </header>
+
+    <section class="season-preview-toolbar" aria-label="Фильтры каталога">
+      <label class="season-preview-control season-preview-search">
+        Поиск
+        <input id="searchInput" type="search" placeholder="Название, тема или предмет" autocomplete="off">
+      </label>
+      <label class="season-preview-control">
+        Сезон
+        <select id="seasonFilter">
+          <option value="all">Все 23 сезона</option>
+        </select>
+      </label>
+      <label class="season-preview-control">
+        Редкость предметов
+        <select id="rarityFilter">
+          <option value="all">Все редкости</option>
+          <option value="common">Common</option>
+          <option value="rare">Rare</option>
+          <option value="epic">Epic</option>
+          <option value="legendary">Legendary</option>
+        </select>
+      </label>
+      <button class="season-theme-toggle" id="themeToggle" type="button" aria-pressed="false">
+        Тёмная тема
+      </button>
+    </section>
+
+    <p id="catalogStatus" class="season-preview-lead" role="status" aria-live="polite">Загрузка каталога…</p>
+    <section id="seasonGrid" class="season-grid" aria-label="Сезонные коллекции"></section>
+    <div id="emptyState" class="season-preview-empty" hidden>
+      По выбранным условиям ничего не найдено.
+    </div>
+  </main>
+
+  <div class="season-modal" id="previewModal" role="dialog" aria-modal="true" aria-labelledby="previewModalTitle" hidden>
+    <section class="season-modal-panel">
+      <header class="season-modal-head">
+        <h2 id="previewModalTitle">Примерка предмета</h2>
+        <button class="season-modal-close" id="previewModalClose" type="button" aria-label="Закрыть примерку">×</button>
+      </header>
+      <div id="previewModalBody"></div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const catalogUrl = "../data/season_presets_2026_2027.json";
+      const avatarRoot = "../assets/season-avatars/";
+      const root = document.documentElement;
+      const grid = document.getElementById("seasonGrid");
+      const status = document.getElementById("catalogStatus");
+      const emptyState = document.getElementById("emptyState");
+      const searchInput = document.getElementById("searchInput");
+      const seasonFilter = document.getElementById("seasonFilter");
+      const rarityFilter = document.getElementById("rarityFilter");
+      const themeToggle = document.getElementById("themeToggle");
+      const modal = document.getElementById("previewModal");
+      const modalTitle = document.getElementById("previewModalTitle");
+      const modalBody = document.getElementById("previewModalBody");
+      const modalClose = document.getElementById("previewModalClose");
+
+      const slotIcons = {
+        avatar: "◉",
+        frame: "⬡",
+        title: "✦",
+        background: "▧"
+      };
+      const slotLabels = {
+        avatar: "Аватар",
+        frame: "Рамка",
+        title: "Титул",
+        background: "Фон"
+      };
+      const rarityLabels = {
+        common: "Common",
+        rare: "Rare",
+        epic: "Epic",
+        legendary: "Legendary"
+      };
+
+      let catalog = null;
+      let lastFocused = null;
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function cssClassFromPayload(payload) {
+        if (payload.startsWith("season_frame_")) {
+          return "season-frame-" + payload.slice("season_frame_".length).replaceAll("_", "-");
+        }
+        if (payload.startsWith("season_bg_")) {
+          return "season-bg-" + payload.slice("season_bg_".length).replaceAll("_", "-");
+        }
+        return "";
+      }
+
+      function getItem(preset, slot) {
+        return preset.items.find((item) => item.slot === slot);
+      }
+
+      function titleTierClass(titleItem) {
+        return `title-tier-${titleItem.title_visual_tier}`;
+      }
+
+      function itemButton(preset, item) {
+        const isFlagship = preset.flagship_item_code === item.item_code;
+        return `
+          <button
+            class="season-item-button rarity-${escapeHtml(item.rarity)}"
+            type="button"
+            data-sequence="${preset.sequence}"
+            data-item-code="${escapeHtml(item.item_code)}"
+            data-flagship="${isFlagship}"
+            aria-label="Примерить: ${escapeHtml(item.name)}, ${escapeHtml(rarityLabels[item.rarity])}, ${item.price} шестерёнок"
+          >
+            <span class="season-item-icon" aria-hidden="true">${slotIcons[item.slot]}</span>
+            <span class="season-item-label">
+              <strong>${escapeHtml(item.name)}</strong>
+              <small>${escapeHtml(slotLabels[item.slot])} · ${escapeHtml(rarityLabels[item.rarity])}${isFlagship ? " · флагман" : ""}</small>
+            </span>
+            <span class="season-price-pill">${item.price}</span>
+          </button>
+        `;
+      }
+
+      function seasonCard(preset) {
+        const avatar = getItem(preset, "avatar");
+        const frame = getItem(preset, "frame");
+        const title = getItem(preset, "title");
+        const background = getItem(preset, "background");
+        const visibleItems = rarityFilter.value === "all"
+          ? preset.items
+          : preset.items.filter((item) => item.rarity === rarityFilter.value);
+        const scheduleLabel = preset.schedule_type === "summer_interseason"
+          ? "межсезонье · provisional"
+          : "14 дней";
+
+        return `
+          <article class="season-card">
+            <div class="season-bg-canvas ${cssClassFromPayload(background.render_payload)}">
+              <div class="season-card-topline">
+                <span class="season-card-number">${String(preset.sequence).padStart(2, "0")}</span>
+                <span class="season-schedule-pill" data-schedule="${escapeHtml(preset.schedule_type)}">${escapeHtml(scheduleLabel)}</span>
+              </div>
+              <div class="season-card-hero">
+                <div class="season-card-copy">
+                  <p class="season-card-kicker">${escapeHtml(preset.theme_key.replaceAll("_", " "))}</p>
+                  <h2>${escapeHtml(preset.name)}</h2>
+                  <p class="season-card-description">${escapeHtml(preset.description)}</p>
+                  <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
+                    ${escapeHtml(title.name)}
+                  </span>
+                </div>
+                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}">
+                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}" loading="lazy">
+                </div>
+              </div>
+            </div>
+            <div class="season-card-body">
+              <ul class="season-palette" aria-label="Палитра сезона">
+                ${preset.palette.map((color) => `<li style="background:${escapeHtml(color)}" title="${escapeHtml(color)}"></li>`).join("")}
+              </ul>
+              <div class="season-items">
+                ${visibleItems.map((item) => itemButton(preset, item)).join("")}
+              </div>
+            </div>
+          </article>
+        `;
+      }
+
+      function filteredPresets() {
+        const query = searchInput.value.trim().toLocaleLowerCase("ru");
+        return catalog.presets.filter((preset) => {
+          if (seasonFilter.value !== "all" && String(preset.sequence) !== seasonFilter.value) {
+            return false;
+          }
+          if (!query) {
+            return true;
+          }
+          const haystack = [
+            preset.name,
+            preset.description,
+            preset.theme_key,
+            ...preset.items.flatMap((item) => [item.name, item.description, item.item_code])
+          ].join(" ").toLocaleLowerCase("ru");
+          return haystack.includes(query);
+        });
+      }
+
+      function renderCards() {
+        if (!catalog) {
+          return;
+        }
+        const presets = filteredPresets();
+        grid.innerHTML = presets.map(seasonCard).join("");
+        emptyState.hidden = presets.length > 0;
+        status.textContent = `Показано сезонов: ${presets.length}. В каждой карточке отображаются ${
+          rarityFilter.value === "all" ? "все четыре предмета" : `предметы редкости ${rarityLabels[rarityFilter.value]}`
+        }.`;
+      }
+
+      function openPreview(preset, selectedItem, trigger) {
+        const avatar = getItem(preset, "avatar");
+        const frame = getItem(preset, "frame");
+        const title = getItem(preset, "title");
+        const background = getItem(preset, "background");
+        const selectedFrameClass = selectedItem.slot === "frame"
+          ? cssClassFromPayload(selectedItem.render_payload)
+          : cssClassFromPayload(frame.render_payload);
+        const selectedTitle = selectedItem.slot === "title" ? selectedItem : title;
+        const selectedAvatar = selectedItem.slot === "avatar" ? selectedItem : avatar;
+
+        lastFocused = trigger;
+        modalTitle.textContent = `${preset.name} · ${selectedItem.name}`;
+        modalBody.innerHTML = `
+          <div class="season-mini-app ${cssClassFromPayload(background.render_payload)}">
+            <div class="season-mini-topbar">
+              <strong>Космическая академия</strong>
+              <span class="season-mini-balance">⚙ 520</span>
+            </div>
+            <div class="season-mini-content">
+              <section class="season-mini-shop">
+                <p class="season-card-kicker">Сезонная витрина · примерка</p>
+                <h3>${escapeHtml(preset.name)}</h3>
+                <div class="season-mini-product">
+                  <img src="${avatarRoot}${escapeHtml(selectedAvatar.asset_key)}.svg" alt="">
+                  <div>
+                    <h4>${escapeHtml(selectedItem.name)}</h4>
+                    <p>${escapeHtml(selectedItem.description)}</p>
+                    <div class="season-modal-meta">
+                      <span class="season-rarity-pill rarity-${escapeHtml(selectedItem.rarity)}">${escapeHtml(rarityLabels[selectedItem.rarity])}</span>
+                      <span class="season-price-pill">⚙ ${selectedItem.price}</span>
+                      <span class="season-price-pill">${escapeHtml(slotLabels[selectedItem.slot])}</span>
+                      ${preset.flagship_item_code === selectedItem.item_code ? '<span class="season-price-pill">Флагман</span>' : ""}
+                    </div>
+                  </div>
+                </div>
+              </section>
+              <aside class="season-mini-profile">
+                <p class="season-card-kicker">Профиль после примерки</p>
+                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${selectedFrameClass}">
+                  <img src="${avatarRoot}${escapeHtml(selectedAvatar.asset_key)}.svg" alt="${escapeHtml(selectedAvatar.name)}">
+                </div>
+                <h3>Ученик Академии</h3>
+                <span class="season-title-sample ${titleTierClass(selectedTitle)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
+                  ${escapeHtml(selectedTitle.name)}
+                </span>
+                <p>Фон, рамка, титул и локальный SVG показаны в контексте условного профиля.</p>
+              </aside>
+            </div>
+          </div>
+        `;
+        modal.hidden = false;
+        document.body.style.overflow = "hidden";
+        modalClose.focus();
+      }
+
+      function closePreview() {
+        modal.hidden = true;
+        document.body.style.overflow = "";
+        modalBody.replaceChildren();
+        if (lastFocused) {
+          lastFocused.focus();
+        }
+      }
+
+      function setTheme(theme) {
+        root.dataset.caTheme = theme;
+        const isDark = theme === "dark";
+        themeToggle.setAttribute("aria-pressed", String(isDark));
+        themeToggle.textContent = isDark ? "Светлая тема" : "Тёмная тема";
+        try {
+          localStorage.setItem("season-catalog-theme", theme);
+        } catch (_) {
+          // Preview remains functional when storage is unavailable.
+        }
+      }
+
+      async function loadCatalog() {
+        try {
+          const response = await fetch(catalogUrl, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          catalog = await response.json();
+          document.getElementById("presetStat").textContent = `${catalog.presets.length} пресета`;
+          document.getElementById("itemStat").textContent = `${catalog.presets.reduce((sum, preset) => sum + preset.items.length, 0)} предмета`;
+          for (const preset of catalog.presets) {
+            const option = document.createElement("option");
+            option.value = String(preset.sequence);
+            option.textContent = `${String(preset.sequence).padStart(2, "0")} · ${preset.name}`;
+            seasonFilter.append(option);
+          }
+          renderCards();
+        } catch (error) {
+          status.textContent = `Не удалось загрузить JSON: ${error.message}. Откройте preview через локальный HTTP-сервер.`;
+          status.style.color = "#dc2626";
+        }
+      }
+
+      [searchInput, seasonFilter, rarityFilter].forEach((control) => {
+        control.addEventListener(control === searchInput ? "input" : "change", renderCards);
+      });
+
+      themeToggle.addEventListener("click", () => {
+        setTheme(root.dataset.caTheme === "dark" ? "light" : "dark");
+      });
+
+      grid.addEventListener("click", (event) => {
+        const trigger = event.target.closest("[data-item-code]");
+        if (!trigger || !catalog) {
+          return;
+        }
+        const preset = catalog.presets.find((entry) => entry.sequence === Number(trigger.dataset.sequence));
+        const item = preset?.items.find((entry) => entry.item_code === trigger.dataset.itemCode);
+        if (preset && item) {
+          openPreview(preset, item, trigger);
+        }
+      });
+
+      modalClose.addEventListener("click", closePreview);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closePreview();
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.hidden) {
+          closePreview();
+        }
+      });
+
+      let initialTheme = "light";
+      try {
+        initialTheme = localStorage.getItem("season-catalog-theme") || "light";
+      } catch (_) {
+        initialTheme = "light";
+      }
+      setTheme(initialTheme === "dark" ? "dark" : "light");
+      loadCatalog();
+    })();
+  </script>
+</body>
+</html>

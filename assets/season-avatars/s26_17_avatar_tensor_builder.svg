@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Тензорный мастер</title>
+  <desc>Мастер с многослойной маской и кубической системой связей.</desc>
+  <defs>
+    <linearGradient id="bg" x1="55" y1="48" x2="456" y2="462" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset=".5" stop-color="#2563EB"/><stop offset="1" stop-color="#171833"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#F5F3FF"/><stop offset="1" stop-color="#2DD4BF"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <g fill="none" stroke="#2DD4BF" stroke-width="7" opacity=".62">
+    <path d="m76 152 54-31 54 31v62l-54 31-54-31zM330 306l54-31 54 31v62l-54 31-54-31z"/>
+    <path d="m130 121 54 31m-54-31v62m254 92 54 31m-54-31v62"/>
+  </g>
+  <path d="M121 438c20-84 65-130 135-130s115 46 135 130" fill="#171833" stroke="#2563EB" stroke-width="12"/>
+  <path d="M149 212c0-70 46-117 107-117s107 47 107 117v66c0 63-45 103-107 103s-107-40-107-103z" fill="#222453" stroke="#F5F3FF" stroke-width="12"/>
+  <path d="M169 173h174v119H169z" fill="url(#glass)"/>
+  <path d="m206 213 50-29 50 29v58l-50 29-50-29zM206 213l50 29 50-29M256 242v58" fill="none" stroke="#7C3AED" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M219 333h74" stroke="#2DD4BF" stroke-width="11" stroke-linecap="round"/>
+</svg>

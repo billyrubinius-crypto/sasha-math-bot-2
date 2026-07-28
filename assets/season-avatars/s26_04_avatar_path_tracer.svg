@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Трассировщик</title>
+  <desc>Разведчик с ломаным маршрутом на визоре.</desc>
+  <defs>
+    <linearGradient id="bg" x1="56" y1="46" x2="456" y2="462" gradientUnits="userSpaceOnUse"><stop stop-color="#F97316"/><stop offset=".46" stop-color="#6366F1"/><stop offset="1" stop-color="#24180F"/></linearGradient>
+    <linearGradient id="glass" x1="169" y1="167" x2="348" y2="293" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF7ED"/><stop offset="1" stop-color="#EAB308"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <path d="m63 336 92-76 71 32 74-113 91 34 58-78" fill="none" stroke="#FFF7ED" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+  <path d="M126 436c18-85 61-129 130-129s112 44 130 129" fill="#24180F" stroke="#F97316" stroke-width="12"/>
+  <path d="M149 223c0-73 46-121 107-121s107 48 107 121v52c0 65-45 106-107 106s-107-41-107-106z" fill="#2E2148" stroke="#FFF7ED" stroke-width="12"/>
+  <path d="M169 183h174v105H169z" fill="url(#glass)" opacity=".95"/>
+  <path d="m187 265 42-43 38 22 56-65" fill="none" stroke="#6366F1" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="187" cy="265" r="10" fill="#F97316"/><circle cx="229" cy="222" r="10" fill="#F97316"/><circle cx="267" cy="244" r="10" fill="#F97316"/><circle cx="323" cy="179" r="10" fill="#F97316"/>
+  <path d="M209 332h94" stroke="#EAB308" stroke-width="11" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>Спектральный аналитик</title>
+  <desc>Аналитик функций со спектральными графиками на визоре.</desc>
+  <defs>
+    <linearGradient id="bg" x1="52" y1="56" x2="459" y2="452" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset=".5" stop-color="#DB2777"/><stop offset="1" stop-color="#221237"/></linearGradient>
+    <linearGradient id="glass" x1="171" y1="182" x2="343" y2="282" gradientUnits="userSpaceOnUse"><stop stop-color="#FAF5FF"/><stop offset="1" stop-color="#F59E0B"/></linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#bg)"/>
+  <path d="M91 112h330M91 137h330M91 162h330" stroke="#F59E0B" stroke-width="8" opacity=".42"/>
+  <path d="M124 437c16-84 60-129 132-129s116 45 132 129" fill="#221237" stroke="#DB2777" stroke-width="12"/>
+  <path d="M149 215c0-70 45-117 107-117s107 47 107 117v63c0 62-45 103-107 103s-107-41-107-103z" fill="#2B1B4D" stroke="#FAF5FF" stroke-width="12"/>
+  <path d="M169 178h174v112H169z" fill="url(#glass)"/>
+  <path d="M184 261c32-4 37-62 69-62s37 62 73 62" fill="none" stroke="#7C3AED" stroke-width="10" stroke-linecap="round"/>
+  <path d="M184 240c35-48 69-48 104 0 13 18 25 22 38 14" fill="none" stroke="#DB2777" stroke-width="8"/>
+  <path d="M217 329h78" stroke="#F59E0B" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="407" cy="323" r="21" fill="#FAF5FF" opacity=".9"/>
+</svg>
