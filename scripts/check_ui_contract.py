@@ -73,7 +73,8 @@ CRITICAL_CLASSES = [
     "history-item", "hist-info", "hist-reason", "hist-date", "hist-amount",
     "hist-positive", "hist-negative", "ach-tile", "ach-icon", "ach-name",
     # коллекции и витрина
-    "collection-block", "collection-season-title", "coll-grid", "coll-tile", "coll-name",
+    "collection-block", "collection-season-title", "coll-grid", "coll-tile", "coll-tile-main",
+    "coll-name", "collection-item-menu", "collection-item-action", "collection-item-state",
     "showcase-tile", "showcase-icon", "showcase-name", "showcase-picker-title",
     "showcase-chip", "showcase-chip-clear", "showcase-picker-empty",
     # магазин
@@ -93,8 +94,6 @@ CRITICAL_CLASSES = [
     "league-note", "league-standing", "league-ladder", "ladder-step",
     # заголовок когорты в полном списке лиги (создаётся только когда групп больше одной)
     "league-group-title",
-    # инвентарь во вкладке «Ещё»
-    "inventory-item", "inventory-showcase-state", "inventory-showcase-btn",
     # косметика
     "nick-gold", "nick-status", "nick-crown", "avatar-img", "avatar-placeholder",
     "bg-grid", "bg-space", "bg-aurora", "bg-draft",

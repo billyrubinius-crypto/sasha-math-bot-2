@@ -892,10 +892,34 @@
         .collections-title { font-size: var(--text-section); font-weight: 800; line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .collection-block { margin-bottom: var(--ca-space-5); }
         .collection-season-title { font-size: var(--text-small); font-weight: 700; color: var(--ca-text-secondary); margin-bottom: var(--ca-space-2); }
-        .coll-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ca-space-2); }
+        .coll-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: var(--ca-space-2); }
         .coll-tile { min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .coll-tile-main {
+            box-sizing: border-box; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent;
+            color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center;
+            text-align: center;
+        }
+        button.coll-tile-main { cursor: pointer; }
+        button.coll-tile-main:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 3px; border-radius: var(--ca-radius-sm); }
         .coll-tile.locked .shop-preview { opacity: 0.42; filter: grayscale(1); }
         .coll-name { min-height: 27px; font-size: 11px; color: var(--ca-text-secondary); margin-top: var(--ca-space-1); line-height: 1.22; overflow-wrap: anywhere; }
+        .coll-tile.is-equipped .coll-name { color: var(--ca-accent); font-weight: 750; }
+        .collection-item-menu { box-sizing: border-box; width: 100%; margin-top: var(--ca-space-1); }
+        .collection-item-menu[hidden] { display: none; }
+        .collection-item-action {
+            box-sizing: border-box; width: 100%; min-height: var(--ca-touch); padding: 0 var(--ca-space-1);
+            border: 1px solid var(--ca-accent-soft); border-radius: var(--ca-radius-sm);
+            background: var(--ca-tint-accent); color: var(--ca-accent); font-size: 11px; font-weight: 800;
+            cursor: pointer;
+        }
+        .collection-item-action:disabled { opacity: var(--ca-disabled-opacity); cursor: default; }
+        .collection-item-action:focus-visible { outline: 2px solid var(--ca-accent); outline-offset: 2px; }
+        .collection-item-state {
+            box-sizing: border-box; width: 100%; min-height: var(--ca-touch); padding: var(--ca-space-1);
+            border-radius: var(--ca-radius-sm); background: var(--ca-surface-nested);
+            color: var(--ca-text-muted); font-size: 10px; line-height: 1.2;
+            display: flex; align-items: center; justify-content: center;
+        }
 
         /* =====================================================================
            Витрина профиля (S7, этап 4). Три слота; обработчик вешает JS
@@ -1027,7 +1051,7 @@
         .shop-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--ca-space-1); text-align: right; }
         /* Кнопка покупки — единственное «сильное» действие в списке: фирменный
            индиго→фиолетовый градиент плюс мягкое свечение той же гаммы. Обычные действия
-           (.shop-equip-btn, .lb-load-more, .inventory-showcase-btn) остались контурными,
+           (.shop-equip-btn, .lb-load-more) остались контурными,
            поэтому «купить» и «надеть» не путаются. Геометрия и классы не менялись. */
         .shop-buy-btn {
             box-sizing: border-box; min-height: var(--ca-touch);
@@ -1363,15 +1387,6 @@
            шевроном (▸/▾) — декоративный, не «иконка интерфейса» в смысле §12.1,
            замена на SVG не даёт ощутимой пользы при заметном риске для 14 строк.
            ===================================================================== */
-        /* Инвентарь (вкладка «Ещё»). Та же карточка-контейнер, что и у FAQ, и те же
-           .shop-item/.shop-preview/.shop-action внутри — инвентарь это другой СПИСОК тех же
-           предметов, а не другой визуальный язык. Собственных цветов и градиентов не заводит. */
-        .inventory-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-6); margin-bottom: var(--ca-space-6); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2); }
-        .inventory-note { font-size: var(--text-small); color: var(--ca-text-secondary); line-height: 1.45; margin-bottom: var(--ca-space-4); overflow-wrap: anywhere; }
-        .inventory-item { background: var(--ca-surface-nested); }
-        .inventory-showcase-state { color: var(--ca-accent-cyan); font-weight: 700; }
-        .inventory-showcase-btn { color: var(--ca-text-secondary); border-color: var(--ca-border); }
-
         .faq-section { background: var(--tg-secondary); border-radius: var(--ca-radius-xl); padding: var(--ca-space-6); margin-bottom: var(--ca-space-6); border: 1px solid var(--ca-border-soft); box-shadow: var(--ca-elev-2); }
         .faq-title { font-weight: 800; font-size: var(--text-section); line-height: 1.25; margin-bottom: var(--ca-space-4); }
         .faq-item { border-bottom: 1px solid var(--ca-divider); padding: var(--ca-space-3) 0; }

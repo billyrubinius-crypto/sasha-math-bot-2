@@ -6158,6 +6158,8 @@ revoke all on function public.student_public_cosmetics(bigint) from public, anon
 grant execute on function public.student_public_cosmetics(bigint) to authenticated;
 
 -- --- 5. get_global_top_self — общий топ за всё время -----------------------------------------
+-- 056_fix_global_top.sql: season_results columns are explicitly qualified because TABLE output
+-- columns are PL/pgSQL variables too; an unqualified student_id caused runtime error 42702.
 -- Все зарегистрированные ученики (в схеме нет ни статуса удаления, ни блокировки — фильтровать
 -- нечего и выдумывать статусы нельзя). Сортировка стабильная и полностью детерминированная:
 --   1) общий рейтинг за все сезоны;
@@ -6200,9 +6202,9 @@ begin
            coalesce(a.total, 0) + coalesce(s.rating, 0) as lifetime_points
       from public.students s
       left join (
-        select student_id, sum(points)::integer as total
-          from public.season_results
-         group by student_id) a on a.student_id = s.telegram_id
+        select sr.student_id, sum(sr.points)::integer as total
+          from public.season_results sr
+         group by sr.student_id) a on a.student_id = s.telegram_id
   ),
   ranked as (
     select t.*,

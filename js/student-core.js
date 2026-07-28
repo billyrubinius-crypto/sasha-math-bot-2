@@ -88,7 +88,6 @@
             } else if (tabName === 'more') {
                 document.getElementById('screen-more').classList.add('active');
                 document.querySelectorAll('.nav-btn')[4].classList.add('active');
-                loadInventory();
             }
         }
 
