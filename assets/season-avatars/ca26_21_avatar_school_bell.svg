@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Школьный звонок</title>
+  <desc>Школьный звонок над открытой тетрадью и линией итогов года.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DBEAFE"/><stop offset="1" stop-color="#FEF3C7"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M164 270c22-26 32-61 32-110 0-38 25-70 60-70s60 32 60 70c0 49 10 84 32 110z" fill="#F59E0B" stroke="#1E293B" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M152 270h208M226 298c8 31 52 31 60 0" fill="none" stroke="#1E293B" stroke-width="18" stroke-linecap="round"/>
+  <path d="M64 352q96-42 192 6v102q-91-40-192-10zM256 358q96-48 192-6v98q-101-30-192 10z" fill="#EFF6FF" stroke="#1E293B" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M256 360v98M102 398h108M302 398h104" stroke="#8B5CF6" stroke-width="12" stroke-linecap="round"/>
+  <path d="M104 96h54M354 96h54M82 142h54M376 142h54" stroke="#2563EB" stroke-width="12" stroke-linecap="round"/>
+</svg>

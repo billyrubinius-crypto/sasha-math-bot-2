@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Весенний росток</title>
+  <desc>Весенний росток с парой листьев, симметричной линией роста и светом.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DCFCE7"/><stop offset="1" stop-color="#FEF3C7"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <circle cx="384" cy="116" r="58" fill="#F59E0B" opacity=".88"/>
+  <path d="M72 412c98-72 262-72 368 0" fill="#16A34A" stroke="#21301F" stroke-width="17" stroke-linejoin="round"/>
+  <path d="M256 400V176" stroke="#21301F" stroke-width="20" stroke-linecap="round"/>
+  <path d="M250 264c-100 6-133-55-123-126 86-5 135 42 123 126zM262 316c100 6 133-55 123-126-86-5-135 42-123 126z" fill="#16A34A" stroke="#21301F" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M244 250 148 164M268 300l94-86" stroke="#F0FDF4" stroke-width="12" stroke-linecap="round"/>
+  <path d="m256 176 18-36 39-6-28-27 7-39-36 18-36-18 7 39-28 27 39 6z" fill="#8B5CF6" stroke="#21301F" stroke-width="11" stroke-linejoin="round"/>
+</svg>

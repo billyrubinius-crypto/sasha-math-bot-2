@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Планер старта</title>
+  <desc>Августовский планер с чек-листом и бумажным самолётом.</desc>
+  <defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#FED7AA"/><stop offset="1" stop-color="#C7D2FE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect x="92" y="118" width="294" height="300" rx="34" fill="#FFF7ED" stroke="#25233D" stroke-width="17"/>
+  <path d="M144 118V84M334 118V84" stroke="#6366F1" stroke-width="20" stroke-linecap="round"/>
+  <path d="M138 194h30v30h-30zM138 258h30v30h-30zM138 322h30v30h-30z" fill="none" stroke="#F97316" stroke-width="12"/>
+  <path d="m140 206 12 12 28-34M196 208h128M196 272h106M196 336h126" fill="none" stroke="#6366F1" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m270 94 168 28-96 50-29 89-24-77-69-25z" fill="#38BDF8" stroke="#25233D" stroke-width="14" stroke-linejoin="round"/>
+  <path d="m289 184 149-62-96 50" fill="none" stroke="#25233D" stroke-width="11" stroke-linecap="round"/>
+</svg>

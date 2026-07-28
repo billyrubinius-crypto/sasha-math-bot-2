@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Мастерская огней</title>
+  <desc>Новогодняя мастерская с лампой, подарком и геометрической елью.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#FECACA"/><stop offset="1" stop-color="#DCFCE7"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="m262 66-88 118h48l-82 106h76l-55 86h202l-59-86h74l-82-106h50z" fill="#16A34A" stroke="#251B32" stroke-width="17" stroke-linejoin="round"/>
+  <circle cx="262" cy="104" r="18" fill="#FBBF24"/><circle cx="224" cy="214" r="15" fill="#DC2626"/><circle cx="304" cy="252" r="15" fill="#7C3AED"/><circle cx="244" cy="330" r="15" fill="#FBBF24"/>
+  <rect x="72" y="318" width="132" height="108" rx="16" fill="#DC2626" stroke="#251B32" stroke-width="14"/>
+  <path d="M138 318v108M72 360h132M110 318c-38-50 20-65 28 0M166 318c38-50-20-65-28 0" fill="none" stroke="#FFFBEB" stroke-width="13"/>
+  <path d="M376 380v-86l-44-50M332 244l-40 52" fill="none" stroke="#251B32" stroke-width="18" stroke-linecap="round"/><path d="m294 266 61 27-25 56-83-37z" fill="#FBBF24" stroke="#251B32" stroke-width="13"/>
+</svg>

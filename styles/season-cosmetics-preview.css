@@ -1,33 +1,29 @@
-/* Local-only Cosmic Academy season catalog preview. No production selectors are changed. */
+/* Local-only calendar season catalog preview. No production selector is changed. */
 
 :root {
-  --season-preview-bg: #eceeff;
-  --season-preview-surface: rgba(255, 255, 255, 0.94);
-  --season-preview-surface-soft: rgba(247, 246, 255, 0.9);
-  --season-preview-border: #c4caee;
-  --season-preview-text: #131629;
-  --season-preview-muted: #5b6180;
-  --season-preview-accent: #6d28d9;
-  --season-preview-shadow: 0 20px 54px rgba(63, 58, 135, 0.14);
+  --preview-bg: #eef2f7;
+  --preview-surface: rgba(255, 255, 255, 0.94);
+  --preview-soft: rgba(248, 250, 252, 0.9);
+  --preview-border: #cbd5e1;
+  --preview-text: #162033;
+  --preview-muted: #59657a;
+  --preview-accent: #4f46e5;
+  --preview-shadow: 0 18px 54px rgba(37, 50, 76, 0.13);
+  --modal-preview-width: 768px;
 }
 
-html[data-ca-theme="dark"] {
-  --season-preview-bg: #0b1022;
-  --season-preview-surface: rgba(16, 21, 43, 0.94);
-  --season-preview-surface-soft: rgba(29, 36, 69, 0.88);
-  --season-preview-border: #2c3566;
-  --season-preview-text: #f4f6ff;
-  --season-preview-muted: #a6aed4;
-  --season-preview-accent: #9575f7;
-  --season-preview-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
-}
-
-html {
-  color-scheme: light;
-}
+html { color-scheme: light; }
 
 html[data-ca-theme="dark"] {
   color-scheme: dark;
+  --preview-bg: #0d1422;
+  --preview-surface: rgba(19, 28, 45, 0.95);
+  --preview-soft: rgba(29, 41, 63, 0.9);
+  --preview-border: #35445f;
+  --preview-text: #f4f7fb;
+  --preview-muted: #aebad0;
+  --preview-accent: #a5b4fc;
+  --preview-shadow: 0 22px 64px rgba(0, 0, 0, 0.34);
 }
 
 body.season-catalog-preview {
@@ -35,15 +31,18 @@ body.season-catalog-preview {
   min-height: 100vh;
   margin: 0;
   overflow-x: hidden;
-  color: var(--season-preview-text);
-  background: var(--season-preview-bg);
+  color: var(--preview-text);
+  background:
+    radial-gradient(circle at 8% 4%, rgba(14, 165, 233, 0.12), transparent 26rem),
+    radial-gradient(circle at 92% 12%, rgba(245, 158, 11, 0.1), transparent 24rem),
+    var(--preview-bg);
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
 .season-preview-shell {
-  width: min(1480px, calc(100% - 32px));
+  width: min(1500px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 28px 0 64px;
+  padding: 26px 0 64px;
 }
 
 .season-preview-header,
@@ -51,24 +50,24 @@ body.season-catalog-preview {
 .season-card,
 .season-preview-empty,
 .season-modal-panel {
-  border: 1px solid var(--season-preview-border);
-  background: var(--season-preview-surface);
-  box-shadow: var(--season-preview-shadow);
+  border: 1px solid var(--preview-border);
+  background: var(--preview-surface);
+  box-shadow: var(--preview-shadow);
 }
 
 .season-preview-header {
   position: relative;
   overflow: hidden;
-  padding: clamp(24px, 4vw, 52px);
+  padding: clamp(24px, 4vw, 50px);
   border-radius: 30px;
 }
 
 .season-preview-header::after {
   position: absolute;
-  inset: auto -8% -75% 42%;
-  height: 270px;
+  inset: auto -8% -92px 46%;
+  height: 210px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.2), transparent 66%);
+  background: repeating-linear-gradient(110deg, transparent 0 28px, rgba(79, 70, 229, 0.08) 29px 31px);
   content: "";
   pointer-events: none;
 }
@@ -76,217 +75,228 @@ body.season-catalog-preview {
 .season-preview-kicker,
 .season-card-kicker {
   margin: 0 0 8px;
-  color: var(--season-preview-accent);
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  color: var(--preview-accent);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
 .season-preview-header h1 {
-  max-width: 900px;
+  max-width: 960px;
   margin: 0;
-  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-size: clamp(2rem, 5vw, 4.3rem);
   line-height: 0.98;
 }
 
 .season-preview-lead {
-  max-width: 760px;
-  margin: 18px 0 0;
-  color: var(--season-preview-muted);
-  font-size: clamp(1rem, 2vw, 1.2rem);
-  line-height: 1.6;
+  max-width: 800px;
+  margin: 17px 0 0;
+  color: var(--preview-muted);
+  font-size: clamp(0.95rem, 2vw, 1.13rem);
+  line-height: 1.58;
 }
 
-.season-preview-stats {
+.season-preview-stats,
+.season-card-meta,
+.season-technical-row,
+.season-modal-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 24px;
+  gap: 8px;
+}
+
+.season-preview-stats { margin-top: 22px; }
+
+.season-preview-stat,
+.season-period-pill,
+.season-price-pill,
+.season-rarity-pill,
+.season-tech-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--preview-surface) 86%, transparent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  backdrop-filter: blur(10px);
 }
 
 .season-preview-stat {
-  display: inline-flex;
-  align-items: center;
   min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--season-preview-border);
-  border-radius: 999px;
-  background: var(--season-preview-surface-soft);
-  font-weight: 750;
+  padding-inline: 14px;
+  font-size: 0.82rem;
 }
 
 .season-preview-toolbar {
   position: sticky;
   z-index: 20;
-  top: 12px;
+  top: 10px;
   display: grid;
-  grid-template-columns: minmax(220px, 1.8fr) repeat(2, minmax(150px, 0.7fr)) auto;
-  gap: 12px;
+  grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(135px, 0.68fr)) auto auto;
+  gap: 10px;
   margin: 18px 0;
-  padding: 14px;
+  padding: 13px;
   border-radius: 20px;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(18px);
 }
 
 .season-preview-control {
   display: grid;
-  gap: 6px;
-  color: var(--season-preview-muted);
-  font-size: 0.76rem;
-  font-weight: 750;
+  gap: 5px;
+  min-width: 0;
+  color: var(--preview-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .season-preview-control input,
 .season-preview-control select,
-.season-theme-toggle,
+.season-control-button,
 .season-item-button,
 .season-modal-close {
+  min-width: 0;
   min-height: 44px;
-  border: 1px solid var(--season-preview-border);
+  box-sizing: border-box;
+  border: 1px solid var(--preview-border);
   border-radius: 12px;
-  color: var(--season-preview-text);
-  background: var(--season-preview-surface-soft);
+  color: var(--preview-text);
+  background: var(--preview-soft);
   font: inherit;
 }
 
 .season-preview-control input,
 .season-preview-control select {
   width: 100%;
-  box-sizing: border-box;
-  padding: 0 12px;
+  padding: 0 11px;
 }
 
-.season-theme-toggle,
+.season-control-button,
 .season-modal-close {
   align-self: end;
-  padding: 0 16px;
+  padding: 0 14px;
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 850;
 }
 
-.season-theme-toggle:hover,
-.season-theme-toggle:focus-visible,
-.season-modal-close:hover,
-.season-modal-close:focus-visible,
+.season-control-button:hover,
+.season-control-button:focus-visible,
 .season-item-button:hover,
-.season-item-button:focus-visible {
-  border-color: var(--season-preview-accent);
-  outline: 3px solid color-mix(in srgb, var(--season-preview-accent) 24%, transparent);
+.season-item-button:focus-visible,
+.season-modal-close:hover,
+.season-modal-close:focus-visible {
+  border-color: var(--preview-accent);
+  outline: 3px solid color-mix(in srgb, var(--preview-accent) 23%, transparent);
   outline-offset: 2px;
+}
+
+.season-preview-status {
+  min-height: 26px;
+  margin: 0 0 14px;
+  color: var(--preview-muted);
 }
 
 .season-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 410px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr));
   gap: 18px;
 }
 
 .season-card {
+  min-width: 0;
   overflow: hidden;
   border-radius: 24px;
 }
 
-.season-bg-canvas {
+.season-bg-canvas,
+.season-mini-app {
   position: relative;
-  min-height: 228px;
   overflow: hidden;
   isolation: isolate;
+  background-color: var(--theme-base, #dbeafe);
+  background-image: var(--theme-art);
   background-position: center;
+  background-size: cover;
 }
 
-.season-bg-canvas::after {
+.season-bg-canvas {
+  min-height: 278px;
+}
+
+.season-bg-canvas::after,
+.season-mini-app::after {
   position: absolute;
   z-index: -1;
   inset: 0;
-  background: linear-gradient(180deg, transparent 28%, color-mix(in srgb, var(--season-preview-surface) 88%, transparent));
+  background: linear-gradient(180deg, transparent 18%, color-mix(in srgb, var(--preview-surface) 88%, transparent));
   content: "";
 }
 
-.season-card-topline {
+.season-card-topline,
+.season-card-hero {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 20px 0;
+  padding: 18px 20px 0;
 }
 
-.season-card-number,
-.season-schedule-pill,
-.season-price-pill,
-.season-rarity-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, currentColor 26%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--season-preview-surface) 84%, transparent);
+.season-card-topline { align-items: flex-start; }
+.season-card-hero { align-items: flex-end; padding-top: 16px; }
+.season-card-copy { min-width: 0; }
+
+.season-card-number {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--preview-surface) 87%, transparent);
+  font-weight: 900;
   backdrop-filter: blur(10px);
 }
 
-.season-card-number {
-  width: 44px;
-  height: 44px;
-  font-size: 0.84rem;
-  font-weight: 850;
-}
-
-.season-schedule-pill,
-.season-price-pill,
-.season-rarity-pill {
-  min-height: 29px;
-  padding: 0 10px;
-  font-size: 0.7rem;
-  font-weight: 850;
-  letter-spacing: 0.04em;
-}
-
-.season-schedule-pill[data-schedule="summer_interseason"] {
-  color: #b45309;
-}
-
-html[data-ca-theme="dark"] .season-schedule-pill[data-schedule="summer_interseason"] {
-  color: #fbbf24;
-}
-
-.season-card-hero {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 22px;
-  padding: 20px;
-}
-
-.season-card-copy {
-  min-width: 0;
-}
+.season-period-pill[data-kind="interseason"] { color: #b45309; }
+html[data-ca-theme="dark"] .season-period-pill[data-kind="interseason"] { color: #fbbf24; }
 
 .season-card h2 {
   margin: 0;
-  font-size: clamp(1.4rem, 3vw, 2rem);
-  line-height: 1.06;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  line-height: 1.04;
+}
+
+.season-card-dates {
+  margin: 9px 0 0;
+  color: var(--preview-text);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .season-card-description {
   display: -webkit-box;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   overflow: hidden;
-  color: var(--season-preview-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  color: var(--preview-muted);
+  font-size: 0.88rem;
+  line-height: 1.46;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
 
 .season-avatar-shell {
   position: relative;
-  width: 104px;
-  min-width: 104px;
-  height: 104px;
-  padding: 7px;
+  width: 108px;
+  min-width: 108px;
+  height: 108px;
+  box-sizing: border-box;
+  padding: 6px;
   border-radius: 50%;
-  background: var(--season-preview-surface);
-  box-shadow: 0 14px 38px rgba(18, 21, 56, 0.28);
+  background: var(--preview-surface);
+  box-shadow: 0 14px 36px rgba(20, 28, 46, 0.27);
 }
 
 .season-avatar-shell img {
@@ -298,12 +308,12 @@ html[data-ca-theme="dark"] .season-schedule-pill[data-schedule="summer_interseas
 }
 
 .season-frame {
-  --frame-a: #9575f7;
-  --frame-b: #22d3ee;
-  --frame-c: #f4f6ff;
-  --frame-width: 5px;
-  border: var(--frame-width) solid var(--frame-a);
-  background: var(--frame-pattern, conic-gradient(from 45deg, var(--frame-a), var(--frame-b), var(--frame-c), var(--frame-a)));
+  --frame-a: #4f46e5;
+  --frame-b: #0ea5e9;
+  --frame-c: #f8fafc;
+  --frame-pattern: conic-gradient(var(--frame-a), var(--frame-b), var(--frame-a));
+  border: 6px solid var(--frame-a);
+  background: var(--frame-pattern);
 }
 
 .season-frame::before,
@@ -314,503 +324,225 @@ html[data-ca-theme="dark"] .season-schedule-pill[data-schedule="summer_interseas
 }
 
 .season-frame::before {
-  inset: -8px;
+  inset: -9px;
   border: 2px solid var(--frame-b);
   border-radius: inherit;
-  opacity: 0.82;
+  opacity: 0.72;
 }
 
 .season-frame::after {
-  inset: -13px;
+  inset: -14px;
   border: 3px dotted var(--frame-c);
   border-radius: inherit;
-  opacity: 0.7;
+  opacity: 0.68;
 }
 
-.season-frame.rarity-common::after {
-  display: none;
-}
-
-.season-frame.rarity-common::before {
-  opacity: 0.42;
-}
-
-.season-frame.rarity-rare {
-  --frame-width: 6px;
-}
-
-.season-frame.rarity-epic {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--frame-b) 28%, transparent), 0 0 28px color-mix(in srgb, var(--frame-a) 42%, transparent);
-}
-
+.season-frame.rarity-common::after { display: none; }
+.season-frame.rarity-common::before { opacity: 0.34; }
+.season-frame.rarity-epic { box-shadow: 0 0 27px color-mix(in srgb, var(--frame-a) 42%, transparent); }
 .season-frame.rarity-legendary {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--frame-c) 38%, transparent), 0 0 36px color-mix(in srgb, var(--frame-a) 52%, transparent);
-  animation: season-frame-breathe 4.8s ease-in-out infinite;
+  box-shadow: 0 0 34px color-mix(in srgb, var(--frame-a) 52%, transparent);
+  animation: frame-breathe 4.8s ease-in-out infinite;
 }
 
-@keyframes season-frame-breathe {
-  0%,
-  100% { filter: saturate(1) brightness(1); }
-  50% { filter: saturate(1.14) brightness(1.08); }
+@keyframes frame-breathe {
+  0%, 100% { filter: saturate(1) brightness(1); }
+  50% { filter: saturate(1.13) brightness(1.07); }
 }
 
-.season-frame-s26-01-direction-ring { --frame-a: #6d28d9; --frame-b: #22d3ee; --frame-c: #f4f6ff; --frame-pattern: conic-gradient(from 45deg, #6d28d9 0 11%, #22d3ee 11% 14%, #10152b 14% 36%, #f4f6ff 36% 39%, #4338ca 39% 61%, #22d3ee 61% 64%, #10152b 64% 86%, #f4f6ff 86% 89%, #6d28d9 89%); }
-.season-frame-s26-02-coordinate-sight { --frame-a: #2563eb; --frame-b: #06b6d4; --frame-c: #e0f2fe; --frame-pattern: repeating-conic-gradient(#2563eb 0 8deg, #111827 8deg 38deg, #06b6d4 38deg 43deg); border-radius: 18%; }
-.season-frame-s26-03-reflection-axis { --frame-a: #ec4899; --frame-b: #8b5cf6; --frame-c: #fdf2f8; --frame-pattern: linear-gradient(90deg, #ec4899 0 47%, #fdf2f8 47% 53%, #8b5cf6 53%); }
-.season-frame-s26-04-trajectory-contour { --frame-a: #f97316; --frame-b: #eab308; --frame-c: #fff7ed; --frame-pattern: conic-gradient(from 210deg, #f97316 0 16%, #24180f 16% 31%, #eab308 31% 49%, #6366f1 49% 68%, #fff7ed 68% 74%, #f97316 74%); border-radius: 42% 58% 47% 53% / 55% 46% 54% 45%; }
-.season-frame-s26-05-eratosthenes-sieve { --frame-a: #10b981; --frame-b: #14b8a6; --frame-c: #ecfdf5; --frame-pattern: radial-gradient(circle at 50% 0, #ecfdf5 0 3px, transparent 4px), repeating-conic-gradient(#10b981 0 9deg, #0b2524 9deg 18deg); }
-.season-frame-s26-06-spectral-scale { --frame-a: #7c3aed; --frame-b: #db2777; --frame-c: #f59e0b; --frame-pattern: conic-gradient(#7c3aed, #db2777, #f59e0b, #06b6d4, #7c3aed); border-style: double; }
-.season-frame-s26-07-probability-sector { --frame-a: #0ea5e9; --frame-b: #14b8a6; --frame-c: #f43f5e; --frame-pattern: conic-gradient(#0ea5e9 0 18%, #14b8a6 18% 57%, #f43f5e 57% 72%, #102a35 72%); border-radius: 50% 44% 50% 46%; }
-.season-frame-s26-08-construction-prism { --frame-a: #facc15; --frame-b: #38bdf8; --frame-c: #6366f1; --frame-pattern: conic-gradient(from 30deg, #facc15, #38bdf8 25%, #6366f1 50%, #fffbeb 75%, #facc15); border-radius: 28% 50% 28% 50%; }
-.season-frame-s26-09-fractal-edge { --frame-a: #a855f7; --frame-b: #22c55e; --frame-c: #06b6d4; --frame-pattern: repeating-conic-gradient(#a855f7 0 6deg, #19142d 6deg 12deg, #22c55e 12deg 18deg, #19142d 18deg 24deg); border-radius: 24%; }
-.season-frame-s26-10-graph-drive { --frame-a: #ef4444; --frame-b: #f97316; --frame-c: #8b5cf6; --frame-pattern: repeating-conic-gradient(#ef4444 0 10deg, #2b171b 10deg 25deg, #f97316 25deg 31deg); border: 7px dashed var(--frame-a); }
-.season-frame-s26-11-sky-cipher { --frame-a: #4f46e5; --frame-b: #9333ea; --frame-c: #fbbf24; --frame-pattern: conic-gradient(from 12deg, #fbbf24 0 2%, #0e1636 2% 18%, #4f46e5 18% 20%, #0e1636 20% 44%, #9333ea 44% 47%, #0e1636 47% 71%, #fbbf24 71% 74%, #0e1636 74%); }
-.season-frame-s26-12-algorithm-contour { --frame-a: #0891b2; --frame-b: #4f46e5; --frame-c: #a3e635; --frame-pattern: conic-gradient(from 90deg, #0891b2 0 20%, #a3e635 20% 24%, #0b2029 24% 45%, #4f46e5 45% 66%, #a3e635 66% 70%, #0b2029 70% 90%, #0891b2 90%); border-radius: 32% 48% 32% 48%; }
-.season-frame-s26-13-resonance-arc { --frame-a: #06b6d4; --frame-b: #3b82f6; --frame-c: #d946ef; --frame-pattern: repeating-radial-gradient(circle at 50% 50%, #06b6d4 0 4px, #101d3a 5px 10px, #d946ef 11px 14px); border-radius: 48% 52% 42% 58%; }
-.season-frame-s26-14-polar-compass { --frame-a: #0ea5e9; --frame-b: #2dd4bf; --frame-c: #a5b4fc; --frame-pattern: conic-gradient(from 45deg, #a5b4fc 0 4%, #10243b 4% 21%, #0ea5e9 21% 29%, #10243b 29% 46%, #2dd4bf 46% 54%, #10243b 54% 71%, #0ea5e9 71% 79%, #10243b 79% 96%, #a5b4fc 96%); }
-.season-frame-s26-15-metric-scale { --frame-a: #d97706; --frame-b: #0f766e; --frame-c: #6366f1; --frame-pattern: repeating-conic-gradient(#fffbeb 0 2deg, #d97706 2deg 7deg, #2c2118 7deg 18deg); border-radius: 20%; }
-.season-frame-s26-16-detour-ribbon { --frame-a: #e11d48; --frame-b: #7c3aed; --frame-c: #06b6d4; --frame-pattern: conic-gradient(from 135deg, #e11d48 0 12%, #281329 12% 23%, #06b6d4 23% 35%, #7c3aed 35% 62%, #281329 62% 73%, #e11d48 73%); border-radius: 62% 38% 62% 38%; }
-.season-frame-s26-17-tensor-grid { --frame-a: #7c3aed; --frame-b: #2563eb; --frame-c: #2dd4bf; --frame-pattern: repeating-linear-gradient(45deg, #7c3aed 0 6px, #171833 6px 12px, #2dd4bf 12px 15px); border-radius: 30%; }
-.season-frame-s26-18-number-eyepiece { --frame-a: #1d4ed8; --frame-b: #7e22ce; --frame-c: #f59e0b; --frame-pattern: repeating-conic-gradient(#eff6ff 0 1.5deg, #10152c 1.5deg 12deg, #1d4ed8 12deg 15deg); border-style: double; }
-.season-frame-s26-19-chronometer-ring { --frame-a: #0f766e; --frame-b: #2563eb; --frame-c: #f59e0b; --frame-pattern: repeating-conic-gradient(#f0fdfa 0 2deg, #10272b 2deg 10deg, #f59e0b 10deg 12deg, #10272b 12deg 30deg); }
-.season-frame-s26-20-limit-aperture { --frame-a: #4338ca; --frame-b: #c026d3; --frame-c: #22d3ee; --frame-pattern: conic-gradient(from 45deg, #4338ca, #1b1434 14%, #c026d3 25%, #1b1434 39%, #22d3ee 50%, #1b1434 64%, #c026d3 75%, #1b1434 89%, #4338ca); border-radius: 38% 62% 38% 62%; }
-.season-frame-s26-21-meridian-grid { --frame-a: #6d28d9; --frame-b: #0ea5e9; --frame-c: #fbbf24; --frame-pattern: repeating-conic-gradient(#6d28d9 0 4deg, #18152f 4deg 22deg, #0ea5e9 22deg 25deg); border-radius: 50% 42% 50% 42%; }
-.season-frame-s26-22-solar-azimuth { --frame-a: #f59e0b; --frame-b: #14b8a6; --frame-c: #38bdf8; --frame-pattern: conic-gradient(from 180deg, #f59e0b 0 32%, #fffbeb 32% 35%, #14b8a6 35% 67%, #38bdf8 67%); border-radius: 50% 50% 42% 42%; }
-.season-frame-s26-23-lunar-lagoon { --frame-a: #6366f1; --frame-b: #0ea5e9; --frame-c: #f472b6; --frame-pattern: radial-gradient(circle at 72% 22%, #eef2ff 0 5px, transparent 6px), conic-gradient(from 220deg, #6366f1 0 34%, #14172f 34% 49%, #0ea5e9 49% 71%, #f472b6 71%); border-radius: 58% 42% 58% 42%; }
+.season-frame-ca26-01-sun-route { --frame-a:#f59e0b;--frame-b:#14b8a6;--frame-c:#f8fafc;--frame-pattern:conic-gradient(from 30deg,#f59e0b 0 30%,#14b8a6 30% 48%,#3b82f6 48% 68%,#f8fafc 68% 73%,#f59e0b 73%);border-radius:48% 52% 45% 55%; }
+.season-frame-ca26-02-checkpoint-flight { --frame-a:#f97316;--frame-b:#38bdf8;--frame-c:#fff7ed;--frame-pattern:conic-gradient(from 140deg,#f97316 0 12%,#25233d 12% 38%,#38bdf8 38% 45%,#25233d 45% 72%,#6366f1 72% 79%,#f97316 79%);border-radius:34% 58% 36% 54%; }
+.season-frame-ca26-03-start-line { --frame-a:#4f46e5;--frame-b:#0ea5e9;--frame-c:#f59e0b;--frame-pattern:repeating-conic-gradient(#4f46e5 0 9deg,#f8fafc 9deg 12deg,#0ea5e9 12deg 28deg);border-radius:22%; }
+.season-frame-ca26-04-autumn-rhythm { --frame-a:#d97706;--frame-b:#84cc16;--frame-c:#fff7ed;--frame-pattern:conic-gradient(#84cc16 0 18%,#d97706 18% 39%,#29331f 39% 48%,#6366f1 48% 57%,#d97706 57% 78%,#84cc16 78%);border-radius:42% 58% 46% 54%; }
+.season-frame-ca26-05-leaf-symmetry { --frame-a:#ea580c;--frame-b:#ca8a04;--frame-c:#7c3aed;--frame-pattern:linear-gradient(90deg,#ea580c 0 46%,#fff7ed 46% 54%,#ca8a04 54%);border-radius:37% 63% 37% 63%; }
+.season-frame-ca26-06-rain-arcs { --frame-a:#3b82f6;--frame-b:#64748b;--frame-c:#eff6ff;--frame-pattern:repeating-linear-gradient(120deg,#3b82f6 0 8px,#1e293b 8px 18px,#8b5cf6 18px 22px);border-radius:58% 42% 58% 42%; }
+.season-frame-ca26-07-team-nodes { --frame-a:#d97706;--frame-b:#6366f1;--frame-c:#fff7ed;--frame-pattern:radial-gradient(circle at 50% 0,#fff7ed 0 6px,transparent 7px),repeating-conic-gradient(#d97706 0 8deg,#2f2a25 8deg 30deg,#6366f1 30deg 34deg); }
+.season-frame-ca26-08-lamp-light { --frame-a:#f59e0b;--frame-b:#8b5cf6;--frame-c:#fff7ed;--frame-pattern:conic-gradient(from 220deg,#f59e0b 0 34%,#172033 34% 63%,#8b5cf6 63% 73%,#1e3a8a 73%);border-radius:65% 35% 62% 38%; }
+.season-frame-ca26-09-first-crystal { --frame-a:#38bdf8;--frame-b:#a5b4fc;--frame-c:#f8fafc;--frame-pattern:repeating-conic-gradient(#38bdf8 0 4deg,#16213a 4deg 26deg,#a5b4fc 26deg 30deg);border-radius:24%; }
+.season-frame-ca26-10-countdown-ring { --frame-a:#7c3aed;--frame-b:#3b82f6;--frame-c:#fbbf24;--frame-pattern:repeating-conic-gradient(#fbbf24 0 3deg,#1e1b3a 3deg 13deg,#7c3aed 13deg 17deg,#1e1b3a 17deg 30deg); }
+.season-frame-ca26-11-festive-garland { --frame-a:#dc2626;--frame-b:#16a34a;--frame-c:#fbbf24;--frame-pattern:radial-gradient(circle at 50% 0,#fbbf24 0 8px,transparent 9px),repeating-conic-gradient(#dc2626 0 9deg,#251b32 9deg 20deg,#16a34a 20deg 29deg);border-radius:46% 54% 42% 58%; }
+.season-frame-ca26-12-frost-pattern { --frame-a:#0ea5e9;--frame-b:#6366f1;--frame-c:#e0f2fe;--frame-pattern:repeating-conic-gradient(#e0f2fe 0 2deg,#17243a 2deg 16deg,#0ea5e9 16deg 20deg,#17243a 20deg 30deg);border-radius:28%; }
+.season-frame-ca26-13-notebook-margins { --frame-a:#2563eb;--frame-b:#64748b;--frame-c:#fff;--frame-pattern:repeating-linear-gradient(90deg,#2563eb 0 7px,#fff 7px 10px,#a78bfa 10px 17px,#1e293b 17px 25px);border-radius:18%; }
+.season-frame-ca26-14-week-rhythm { --frame-a:#1d4ed8;--frame-b:#475569;--frame-c:#8b5cf6;--frame-pattern:repeating-conic-gradient(#eff6ff 0 2deg,#172033 2deg 12deg,#1d4ed8 12deg 19deg,#172033 19deg 30deg); }
+.season-frame-ca26-15-resilience-contour { --frame-a:#0f766e;--frame-b:#2563eb;--frame-c:#f59e0b;--frame-pattern:linear-gradient(135deg,#0f766e 0 26%,#f0fdfa 26% 31%,#2563eb 31% 59%,#f59e0b 59% 65%,#0f766e 65%);border-radius:28% 50% 28% 50%; }
+.season-frame-ca26-16-growth-lines { --frame-a:#16a34a;--frame-b:#f59e0b;--frame-c:#8b5cf6;--frame-pattern:conic-gradient(from 180deg,#16a34a 0 22%,#f0fdf4 22% 27%,#f59e0b 27% 47%,#8b5cf6 47% 54%,#16a34a 54%);border-radius:52% 48% 58% 42%; }
+.season-frame-ca26-17-balance-circle { --frame-a:#0d9488;--frame-b:#f59e0b;--frame-c:#6366f1;--frame-pattern:linear-gradient(90deg,#0d9488 0 48%,#f0fdfa 48% 52%,#f59e0b 52%); }
+.season-frame-ca26-18-launch-trajectory { --frame-a:#4338ca;--frame-b:#22d3ee;--frame-c:#f4f6ff;--frame-pattern:conic-gradient(from 210deg,#4338ca 0 42%,#22d3ee 42% 48%,#0b1022 48% 81%,#7c3aed 81%);border-radius:42% 58% 48% 52%; }
+.season-frame-ca26-19-water-ripples { --frame-a:#0ea5e9;--frame-b:#64748b;--frame-c:#a855f7;--frame-pattern:repeating-radial-gradient(circle,#0ea5e9 0 5px,#1b2738 6px 13px,#a855f7 14px 17px);border-radius:58% 42% 58% 42%; }
+.season-frame-ca26-20-may-light { --frame-a:#22c55e;--frame-b:#eab308;--frame-c:#6366f1;--frame-pattern:conic-gradient(#22c55e 0 18%,#f7fee7 18% 24%,#eab308 24% 40%,#22301e 40% 50%,#6366f1 50% 55%,#22c55e 55%);border-radius:54% 46% 62% 38%; }
+.season-frame-ca26-21-final-ribbon { --frame-a:#2563eb;--frame-b:#f59e0b;--frame-c:#8b5cf6;--frame-pattern:conic-gradient(from 45deg,#2563eb 0 24%,#eff6ff 24% 28%,#f59e0b 28% 52%,#8b5cf6 52% 58%,#2563eb 58%);border-radius:36% 64% 36% 64%; }
+.season-frame-ca26-22-timer-markings { --frame-a:#4f46e5;--frame-b:#0ea5e9;--frame-c:#f59e0b;--frame-pattern:repeating-conic-gradient(#f8fafc 0 2deg,#182238 2deg 11deg,#4f46e5 11deg 15deg,#182238 15deg 30deg); }
+.season-frame-ca26-23-summer-window { --frame-a:#14b8a6;--frame-b:#f59e0b;--frame-c:#38bdf8;--frame-pattern:linear-gradient(45deg,#14b8a6 0 27%,#fffbeb 27% 33%,#f59e0b 33% 58%,#38bdf8 58% 68%,#14b8a6 68%);border-radius:26% 50% 26% 50%; }
 
-.season-card-body {
-  padding: 0 20px 20px;
-}
-
-.season-palette {
-  display: flex;
-  gap: 7px;
-  margin: 0 0 16px;
-  padding: 0;
-  list-style: none;
-}
-
-.season-palette li {
-  width: 24px;
-  height: 24px;
-  border: 2px solid color-mix(in srgb, var(--season-preview-surface) 88%, transparent);
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px var(--season-preview-border);
-}
-
-.season-items {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-}
+.season-card-body { padding: 16px 20px 20px; }
+.season-palette { display:flex;gap:7px;margin:0 0 14px;padding:0;list-style:none; }
+.season-palette li { width:23px;height:23px;border:2px solid var(--preview-surface);border-radius:50%;box-shadow:0 0 0 1px var(--preview-border); }
+.season-items { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px; }
 
 .season-item-button {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-  padding: 9px;
-  cursor: pointer;
-  text-align: left;
+  display:grid;
+  grid-template-columns:32px minmax(0,1fr) auto;
+  align-items:center;
+  gap:8px;
+  padding:8px;
+  cursor:pointer;
+  text-align:left;
 }
 
 .season-item-button[data-flagship="true"] {
-  border-color: color-mix(in srgb, #fbbf24 68%, var(--season-preview-border));
-  background: linear-gradient(135deg, color-mix(in srgb, #fbbf24 12%, var(--season-preview-surface-soft)), var(--season-preview-surface-soft));
+  border-color: color-mix(in srgb, #f59e0b 66%, var(--preview-border));
+  background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 12%, var(--preview-soft)), var(--preview-soft));
 }
 
-.season-item-icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--season-preview-accent) 13%, var(--season-preview-surface));
-  font-size: 1rem;
-}
-
-.season-item-label {
-  min-width: 0;
-}
-
-.season-item-label strong,
-.season-item-label small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.season-item-label strong {
-  font-size: 0.78rem;
-}
-
-.season-item-label small {
-  margin-top: 2px;
-  color: var(--season-preview-muted);
-  font-size: 0.66rem;
-}
-
-.season-price-pill {
-  padding-inline: 7px;
-  font-size: 0.64rem;
-}
-
-.rarity-common { --rarity-color: #64748b; }
-.rarity-rare { --rarity-color: #0ea5e9; }
-.rarity-epic { --rarity-color: #8b5cf6; }
-.rarity-legendary { --rarity-color: #f59e0b; }
-
-.season-rarity-pill {
-  color: var(--rarity-color);
-}
+.season-item-icon { display:grid;width:32px;height:32px;place-items:center;border-radius:9px;background:color-mix(in srgb,var(--preview-accent) 13%,var(--preview-surface)); }
+.season-item-label { min-width:0; }
+.season-item-label strong,.season-item-label small { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.season-item-label strong { font-size:.76rem; }
+.season-item-label small { margin-top:2px;color:var(--preview-muted);font-size:.63rem; }
+.season-price-pill { padding-inline:7px;font-size:.63rem; }
+.rarity-common { --rarity-color:#64748b; }
+.rarity-rare { --rarity-color:#0ea5e9; }
+.rarity-epic { --rarity-color:#8b5cf6; }
+.rarity-legendary { --rarity-color:#f59e0b; }
+.season-rarity-pill { color:var(--rarity-color); }
 
 .season-title-sample {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  max-width: 100%;
-  margin-top: 12px;
-  padding: 0 11px;
-  overflow: hidden;
-  border-radius: 999px;
-  color: var(--season-title-color, var(--season-preview-accent));
-  background: color-mix(in srgb, var(--season-title-color, var(--season-preview-accent)) 10%, var(--season-preview-surface));
-  font-size: 0.78rem;
-  font-weight: 850;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  max-width:100%;
+  margin-top:11px;
+  padding:0 11px;
+  overflow:hidden;
+  border-radius:999px;
+  color:var(--season-title-color,var(--preview-accent));
+  background:color-mix(in srgb,var(--season-title-color,var(--preview-accent)) 11%,var(--preview-surface));
+  font-size:.76rem;
+  font-weight:850;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
-.season-title-sample::before {
-  margin-right: 7px;
-  content: "✦";
-}
+.season-title-sample::before { margin-right:7px;content:"✦"; }
+.title-tier-plain { border:1px solid color-mix(in srgb,currentColor 27%,transparent); }
+.title-tier-outlined { border:2px double currentColor;letter-spacing:.02em; }
+.title-tier-accent { border:1px solid currentColor;box-shadow:inset 0 0 14px color-mix(in srgb,currentColor 10%,transparent); }
+.title-tier-radiant { border:1px solid currentColor;text-shadow:0 0 11px color-mix(in srgb,currentColor 45%,transparent);box-shadow:0 0 18px color-mix(in srgb,currentColor 22%,transparent); }
 
-.title-tier-plain {
-  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+.season-technical {
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid var(--preview-border);
 }
+.season-technical summary { cursor:pointer;color:var(--preview-muted);font-size:.72rem;font-weight:800; }
+.season-technical-row { margin-top:9px; }
+.season-tech-pill { min-width:0;max-width:100%;overflow:hidden;color:var(--preview-muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;text-overflow:ellipsis;white-space:nowrap; }
 
-.title-tier-accent {
-  border: 1px solid currentColor;
-  box-shadow: inset 0 0 14px color-mix(in srgb, currentColor 10%, transparent);
-}
-
-.title-tier-outlined {
-  border: 2px double currentColor;
-  letter-spacing: 0.02em;
-}
-
-.title-tier-radiant {
-  border: 1px solid currentColor;
-  text-shadow: 0 0 12px color-mix(in srgb, currentColor 45%, transparent);
-  box-shadow: 0 0 18px color-mix(in srgb, currentColor 22%, transparent);
-}
-
-.season-preview-empty {
-  padding: 48px 24px;
-  border-radius: 22px;
-  color: var(--season-preview-muted);
-  text-align: center;
-}
-
-.season-preview-empty[hidden] {
-  display: none;
-}
+.season-preview-empty { padding:48px 24px;border-radius:22px;color:var(--preview-muted);text-align:center; }
+.season-preview-empty[hidden] { display:none; }
 
 .season-modal {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  display: grid;
-  padding: 18px;
-  place-items: center;
-  background: rgba(8, 11, 26, 0.72);
-  backdrop-filter: blur(12px);
+  position:fixed;
+  z-index:100;
+  inset:0;
+  display:grid;
+  padding:16px;
+  place-items:center;
+  background:rgba(5,10,20,.74);
+  backdrop-filter:blur(12px);
+}
+.season-modal[hidden] { display:none; }
+.season-modal-panel { width:min(calc(var(--modal-preview-width) + 38px),100%);max-height:calc(100vh - 32px);overflow:auto;border-radius:26px; }
+.season-modal-head { position:sticky;z-index:4;top:0;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;border-bottom:1px solid var(--preview-border);background:var(--preview-surface); }
+.season-modal-head h2 { margin:0;font-size:.95rem; }
+.season-modal-close { width:44px;padding:0; }
+.season-mini-app { width:min(var(--modal-preview-width),100%);min-height:590px;margin:0 auto; }
+.season-mini-topbar { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid color-mix(in srgb,var(--preview-border) 72%,transparent);background:color-mix(in srgb,var(--preview-surface) 85%,transparent);backdrop-filter:blur(12px); }
+.season-mini-balance { padding:8px 11px;border-radius:999px;background:var(--preview-soft);font-size:.78rem;font-weight:850; }
+.season-mini-content { display:grid;grid-template-columns:minmax(0,1.3fr) minmax(240px,.7fr);gap:14px;padding:16px; }
+.season-mini-shop,.season-mini-profile { border:1px solid var(--preview-border);border-radius:20px;background:color-mix(in srgb,var(--preview-surface) 91%,transparent);box-shadow:var(--preview-shadow);backdrop-filter:blur(10px); }
+.season-mini-shop { padding:17px; }
+.season-mini-shop h3,.season-mini-profile h3 { margin:0; }
+.season-mini-product { display:grid;grid-template-columns:116px minmax(0,1fr);gap:15px;margin-top:17px; }
+.season-mini-product > img { width:116px;height:116px;border-radius:24px; }
+.season-mini-product h4 { margin:0 0 7px; }
+.season-mini-product p,.season-mini-profile p { color:var(--preview-muted);font-size:.82rem;line-height:1.48; }
+.season-mini-profile { display:flex;flex-direction:column;align-items:center;padding:22px;text-align:center; }
+.season-mini-profile .season-avatar-shell { margin:16px 0; }
+.season-mini-code { overflow-wrap:anywhere;color:var(--preview-muted);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.68rem; }
+
+/* Each background uses a dominant real-world calendar motif plus a restrained academic overlay. */
+html[data-ca-theme="light"] .season-bg-ca26-01-summer-notes { --theme-base:#fef3c7;--theme-art:radial-gradient(circle at 82% 20%,#f59e0b 0 13%,transparent 13.5%),linear-gradient(168deg,transparent 0 58%,rgba(20,184,166,.65) 59% 72%,rgba(59,130,246,.65) 73%),repeating-linear-gradient(0deg,transparent 0 31px,rgba(59,130,246,.12) 32px 34px); }
+html[data-ca-theme="dark"] .season-bg-ca26-01-summer-notes { --theme-base:#17303a;--theme-art:radial-gradient(circle at 82% 20%,#f59e0b 0 13%,transparent 13.5%),linear-gradient(168deg,transparent 0 58%,rgba(20,184,166,.42) 59% 72%,rgba(59,130,246,.45) 73%),repeating-linear-gradient(0deg,transparent 0 31px,rgba(148,163,184,.13) 32px 34px); }
+html[data-ca-theme="light"] .season-bg-ca26-02-august-plan { --theme-base:#fff7ed;--theme-art:linear-gradient(145deg,transparent 0 49%,rgba(99,102,241,.18) 50% 51%,transparent 52%),linear-gradient(25deg,transparent 0 58%,rgba(249,115,22,.48) 59% 75%,transparent 76%),repeating-linear-gradient(90deg,transparent 0 47px,rgba(56,189,248,.15) 48px 50px); }
+html[data-ca-theme="dark"] .season-bg-ca26-02-august-plan { --theme-base:#25233d;--theme-art:linear-gradient(145deg,transparent 0 49%,rgba(56,189,248,.35) 50% 51%,transparent 52%),linear-gradient(25deg,transparent 0 58%,rgba(249,115,22,.35) 59% 75%,transparent 76%),repeating-linear-gradient(90deg,transparent 0 47px,rgba(99,102,241,.2) 48px 50px); }
+html[data-ca-theme="light"] .season-bg-ca26-03-new-path-map { --theme-base:#f8fafc;--theme-art:radial-gradient(circle at 15% 74%,#f59e0b 0 5%,transparent 5.5%),radial-gradient(circle at 81% 20%,#0ea5e9 0 4%,transparent 4.5%),linear-gradient(142deg,transparent 0 46%,rgba(79,70,229,.34) 47% 50%,transparent 51%),repeating-linear-gradient(0deg,transparent 0 29px,rgba(59,130,246,.11) 30px 31px); }
+html[data-ca-theme="dark"] .season-bg-ca26-03-new-path-map { --theme-base:#1e293b;--theme-art:radial-gradient(circle at 15% 74%,#f59e0b 0 5%,transparent 5.5%),radial-gradient(circle at 81% 20%,#0ea5e9 0 4%,transparent 4.5%),linear-gradient(142deg,transparent 0 46%,rgba(99,102,241,.52) 47% 50%,transparent 51%),repeating-linear-gradient(0deg,transparent 0 29px,rgba(148,163,184,.11) 30px 31px); }
+html[data-ca-theme="light"] .season-bg-ca26-04-autumn-schedule { --theme-base:#fff7ed;--theme-art:radial-gradient(ellipse at 15% 20%,rgba(217,119,6,.72) 0 10%,transparent 10.5%),radial-gradient(ellipse at 85% 64%,rgba(132,204,22,.7) 0 12%,transparent 12.5%),repeating-linear-gradient(90deg,transparent 0 62px,rgba(99,102,241,.12) 63px 65px); }
+html[data-ca-theme="dark"] .season-bg-ca26-04-autumn-schedule { --theme-base:#29331f;--theme-art:radial-gradient(ellipse at 15% 20%,rgba(217,119,6,.6) 0 10%,transparent 10.5%),radial-gradient(ellipse at 85% 64%,rgba(132,204,22,.48) 0 12%,transparent 12.5%),repeating-linear-gradient(90deg,transparent 0 62px,rgba(165,180,252,.13) 63px 65px); }
+html[data-ca-theme="light"] .season-bg-ca26-05-leaf-fall-symmetry { --theme-base:#fff7ed;--theme-art:linear-gradient(90deg,transparent 49%,rgba(124,58,237,.28) 49% 51%,transparent 51%),radial-gradient(ellipse at 20% 28%,rgba(234,88,12,.72) 0 13%,transparent 13.5%),radial-gradient(ellipse at 80% 28%,rgba(202,138,4,.7) 0 13%,transparent 13.5%),radial-gradient(ellipse at 50% 78%,rgba(234,88,12,.5) 0 15%,transparent 15.5%); }
+html[data-ca-theme="dark"] .season-bg-ca26-05-leaf-fall-symmetry { --theme-base:#342014;--theme-art:linear-gradient(90deg,transparent 49%,rgba(167,139,250,.38) 49% 51%,transparent 51%),radial-gradient(ellipse at 20% 28%,rgba(234,88,12,.56) 0 13%,transparent 13.5%),radial-gradient(ellipse at 80% 28%,rgba(202,138,4,.5) 0 13%,transparent 13.5%),radial-gradient(ellipse at 50% 78%,rgba(234,88,12,.4) 0 15%,transparent 15.5%); }
+html[data-ca-theme="light"] .season-bg-ca26-06-rain-at-window { --theme-base:#eff6ff;--theme-art:linear-gradient(90deg,transparent 49%,rgba(100,116,139,.42) 49% 51%,transparent 51%),linear-gradient(0deg,transparent 49%,rgba(100,116,139,.42) 49% 51%,transparent 51%),repeating-linear-gradient(118deg,transparent 0 25px,rgba(59,130,246,.3) 26px 29px,transparent 30px 47px); }
+html[data-ca-theme="dark"] .season-bg-ca26-06-rain-at-window { --theme-base:#1e293b;--theme-art:linear-gradient(90deg,transparent 49%,rgba(148,163,184,.28) 49% 51%,transparent 51%),linear-gradient(0deg,transparent 49%,rgba(148,163,184,.28) 49% 51%,transparent 51%),repeating-linear-gradient(118deg,transparent 0 25px,rgba(96,165,250,.33) 26px 29px,transparent 30px 47px); }
+html[data-ca-theme="light"] .season-bg-ca26-07-late-autumn-map { --theme-base:#fff7ed;--theme-art:radial-gradient(circle at 18% 70%,#d97706 0 4%,transparent 4.5%),radial-gradient(circle at 54% 34%,#6366f1 0 4%,transparent 4.5%),radial-gradient(circle at 84% 62%,#475569 0 4%,transparent 4.5%),linear-gradient(28deg,transparent 0 43%,rgba(99,102,241,.35) 44% 47%,transparent 48%),linear-gradient(152deg,transparent 0 52%,rgba(217,119,6,.35) 53% 56%,transparent 57%); }
+html[data-ca-theme="dark"] .season-bg-ca26-07-late-autumn-map { --theme-base:#2f2a25;--theme-art:radial-gradient(circle at 18% 70%,#d97706 0 4%,transparent 4.5%),radial-gradient(circle at 54% 34%,#818cf8 0 4%,transparent 4.5%),radial-gradient(circle at 84% 62%,#94a3b8 0 4%,transparent 4.5%),linear-gradient(28deg,transparent 0 43%,rgba(129,140,248,.43) 44% 47%,transparent 48%),linear-gradient(152deg,transparent 0 52%,rgba(217,119,6,.33) 53% 56%,transparent 57%); }
+html[data-ca-theme="light"] .season-bg-ca26-08-evening-notebook { --theme-base:#dbeafe;--theme-art:linear-gradient(90deg,transparent 0 14%,rgba(245,158,11,.58) 15% 33%,transparent 34% 62%,rgba(245,158,11,.44) 63% 82%,transparent 83%),linear-gradient(0deg,transparent 0 45%,rgba(30,58,138,.34) 46% 49%,transparent 50%),radial-gradient(circle at 72% 34%,rgba(139,92,246,.3),transparent 23%); }
+html[data-ca-theme="dark"] .season-bg-ca26-08-evening-notebook { --theme-base:#172033;--theme-art:linear-gradient(90deg,transparent 0 14%,rgba(245,158,11,.58) 15% 33%,transparent 34% 62%,rgba(245,158,11,.44) 63% 82%,transparent 83%),linear-gradient(0deg,transparent 0 45%,rgba(165,180,252,.2) 46% 49%,transparent 50%),radial-gradient(circle at 72% 34%,rgba(139,92,246,.4),transparent 23%); }
+html[data-ca-theme="light"] .season-bg-ca26-09-first-snowfall { --theme-base:#f8fafc;--theme-art:radial-gradient(circle at 18% 20%,rgba(56,189,248,.8) 0 3%,transparent 3.5%),radial-gradient(circle at 76% 28%,rgba(99,102,241,.55) 0 5%,transparent 5.5%),radial-gradient(circle at 44% 68%,rgba(165,180,252,.65) 0 7%,transparent 7.5%),repeating-linear-gradient(60deg,transparent 0 45px,rgba(56,189,248,.13) 46px 48px); }
+html[data-ca-theme="dark"] .season-bg-ca26-09-first-snowfall { --theme-base:#16213a;--theme-art:radial-gradient(circle at 18% 20%,rgba(125,211,252,.85) 0 3%,transparent 3.5%),radial-gradient(circle at 76% 28%,rgba(165,180,252,.7) 0 5%,transparent 5.5%),radial-gradient(circle at 44% 68%,rgba(224,231,255,.52) 0 7%,transparent 7.5%),repeating-linear-gradient(60deg,transparent 0 45px,rgba(56,189,248,.16) 46px 48px); }
+html[data-ca-theme="light"] .season-bg-ca26-10-december-countdown { --theme-base:#f5f3ff;--theme-art:repeating-conic-gradient(at 78% 28%,rgba(124,58,237,.5) 0 3deg,transparent 3deg 15deg),radial-gradient(circle at 78% 28%,transparent 0 19%,rgba(59,130,246,.3) 19.5% 21%,transparent 21.5%),linear-gradient(18deg,transparent 0 65%,rgba(251,191,36,.55) 66% 70%,transparent 71%); }
+html[data-ca-theme="dark"] .season-bg-ca26-10-december-countdown { --theme-base:#1e1b3a;--theme-art:repeating-conic-gradient(at 78% 28%,rgba(167,139,250,.6) 0 3deg,transparent 3deg 15deg),radial-gradient(circle at 78% 28%,transparent 0 19%,rgba(96,165,250,.4) 19.5% 21%,transparent 21.5%),linear-gradient(18deg,transparent 0 65%,rgba(251,191,36,.44) 66% 70%,transparent 71%); }
+html[data-ca-theme="light"] .season-bg-ca26-11-festive-workshop { --theme-base:#fffbeb;--theme-art:linear-gradient(60deg,transparent 0 43%,rgba(22,163,74,.5) 44% 47%,transparent 48%),linear-gradient(-60deg,transparent 0 43%,rgba(220,38,38,.42) 44% 47%,transparent 48%),radial-gradient(circle at 18% 22%,#fbbf24 0 3%,transparent 3.5%),radial-gradient(circle at 72% 18%,#7c3aed 0 3%,transparent 3.5%),radial-gradient(circle at 82% 64%,#dc2626 0 4%,transparent 4.5%); }
+html[data-ca-theme="dark"] .season-bg-ca26-11-festive-workshop { --theme-base:#251b32;--theme-art:linear-gradient(60deg,transparent 0 43%,rgba(34,197,94,.46) 44% 47%,transparent 48%),linear-gradient(-60deg,transparent 0 43%,rgba(248,113,113,.4) 44% 47%,transparent 48%),radial-gradient(circle at 18% 22%,#fbbf24 0 3%,transparent 3.5%),radial-gradient(circle at 72% 18%,#a78bfa 0 3%,transparent 3.5%),radial-gradient(circle at 82% 64%,#ef4444 0 4%,transparent 4.5%); }
+html[data-ca-theme="light"] .season-bg-ca26-12-frosty-morning { --theme-base:#f8fafc;--theme-art:linear-gradient(45deg,transparent 0 45%,rgba(14,165,233,.38) 46% 48%,transparent 49%),linear-gradient(-45deg,transparent 0 45%,rgba(99,102,241,.3) 46% 48%,transparent 49%),repeating-linear-gradient(90deg,transparent 0 76px,rgba(14,165,233,.12) 77px 79px); }
+html[data-ca-theme="dark"] .season-bg-ca26-12-frosty-morning { --theme-base:#17243a;--theme-art:linear-gradient(45deg,transparent 0 45%,rgba(125,211,252,.4) 46% 48%,transparent 49%),linear-gradient(-45deg,transparent 0 45%,rgba(165,180,252,.35) 46% 48%,transparent 49%),repeating-linear-gradient(90deg,transparent 0 76px,rgba(224,242,254,.1) 77px 79px); }
+html[data-ca-theme="light"] .season-bg-ca26-13-white-page { --theme-base:#fff;--theme-art:linear-gradient(90deg,transparent 0 16%,rgba(37,99,235,.27) 16.5% 17.5%,transparent 18%),repeating-linear-gradient(0deg,transparent 0 31px,rgba(100,116,139,.14) 32px 34px),linear-gradient(128deg,transparent 0 68%,rgba(167,139,250,.38) 69% 73%,transparent 74%); }
+html[data-ca-theme="dark"] .season-bg-ca26-13-white-page { --theme-base:#1e293b;--theme-art:linear-gradient(90deg,transparent 0 16%,rgba(96,165,250,.38) 16.5% 17.5%,transparent 18%),repeating-linear-gradient(0deg,transparent 0 31px,rgba(148,163,184,.15) 32px 34px),linear-gradient(128deg,transparent 0 68%,rgba(167,139,250,.34) 69% 73%,transparent 74%); }
+html[data-ca-theme="light"] .season-bg-ca26-14-winter-schedule { --theme-base:#eff6ff;--theme-art:linear-gradient(0deg,rgba(71,85,105,.35) 0 24%,transparent 24.5%),repeating-linear-gradient(90deg,transparent 0 48px,rgba(29,78,216,.17) 49px 52px),repeating-linear-gradient(0deg,transparent 0 39px,rgba(139,92,246,.13) 40px 42px); }
+html[data-ca-theme="dark"] .season-bg-ca26-14-winter-schedule { --theme-base:#172033;--theme-art:linear-gradient(0deg,rgba(71,85,105,.58) 0 24%,transparent 24.5%),repeating-linear-gradient(90deg,transparent 0 48px,rgba(96,165,250,.2) 49px 52px),repeating-linear-gradient(0deg,transparent 0 39px,rgba(167,139,250,.15) 40px 42px); }
+html[data-ca-theme="light"] .season-bg-ca26-15-resilience-line { --theme-base:#f0fdfa;--theme-art:linear-gradient(135deg,transparent 0 59%,rgba(15,118,110,.5) 60% 64%,transparent 65%),linear-gradient(0deg,rgba(37,99,235,.28) 0 14%,transparent 14.5%),repeating-linear-gradient(90deg,transparent 0 78px,rgba(245,158,11,.16) 79px 83px); }
+html[data-ca-theme="dark"] .season-bg-ca26-15-resilience-line { --theme-base:#1c2b2a;--theme-art:linear-gradient(135deg,transparent 0 59%,rgba(45,212,191,.48) 60% 64%,transparent 65%),linear-gradient(0deg,rgba(37,99,235,.35) 0 14%,transparent 14.5%),repeating-linear-gradient(90deg,transparent 0 78px,rgba(245,158,11,.2) 79px 83px); }
+html[data-ca-theme="light"] .season-bg-ca26-16-spring-light { --theme-base:#f0fdf4;--theme-art:radial-gradient(ellipse at 17% 27%,rgba(22,163,74,.55) 0 11%,transparent 11.5%),radial-gradient(circle at 78% 22%,rgba(245,158,11,.45) 0 13%,transparent 13.5%),radial-gradient(circle at 70% 66%,rgba(139,92,246,.35) 0 7%,transparent 7.5%),linear-gradient(35deg,transparent 0 52%,rgba(22,163,74,.32) 53% 56%,transparent 57%); }
+html[data-ca-theme="dark"] .season-bg-ca26-16-spring-light { --theme-base:#21301f;--theme-art:radial-gradient(ellipse at 17% 27%,rgba(34,197,94,.5) 0 11%,transparent 11.5%),radial-gradient(circle at 78% 22%,rgba(245,158,11,.4) 0 13%,transparent 13.5%),radial-gradient(circle at 70% 66%,rgba(167,139,250,.4) 0 7%,transparent 7.5%),linear-gradient(35deg,transparent 0 52%,rgba(74,222,128,.3) 53% 56%,transparent 57%); }
+html[data-ca-theme="light"] .season-bg-ca26-17-equinox-day { --theme-base:#f0fdfa;--theme-art:linear-gradient(90deg,rgba(13,148,136,.4) 0 50%,rgba(245,158,11,.38) 50%),linear-gradient(0deg,transparent 0 49%,rgba(99,102,241,.38) 49% 52%,transparent 52.5%),radial-gradient(circle at 50% 50%,transparent 0 25%,rgba(255,255,255,.45) 25.5% 27%,transparent 27.5%); }
+html[data-ca-theme="dark"] .season-bg-ca26-17-equinox-day { --theme-base:#1a2e2b;--theme-art:linear-gradient(90deg,rgba(13,148,136,.42) 0 50%,rgba(245,158,11,.3) 50%),linear-gradient(0deg,transparent 0 49%,rgba(165,180,252,.35) 49% 52%,transparent 52.5%),radial-gradient(circle at 50% 50%,transparent 0 25%,rgba(240,253,250,.22) 25.5% 27%,transparent 27.5%); }
+html[data-ca-theme="light"] .season-bg-ca26-18-academy-launch { --theme-base:#e0e7ff;--theme-art:radial-gradient(circle at 78% 22%,#22d3ee 0 2%,transparent 2.5%),radial-gradient(circle at 20% 18%,#7c3aed 0 2%,transparent 2.5%),linear-gradient(65deg,transparent 0 53%,rgba(67,56,202,.55) 54% 58%,transparent 59%),radial-gradient(ellipse at 50% 110%,rgba(34,211,238,.44),transparent 45%); }
+html[data-ca-theme="dark"] .season-bg-ca26-18-academy-launch { --theme-base:#0b1022;--theme-art:radial-gradient(circle at 78% 22%,#22d3ee 0 2%,transparent 2.5%),radial-gradient(circle at 20% 18%,#a78bfa 0 2%,transparent 2.5%),linear-gradient(65deg,transparent 0 53%,rgba(124,58,237,.6) 54% 58%,transparent 59%),radial-gradient(ellipse at 50% 110%,rgba(34,211,238,.38),transparent 45%); }
+html[data-ca-theme="light"] .season-bg-ca26-19-april-reflections { --theme-base:#f0f9ff;--theme-art:repeating-radial-gradient(ellipse at 64% 74%,transparent 0 24px,rgba(14,165,233,.32) 25px 29px,transparent 30px 50px),repeating-linear-gradient(116deg,transparent 0 32px,rgba(100,116,139,.18) 33px 35px),radial-gradient(circle at 20% 30%,rgba(168,85,247,.2),transparent 20%); }
+html[data-ca-theme="dark"] .season-bg-ca26-19-april-reflections { --theme-base:#1b2738;--theme-art:repeating-radial-gradient(ellipse at 64% 74%,transparent 0 24px,rgba(56,189,248,.35) 25px 29px,transparent 30px 50px),repeating-linear-gradient(116deg,transparent 0 32px,rgba(148,163,184,.2) 33px 35px),radial-gradient(circle at 20% 30%,rgba(168,85,247,.32),transparent 20%); }
+html[data-ca-theme="light"] .season-bg-ca26-20-bright-may { --theme-base:#f7fee7;--theme-art:radial-gradient(circle at 80% 18%,rgba(234,179,8,.55) 0 14%,transparent 14.5%),radial-gradient(ellipse at 18% 28%,rgba(34,197,94,.52) 0 12%,transparent 12.5%),radial-gradient(circle at 42% 20%,rgba(99,102,241,.28) 0 5%,transparent 5.5%),linear-gradient(25deg,transparent 0 62%,rgba(34,197,94,.26) 63% 67%,transparent 68%); }
+html[data-ca-theme="dark"] .season-bg-ca26-20-bright-may { --theme-base:#22301e;--theme-art:radial-gradient(circle at 80% 18%,rgba(234,179,8,.45) 0 14%,transparent 14.5%),radial-gradient(ellipse at 18% 28%,rgba(34,197,94,.45) 0 12%,transparent 12.5%),radial-gradient(circle at 42% 20%,rgba(129,140,248,.34) 0 5%,transparent 5.5%),linear-gradient(25deg,transparent 0 62%,rgba(74,222,128,.25) 63% 67%,transparent 68%); }
+html[data-ca-theme="light"] .season-bg-ca26-21-classroom-results { --theme-base:#eff6ff;--theme-art:linear-gradient(0deg,transparent 0 17%,rgba(37,99,235,.36) 18% 20%,transparent 21%),linear-gradient(90deg,transparent 0 12%,rgba(30,41,59,.16) 13% 85%,transparent 86%),radial-gradient(circle at 77% 22%,rgba(245,158,11,.55) 0 9%,transparent 9.5%),linear-gradient(145deg,transparent 0 65%,rgba(139,92,246,.32) 66% 70%,transparent 71%); }
+html[data-ca-theme="dark"] .season-bg-ca26-21-classroom-results { --theme-base:#1e293b;--theme-art:linear-gradient(0deg,transparent 0 17%,rgba(96,165,250,.38) 18% 20%,transparent 21%),linear-gradient(90deg,transparent 0 12%,rgba(15,23,42,.5) 13% 85%,transparent 86%),radial-gradient(circle at 77% 22%,rgba(245,158,11,.48) 0 9%,transparent 9.5%),linear-gradient(145deg,transparent 0 65%,rgba(167,139,250,.34) 66% 70%,transparent 71%); }
+html[data-ca-theme="light"] .season-bg-ca26-22-calm-exam { --theme-base:#f8fafc;--theme-art:repeating-conic-gradient(at 78% 28%,rgba(79,70,229,.42) 0 3deg,transparent 3deg 18deg),radial-gradient(circle at 78% 28%,transparent 0 17%,rgba(14,165,233,.28) 17.5% 19%,transparent 19.5%),linear-gradient(142deg,transparent 0 62%,rgba(245,158,11,.4) 63% 67%,transparent 68%),repeating-linear-gradient(0deg,transparent 0 29px,rgba(14,165,233,.1) 30px 31px); }
+html[data-ca-theme="dark"] .season-bg-ca26-22-calm-exam { --theme-base:#182238;--theme-art:repeating-conic-gradient(at 78% 28%,rgba(129,140,248,.5) 0 3deg,transparent 3deg 18deg),radial-gradient(circle at 78% 28%,transparent 0 17%,rgba(56,189,248,.34) 17.5% 19%,transparent 19.5%),linear-gradient(142deg,transparent 0 62%,rgba(245,158,11,.34) 63% 67%,transparent 68%),repeating-linear-gradient(0deg,transparent 0 29px,rgba(125,211,252,.1) 30px 31px); }
+html[data-ca-theme="light"] .season-bg-ca26-23-open-summer { --theme-base:#fffbeb;--theme-art:linear-gradient(90deg,transparent 0 18%,rgba(20,184,166,.22) 19% 23%,transparent 24% 76%,rgba(20,184,166,.22) 77% 81%,transparent 82%),radial-gradient(circle at 78% 18%,#f59e0b 0 13%,transparent 13.5%),linear-gradient(165deg,transparent 0 58%,rgba(20,184,166,.48) 59% 70%,rgba(56,189,248,.35) 71%); }
+html[data-ca-theme="dark"] .season-bg-ca26-23-open-summer { --theme-base:#17313b;--theme-art:linear-gradient(90deg,transparent 0 18%,rgba(45,212,191,.25) 19% 23%,transparent 24% 76%,rgba(45,212,191,.25) 77% 81%,transparent 82%),radial-gradient(circle at 78% 18%,#f59e0b 0 13%,transparent 13.5%),linear-gradient(165deg,transparent 0 58%,rgba(20,184,166,.4) 59% 70%,rgba(56,189,248,.3) 71%); }
+
+@media (max-width: 1100px) {
+  .season-preview-toolbar { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .season-preview-search { grid-column:span 2; }
 }
 
-.season-modal[hidden] {
-  display: none;
+@media (max-width: 760px) {
+  .season-preview-shell { width:min(100% - 20px,1500px);padding-top:10px; }
+  .season-preview-toolbar { position:static;grid-template-columns:1fr 1fr; }
+  .season-preview-search { grid-column:1 / -1; }
+  .season-mini-content { grid-template-columns:1fr; }
 }
 
-.season-modal-panel {
-  width: min(960px, 100%);
-  max-height: min(880px, calc(100vh - 36px));
-  overflow: auto;
-  border-radius: 28px;
-}
-
-.season-modal-head {
-  position: sticky;
-  z-index: 3;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--season-preview-border);
-  background: var(--season-preview-surface);
-}
-
-.season-modal-head h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.season-modal-close {
-  min-width: 44px;
-  padding: 0;
-}
-
-.season-mini-app {
-  position: relative;
-  min-height: 620px;
-  overflow: hidden;
-  isolation: isolate;
-  background-position: center;
-}
-
-.season-mini-app::after {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: color-mix(in srgb, var(--season-preview-bg) 28%, transparent);
-  content: "";
-}
-
-.season-mini-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 18px;
-  border-bottom: 1px solid color-mix(in srgb, var(--season-preview-border) 72%, transparent);
-  background: color-mix(in srgb, var(--season-preview-surface) 82%, transparent);
-  backdrop-filter: blur(14px);
-}
-
-.season-mini-balance {
-  padding: 9px 12px;
-  border-radius: 999px;
-  background: var(--season-preview-surface-soft);
-  font-size: 0.8rem;
-  font-weight: 850;
-}
-
-.season-mini-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
-  gap: 16px;
-  padding: 18px;
-}
-
-.season-mini-shop,
-.season-mini-profile {
-  border: 1px solid color-mix(in srgb, var(--season-preview-border) 84%, transparent);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--season-preview-surface) 89%, transparent);
-  box-shadow: var(--season-preview-shadow);
-  backdrop-filter: blur(10px);
-}
-
-.season-mini-shop {
-  padding: 18px;
-}
-
-.season-mini-shop h3,
-.season-mini-profile h3 {
-  margin: 0;
-}
-
-.season-mini-product {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 16px;
-  margin-top: 18px;
-  padding: 16px;
-  border: 1px solid var(--season-preview-border);
-  border-radius: 18px;
-  background: var(--season-preview-surface-soft);
-}
-
-.season-mini-product img {
-  width: 82px;
-  height: 82px;
-  border-radius: 20px;
-}
-
-.season-mini-product h4 {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.season-mini-product p {
-  margin: 7px 0 12px;
-  color: var(--season-preview-muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-.season-mini-profile {
-  display: grid;
-  align-content: start;
-  justify-items: center;
-  padding: 28px 18px;
-  text-align: center;
-}
-
-.season-mini-profile .season-avatar-shell {
-  width: 126px;
-  height: 126px;
-  margin: 18px 0 12px;
-}
-
-.season-mini-profile p {
-  margin: 7px 0 0;
-  color: var(--season-preview-muted);
-}
-
-.season-modal-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-/* Every background uses at least a large motif, a medium motif and a texture layer. */
-html[data-ca-theme="light"] .season-bg-s26-01-vector-field { background-color: #eef0ff; background-image: radial-gradient(circle at 76% 24%, rgba(109,40,217,.20) 0 15%, transparent 16%), repeating-linear-gradient(32deg, transparent 0 46px, rgba(67,56,202,.13) 47px 50px), radial-gradient(circle, rgba(14,116,144,.23) 0 2px, transparent 3px); background-size: auto, auto, 24px 24px; }
-html[data-ca-theme="dark"] .season-bg-s26-01-vector-field { background-color: #0b1022; background-image: radial-gradient(circle at 76% 24%, rgba(149,117,247,.29) 0 15%, transparent 16%), repeating-linear-gradient(32deg, transparent 0 46px, rgba(129,140,248,.20) 47px 50px), radial-gradient(circle, rgba(34,211,238,.32) 0 2px, transparent 3px); background-size: auto, auto, 24px 24px; }
-
-html[data-ca-theme="light"] .season-bg-s26-02-coordinate-atlas { background-color: #edf5ff; background-image: linear-gradient(90deg, transparent 49.4%, rgba(37,99,235,.26) 49.5% 50.5%, transparent 50.6%), linear-gradient(transparent 49.4%, rgba(124,58,237,.22) 49.5% 50.5%, transparent 50.6%), radial-gradient(circle at 50% 50%, transparent 0 18%, rgba(6,182,212,.16) 18.5% 19.5%, transparent 20% 37%, rgba(37,99,235,.12) 37.5% 38.5%, transparent 39%), radial-gradient(circle, rgba(17,24,39,.16) 0 1px, transparent 2px); background-size: auto, auto, auto, 28px 28px; }
-html[data-ca-theme="dark"] .season-bg-s26-02-coordinate-atlas { background-color: #10172a; background-image: linear-gradient(90deg, transparent 49.3%, rgba(56,189,248,.37) 49.5% 50.5%, transparent 50.7%), linear-gradient(transparent 49.3%, rgba(129,140,248,.32) 49.5% 50.5%, transparent 50.7%), radial-gradient(circle at 50% 50%, transparent 0 18%, rgba(6,182,212,.28) 18.5% 19.5%, transparent 20% 37%, rgba(124,58,237,.25) 37.5% 38.5%, transparent 39%), radial-gradient(circle, rgba(224,242,254,.28) 0 1px, transparent 2px); background-size: auto, auto, auto, 28px 28px; }
-
-html[data-ca-theme="light"] .season-bg-s26-03-symmetry-hall { background-color: #fff0fa; background-image: linear-gradient(90deg, transparent 49.5%, rgba(236,72,153,.24) 49.5% 50.5%, transparent 50.5%), radial-gradient(ellipse at 32% 50%, transparent 0 23%, rgba(139,92,246,.17) 23.5% 25%, transparent 25.5%), radial-gradient(ellipse at 68% 50%, transparent 0 23%, rgba(139,92,246,.17) 23.5% 25%, transparent 25.5%), repeating-linear-gradient(45deg, transparent 0 31px, rgba(56,189,248,.10) 32px 34px); }
-html[data-ca-theme="dark"] .season-bg-s26-03-symmetry-hall { background-color: #1f1533; background-image: linear-gradient(90deg, transparent 49.4%, rgba(244,114,182,.42) 49.5% 50.5%, transparent 50.6%), radial-gradient(ellipse at 32% 50%, transparent 0 23%, rgba(139,92,246,.29) 23.5% 25%, transparent 25.5%), radial-gradient(ellipse at 68% 50%, transparent 0 23%, rgba(139,92,246,.29) 23.5% 25%, transparent 25.5%), repeating-linear-gradient(45deg, transparent 0 31px, rgba(56,189,248,.15) 32px 34px); }
-
-html[data-ca-theme="light"] .season-bg-s26-04-trajectory-map { background-color: #fff5ea; background-image: radial-gradient(circle at 16% 76%, rgba(249,115,22,.23) 0 7%, transparent 7.5%), radial-gradient(circle at 77% 18%, rgba(99,102,241,.19) 0 10%, transparent 10.5%), repeating-radial-gradient(ellipse at 12% 88%, transparent 0 42px, rgba(234,179,8,.15) 43px 46px, transparent 47px 72px), linear-gradient(118deg, transparent 0 45%, rgba(99,102,241,.11) 45.5% 47%, transparent 47.5%); }
-html[data-ca-theme="dark"] .season-bg-s26-04-trajectory-map { background-color: #24180f; background-image: radial-gradient(circle at 16% 76%, rgba(249,115,22,.36) 0 7%, transparent 7.5%), radial-gradient(circle at 77% 18%, rgba(129,140,248,.31) 0 10%, transparent 10.5%), repeating-radial-gradient(ellipse at 12% 88%, transparent 0 42px, rgba(234,179,8,.23) 43px 46px, transparent 47px 72px), linear-gradient(118deg, transparent 0 45%, rgba(129,140,248,.18) 45.5% 47%, transparent 47.5%); }
-
-html[data-ca-theme="light"] .season-bg-s26-05-prime-archive { background-color: #effcf7; background-image: linear-gradient(90deg, rgba(16,185,129,.12) 1px, transparent 1px), linear-gradient(rgba(79,70,229,.11) 1px, transparent 1px), radial-gradient(circle at 72% 34%, rgba(20,184,166,.26) 0 18%, transparent 18.5%), repeating-linear-gradient(90deg, transparent 0 47px, rgba(11,37,36,.10) 48px 50px); background-size: 36px 36px, 36px 36px, auto, auto; }
-html[data-ca-theme="dark"] .season-bg-s26-05-prime-archive { background-color: #0b2524; background-image: linear-gradient(90deg, rgba(45,212,191,.20) 1px, transparent 1px), linear-gradient(rgba(129,140,248,.18) 1px, transparent 1px), radial-gradient(circle at 72% 34%, rgba(16,185,129,.30) 0 18%, transparent 18.5%), repeating-linear-gradient(90deg, transparent 0 47px, rgba(236,253,245,.12) 48px 50px); background-size: 36px 36px, 36px 36px, auto, auto; }
-
-html[data-ca-theme="light"] .season-bg-s26-06-function-spectrum { background-color: #fbf1ff; background-image: linear-gradient(120deg, rgba(124,58,237,.19), transparent 30%), linear-gradient(160deg, transparent 35%, rgba(219,39,119,.17) 35.5% 51%, transparent 51.5%), radial-gradient(ellipse at 77% 72%, rgba(245,158,11,.19) 0 24%, transparent 25%), repeating-linear-gradient(0deg, transparent 0 27px, rgba(34,18,55,.08) 28px 29px); }
-html[data-ca-theme="dark"] .season-bg-s26-06-function-spectrum { background-color: #221237; background-image: linear-gradient(120deg, rgba(149,117,247,.31), transparent 30%), linear-gradient(160deg, transparent 35%, rgba(236,72,153,.27) 35.5% 51%, transparent 51.5%), radial-gradient(ellipse at 77% 72%, rgba(245,158,11,.25) 0 24%, transparent 25%), repeating-linear-gradient(0deg, transparent 0 27px, rgba(250,245,255,.10) 28px 29px); }
-
-html[data-ca-theme="light"] .season-bg-s26-07-outcome-field { background-color: #effdfa; background-image: conic-gradient(from 18deg at 78% 25%, rgba(14,165,233,.22) 0 22%, transparent 22% 48%, rgba(244,63,94,.18) 48% 61%, transparent 61%), radial-gradient(circle at 24% 67%, rgba(20,184,166,.22) 0 15%, transparent 15.5%), radial-gradient(circle, rgba(16,42,53,.13) 0 2px, transparent 3px); background-size: auto, auto, 25px 25px; }
-html[data-ca-theme="dark"] .season-bg-s26-07-outcome-field { background-color: #102a35; background-image: conic-gradient(from 18deg at 78% 25%, rgba(14,165,233,.34) 0 22%, transparent 22% 48%, rgba(244,63,94,.28) 48% 61%, transparent 61%), radial-gradient(circle at 24% 67%, rgba(20,184,166,.31) 0 15%, transparent 15.5%), radial-gradient(circle, rgba(240,253,250,.20) 0 2px, transparent 3px); background-size: auto, auto, 25px 25px; }
-
-html[data-ca-theme="light"] .season-bg-s26-08-light-geometry { background-color: #fffbea; background-image: linear-gradient(62deg, transparent 0 32%, rgba(250,204,21,.22) 32.5% 34%, transparent 34.5%), linear-gradient(118deg, transparent 0 58%, rgba(56,189,248,.21) 58.5% 60%, transparent 60.5%), conic-gradient(from 30deg at 72% 36%, rgba(99,102,241,.18), transparent 34% 67%, rgba(250,204,21,.13)), radial-gradient(circle, rgba(29,35,64,.11) 0 1px, transparent 2px); background-size: auto, auto, auto, 22px 22px; }
-html[data-ca-theme="dark"] .season-bg-s26-08-light-geometry { background-color: #1d2340; background-image: linear-gradient(62deg, transparent 0 32%, rgba(250,204,21,.34) 32.5% 34%, transparent 34.5%), linear-gradient(118deg, transparent 0 58%, rgba(56,189,248,.33) 58.5% 60%, transparent 60.5%), conic-gradient(from 30deg at 72% 36%, rgba(129,140,248,.29), transparent 34% 67%, rgba(250,204,21,.20)), radial-gradient(circle, rgba(255,251,235,.18) 0 1px, transparent 2px); background-size: auto, auto, auto, 22px 22px; }
-
-html[data-ca-theme="light"] .season-bg-s26-09-fractal-depth { background-color: #f6f0ff; background-image: radial-gradient(circle at 78% 25%, rgba(168,85,247,.22) 0 18%, transparent 18.5%), repeating-radial-gradient(circle at 78% 25%, transparent 0 24px, rgba(34,197,94,.13) 25px 28px, transparent 29px 48px), repeating-linear-gradient(60deg, transparent 0 39px, rgba(6,182,212,.12) 40px 42px); }
-html[data-ca-theme="dark"] .season-bg-s26-09-fractal-depth { background-color: #19142d; background-image: radial-gradient(circle at 78% 25%, rgba(168,85,247,.34) 0 18%, transparent 18.5%), repeating-radial-gradient(circle at 78% 25%, transparent 0 24px, rgba(34,197,94,.22) 25px 28px, transparent 29px 48px), repeating-linear-gradient(60deg, transparent 0 39px, rgba(6,182,212,.18) 40px 42px); }
-
-html[data-ca-theme="light"] .season-bg-s26-10-dependency-plane { background-color: #fff1f3; background-image: radial-gradient(circle at 18% 24%, transparent 0 11%, rgba(239,68,68,.20) 11.5% 13%, transparent 13.5%), radial-gradient(circle at 81% 72%, transparent 0 17%, rgba(249,115,22,.19) 17.5% 19%, transparent 19.5%), repeating-linear-gradient(0deg, transparent 0 31px, rgba(139,92,246,.11) 32px 34px), linear-gradient(132deg, transparent 0 47%, rgba(239,68,68,.14) 47.5% 49%, transparent 49.5%); }
-html[data-ca-theme="dark"] .season-bg-s26-10-dependency-plane { background-color: #2b171b; background-image: radial-gradient(circle at 18% 24%, transparent 0 11%, rgba(239,68,68,.33) 11.5% 13%, transparent 13.5%), radial-gradient(circle at 81% 72%, transparent 0 17%, rgba(249,115,22,.30) 17.5% 19%, transparent 19.5%), repeating-linear-gradient(0deg, transparent 0 31px, rgba(139,92,246,.18) 32px 34px), linear-gradient(132deg, transparent 0 47%, rgba(239,68,68,.21) 47.5% 49%, transparent 49.5%); }
-
-html[data-ca-theme="light"] .season-bg-s26-11-encoded-sky { background-color: #eef1ff; background-image: linear-gradient(31deg, transparent 0 46%, rgba(79,70,229,.17) 46.5% 47%, transparent 47.5%), linear-gradient(149deg, transparent 0 63%, rgba(147,51,234,.16) 63.5% 64%, transparent 64.5%), radial-gradient(circle at 74% 31%, rgba(251,191,36,.28) 0 3px, transparent 4px), radial-gradient(circle, rgba(14,22,54,.15) 0 1px, transparent 2px); background-size: auto, auto, 71px 71px, 23px 23px; }
-html[data-ca-theme="dark"] .season-bg-s26-11-encoded-sky { background-color: #0e1636; background-image: linear-gradient(31deg, transparent 0 46%, rgba(129,140,248,.26) 46.5% 47%, transparent 47.5%), linear-gradient(149deg, transparent 0 63%, rgba(147,51,234,.25) 63.5% 64%, transparent 64.5%), radial-gradient(circle at 74% 31%, rgba(251,191,36,.42) 0 3px, transparent 4px), radial-gradient(circle, rgba(238,242,255,.25) 0 1px, transparent 2px); background-size: auto, auto, 71px 71px, 23px 23px; }
-
-html[data-ca-theme="light"] .season-bg-s26-12-algorithm-corridor { background-color: #edfcff; background-image: linear-gradient(90deg, rgba(8,145,178,.18) 0 16%, transparent 16% 41%, rgba(79,70,229,.15) 41% 57%, transparent 57% 82%, rgba(163,230,53,.17) 82%), linear-gradient(135deg, transparent 0 48%, rgba(11,32,41,.11) 48.5% 50%, transparent 50.5%), repeating-linear-gradient(0deg, transparent 0 35px, rgba(8,145,178,.10) 36px 38px); }
-html[data-ca-theme="dark"] .season-bg-s26-12-algorithm-corridor { background-color: #0b2029; background-image: linear-gradient(90deg, rgba(8,145,178,.28) 0 16%, transparent 16% 41%, rgba(79,70,229,.25) 41% 57%, transparent 57% 82%, rgba(163,230,53,.23) 82%), linear-gradient(135deg, transparent 0 48%, rgba(236,254,255,.18) 48.5% 50%, transparent 50.5%), repeating-linear-gradient(0deg, transparent 0 35px, rgba(8,145,178,.17) 36px 38px); }
-
-html[data-ca-theme="light"] .season-bg-s26-13-wave-lab { background-color: #edfbff; background-image: repeating-radial-gradient(ellipse at 0 50%, transparent 0 54px, rgba(6,182,212,.19) 55px 59px, transparent 60px 105px), repeating-radial-gradient(ellipse at 100% 50%, transparent 0 38px, rgba(217,70,239,.14) 39px 42px, transparent 43px 82px), repeating-linear-gradient(90deg, transparent 0 28px, rgba(59,130,246,.10) 29px 30px); }
-html[data-ca-theme="dark"] .season-bg-s26-13-wave-lab { background-color: #101d3a; background-image: repeating-radial-gradient(ellipse at 0 50%, transparent 0 54px, rgba(6,182,212,.31) 55px 59px, transparent 60px 105px), repeating-radial-gradient(ellipse at 100% 50%, transparent 0 38px, rgba(217,70,239,.23) 39px 42px, transparent 43px 82px), repeating-linear-gradient(90deg, transparent 0 28px, rgba(59,130,246,.16) 29px 30px); }
-
-html[data-ca-theme="light"] .season-bg-s26-14-polar-station { background-color: #effcff; background-image: radial-gradient(ellipse at 50% -12%, rgba(45,212,191,.24) 0 35%, transparent 36%), linear-gradient(158deg, transparent 0 31%, rgba(14,165,233,.18) 31.5% 39%, transparent 39.5%), linear-gradient(198deg, transparent 0 48%, rgba(165,180,252,.20) 48.5% 56%, transparent 56.5%), radial-gradient(circle, rgba(16,36,59,.15) 0 1px, transparent 2px); background-size: auto, auto, auto, 20px 20px; }
-html[data-ca-theme="dark"] .season-bg-s26-14-polar-station { background-color: #10243b; background-image: radial-gradient(ellipse at 50% -12%, rgba(45,212,191,.34) 0 35%, transparent 36%), linear-gradient(158deg, transparent 0 31%, rgba(14,165,233,.28) 31.5% 39%, transparent 39.5%), linear-gradient(198deg, transparent 0 48%, rgba(165,180,252,.27) 48.5% 56%, transparent 56.5%), radial-gradient(circle, rgba(240,253,255,.22) 0 1px, transparent 2px); background-size: auto, auto, auto, 20px 20px; }
-
-html[data-ca-theme="light"] .season-bg-s26-15-measurement-chamber { background-color: #fff9e9; background-image: repeating-conic-gradient(from 270deg at 78% 70%, rgba(217,119,6,.20) 0 1deg, transparent 1deg 8deg), radial-gradient(circle at 78% 70%, transparent 0 18%, rgba(15,118,110,.17) 18.5% 20%, transparent 20.5% 35%, rgba(99,102,241,.13) 35.5% 37%, transparent 37.5%), repeating-linear-gradient(90deg, transparent 0 47px, rgba(44,33,24,.10) 48px 49px); }
-html[data-ca-theme="dark"] .season-bg-s26-15-measurement-chamber { background-color: #2c2118; background-image: repeating-conic-gradient(from 270deg at 78% 70%, rgba(245,158,11,.30) 0 1deg, transparent 1deg 8deg), radial-gradient(circle at 78% 70%, transparent 0 18%, rgba(45,212,191,.25) 18.5% 20%, transparent 20.5% 35%, rgba(129,140,248,.22) 35.5% 37%, transparent 37.5%), repeating-linear-gradient(90deg, transparent 0 47px, rgba(255,251,235,.14) 48px 49px); }
-
-html[data-ca-theme="light"] .season-bg-s26-16-paradox-route { background-color: #fff1f4; background-image: radial-gradient(ellipse at 24% 50%, transparent 0 16%, rgba(225,29,72,.20) 16.5% 19%, transparent 19.5% 35%, rgba(124,58,237,.14) 35.5% 38%, transparent 38.5%), radial-gradient(ellipse at 76% 50%, transparent 0 16%, rgba(6,182,212,.18) 16.5% 19%, transparent 19.5%), repeating-linear-gradient(45deg, transparent 0 30px, rgba(40,19,41,.09) 31px 33px); }
-html[data-ca-theme="dark"] .season-bg-s26-16-paradox-route { background-color: #281329; background-image: radial-gradient(ellipse at 24% 50%, transparent 0 16%, rgba(225,29,72,.33) 16.5% 19%, transparent 19.5% 35%, rgba(124,58,237,.24) 35.5% 38%, transparent 38.5%), radial-gradient(ellipse at 76% 50%, transparent 0 16%, rgba(6,182,212,.29) 16.5% 19%, transparent 19.5%), repeating-linear-gradient(45deg, transparent 0 30px, rgba(255,241,242,.13) 31px 33px); }
-
-html[data-ca-theme="light"] .season-bg-s26-17-tensor-field { background-color: #f2f1ff; background-image: linear-gradient(30deg, rgba(124,58,237,.16) 12%, transparent 12.5% 87%, rgba(37,99,235,.15) 87.5%), linear-gradient(150deg, rgba(45,212,191,.15) 12%, transparent 12.5% 87%, rgba(124,58,237,.13) 87.5%), linear-gradient(90deg, transparent 49%, rgba(23,24,51,.09) 49.5% 50.5%, transparent 51%); background-size: 120px 78px, 120px 78px, 40px 40px; }
-html[data-ca-theme="dark"] .season-bg-s26-17-tensor-field { background-color: #171833; background-image: linear-gradient(30deg, rgba(149,117,247,.27) 12%, transparent 12.5% 87%, rgba(37,99,235,.25) 87.5%), linear-gradient(150deg, rgba(45,212,191,.24) 12%, transparent 12.5% 87%, rgba(124,58,237,.22) 87.5%), linear-gradient(90deg, transparent 49%, rgba(245,243,255,.14) 49.5% 50.5%, transparent 51%); background-size: 120px 78px, 120px 78px, 40px 40px; }
-
-html[data-ca-theme="light"] .season-bg-s26-18-number-observatory { background-color: #eff4ff; background-image: radial-gradient(ellipse at 76% 78%, transparent 0 24%, rgba(29,78,216,.19) 24.5% 27%, transparent 27.5%), radial-gradient(circle at 24% 22%, rgba(126,34,206,.18) 0 15%, transparent 15.5%), repeating-conic-gradient(from 2deg at 76% 78%, rgba(245,158,11,.15) 0 1deg, transparent 1deg 15deg), radial-gradient(circle, rgba(16,21,44,.14) 0 1px, transparent 2px); background-size: auto, auto, auto, 25px 25px; }
-html[data-ca-theme="dark"] .season-bg-s26-18-number-observatory { background-color: #10152c; background-image: radial-gradient(ellipse at 76% 78%, transparent 0 24%, rgba(59,130,246,.31) 24.5% 27%, transparent 27.5%), radial-gradient(circle at 24% 22%, rgba(126,34,206,.30) 0 15%, transparent 15.5%), repeating-conic-gradient(from 2deg at 76% 78%, rgba(245,158,11,.23) 0 1deg, transparent 1deg 15deg), radial-gradient(circle, rgba(239,246,255,.22) 0 1px, transparent 2px); background-size: auto, auto, auto, 25px 25px; }
-
-html[data-ca-theme="light"] .season-bg-s26-19-time-map { background-color: #effcf9; background-image: repeating-conic-gradient(from 0deg at 76% 48%, rgba(15,118,110,.18) 0 1deg, transparent 1deg 12deg), radial-gradient(circle at 76% 48%, transparent 0 17%, rgba(37,99,235,.17) 17.5% 19%, transparent 19.5% 34%, rgba(245,158,11,.15) 34.5% 36%, transparent 36.5%), repeating-linear-gradient(90deg, transparent 0 38px, rgba(16,39,43,.09) 39px 40px); }
-html[data-ca-theme="dark"] .season-bg-s26-19-time-map { background-color: #10272b; background-image: repeating-conic-gradient(from 0deg at 76% 48%, rgba(45,212,191,.28) 0 1deg, transparent 1deg 12deg), radial-gradient(circle at 76% 48%, transparent 0 17%, rgba(59,130,246,.27) 17.5% 19%, transparent 19.5% 34%, rgba(245,158,11,.22) 34.5% 36%, transparent 36.5%), repeating-linear-gradient(90deg, transparent 0 38px, rgba(240,253,250,.13) 39px 40px); }
-
-html[data-ca-theme="light"] .season-bg-s26-20-limit-projection { background-color: #f5f1ff; background-image: linear-gradient(115deg, rgba(67,56,202,.19), transparent 35%), linear-gradient(245deg, rgba(192,38,211,.17), transparent 35%), repeating-radial-gradient(ellipse at 50% 50%, transparent 0 45px, rgba(34,211,238,.14) 46px 49px, transparent 50px 83px), repeating-linear-gradient(0deg, transparent 0 31px, rgba(27,20,52,.08) 32px 33px); }
-html[data-ca-theme="dark"] .season-bg-s26-20-limit-projection { background-color: #1b1434; background-image: linear-gradient(115deg, rgba(67,56,202,.31), transparent 35%), linear-gradient(245deg, rgba(192,38,211,.27), transparent 35%), repeating-radial-gradient(ellipse at 50% 50%, transparent 0 45px, rgba(34,211,238,.22) 46px 49px, transparent 50px 83px), repeating-linear-gradient(0deg, transparent 0 31px, rgba(245,243,255,.12) 32px 33px); }
-
-html[data-ca-theme="light"] .season-bg-s26-21-meridian-map { background-color: #f5f0ff; background-image: radial-gradient(ellipse at 74% 52%, transparent 0 22%, rgba(109,40,217,.20) 22.5% 24%, transparent 24.5% 38%, rgba(14,165,233,.16) 38.5% 40%, transparent 40.5%), linear-gradient(90deg, transparent 73.5%, rgba(251,191,36,.19) 74% 75%, transparent 75.5%), repeating-radial-gradient(circle at 74% 52%, transparent 0 32px, rgba(24,21,47,.09) 33px 34px); }
-html[data-ca-theme="dark"] .season-bg-s26-21-meridian-map { background-color: #18152f; background-image: radial-gradient(ellipse at 74% 52%, transparent 0 22%, rgba(149,117,247,.33) 22.5% 24%, transparent 24.5% 38%, rgba(14,165,233,.27) 38.5% 40%, transparent 40.5%), linear-gradient(90deg, transparent 73.5%, rgba(251,191,36,.28) 74% 75%, transparent 75.5%), repeating-radial-gradient(circle at 74% 52%, transparent 0 32px, rgba(250,245,255,.13) 33px 34px); }
-
-html[data-ca-theme="light"] .season-bg-s26-22-july-horizon { background-color: #fff9e8; background-image: radial-gradient(circle at 76% 27%, rgba(245,158,11,.28) 0 17%, transparent 17.5%), linear-gradient(180deg, transparent 0 62%, rgba(20,184,166,.17) 62.5% 77%, rgba(56,189,248,.13) 77.5%), repeating-radial-gradient(ellipse at 20% 92%, transparent 0 43px, rgba(21,49,58,.09) 44px 46px, transparent 47px 74px); }
-html[data-ca-theme="dark"] .season-bg-s26-22-july-horizon { background-color: #15313a; background-image: radial-gradient(circle at 76% 27%, rgba(245,158,11,.38) 0 17%, transparent 17.5%), linear-gradient(180deg, transparent 0 62%, rgba(20,184,166,.27) 62.5% 77%, rgba(56,189,248,.22) 77.5%), repeating-radial-gradient(ellipse at 20% 92%, transparent 0 43px, rgba(255,251,235,.12) 44px 46px, transparent 47px 74px); }
-
-html[data-ca-theme="light"] .season-bg-s26-23-august-lagoon { background-color: #f0f2ff; background-image: radial-gradient(circle at 74% 24%, rgba(99,102,241,.23) 0 16%, transparent 16.5%), radial-gradient(circle at 79% 20%, #f0f2ff 0 13%, transparent 13.5%), repeating-radial-gradient(ellipse at 50% 100%, transparent 0 34px, rgba(14,165,233,.15) 35px 38px, transparent 39px 67px), radial-gradient(circle, rgba(244,114,182,.17) 0 1px, transparent 2px); background-size: auto, auto, auto, 24px 24px; }
-html[data-ca-theme="dark"] .season-bg-s26-23-august-lagoon { background-color: #14172f; background-image: radial-gradient(circle at 74% 24%, rgba(129,140,248,.37) 0 16%, transparent 16.5%), radial-gradient(circle at 79% 20%, #14172f 0 13%, transparent 13.5%), repeating-radial-gradient(ellipse at 50% 100%, transparent 0 34px, rgba(14,165,233,.25) 35px 38px, transparent 39px 67px), radial-gradient(circle, rgba(244,114,182,.28) 0 1px, transparent 2px); background-size: auto, auto, auto, 24px 24px; }
-
-@media (max-width: 820px) {
-  .season-preview-toolbar {
-    position: static;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .season-preview-search,
-  .season-theme-toggle {
-    grid-column: 1 / -1;
-  }
-
-  .season-mini-content {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 560px) {
-  .season-preview-shell {
-    width: min(100% - 20px, 1480px);
-    padding-top: 10px;
-  }
-
-  .season-preview-header {
-    border-radius: 22px;
-  }
-
-  .season-preview-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .season-preview-search,
-  .season-theme-toggle {
-    grid-column: auto;
-  }
-
-  .season-items {
-    grid-template-columns: 1fr;
-  }
-
-  .season-card-hero {
-    align-items: flex-start;
-  }
-
-  .season-avatar-shell {
-    width: 82px;
-    min-width: 82px;
-    height: 82px;
-  }
-
-  .season-mini-product {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 470px) {
+  .season-preview-header { padding:22px 18px;border-radius:22px; }
+  .season-preview-toolbar { grid-template-columns:1fr; }
+  .season-preview-search { grid-column:auto; }
+  .season-card-topline,.season-card-hero,.season-card-body { padding-inline:16px; }
+  .season-card-hero { align-items:flex-start; }
+  .season-avatar-shell { width:86px;min-width:86px;height:86px; }
+  .season-items { grid-template-columns:1fr; }
+  .season-mini-product { grid-template-columns:1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .season-frame.rarity-legendary {
-    animation: none;
-  }
-
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-  }
+  .season-frame.rarity-legendary { animation:none; }
+  *,*::before,*::after { scroll-behavior:auto !important;transition-duration:.01ms !important; }
 }

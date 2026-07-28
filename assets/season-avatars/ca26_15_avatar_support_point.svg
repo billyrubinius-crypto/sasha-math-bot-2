@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Точка опоры</title>
+  <desc>Прочная геометрическая опора и восходящие ступени как образ ответственности.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#CCFBF1"/><stop offset="1" stop-color="#BFDBFE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M62 398h388" stroke="#1C2B2A" stroke-width="22" stroke-linecap="round"/>
+  <path d="M92 398v-72h88v-74h88v-74h88v-74h74v294z" fill="#2563EB" opacity=".9" stroke="#1C2B2A" stroke-width="17" stroke-linejoin="round"/>
+  <path d="M104 322h70M192 248h70M280 174h70M368 100h54" stroke="#F0FDFA" stroke-width="13" stroke-linecap="round"/>
+  <path d="m116 324 107-90 72 27 92-123" fill="none" stroke="#F59E0B" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="116" cy="324" r="23" fill="#0F766E" stroke="#1C2B2A" stroke-width="11"/><circle cx="387" cy="138" r="23" fill="#F59E0B" stroke="#1C2B2A" stroke-width="11"/>
+</svg>

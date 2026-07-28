@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Исследователь старта</title>
+  <desc>Исследователь Cosmic Academy в шлеме с картой полёта на визоре.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#4338CA"/><stop offset="1" stop-color="#0B1022"/></linearGradient><linearGradient id="visor" x2="1" y2="1"><stop stop-color="#CFFAFE"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <circle cx="256" cy="238" r="154" fill="#F4F6FF" stroke="#0B1022" stroke-width="19"/>
+  <path d="M132 230c4-89 53-132 124-132s120 43 124 132c-28 67-68 98-124 98s-96-31-124-98z" fill="url(#visor)" stroke="#0B1022" stroke-width="17"/>
+  <path d="M172 224c64 35 111 5 166-58M180 190c50 2 105 42 154 92" fill="none" stroke="#22D3EE" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="183" cy="223" r="14" fill="#FBBF24"/><circle cx="335" cy="167" r="14" fill="#F4F6FF"/>
+  <path d="M106 454c14-86 69-134 150-134s136 48 150 134" fill="#7C3AED" stroke="#0B1022" stroke-width="19"/>
+  <path d="m256 346 38 44-38 42-38-42z" fill="#22D3EE" stroke="#0B1022" stroke-width="11"/>
+  <path d="M80 110c44-46 79-61 122-71M396 92c-27-25-50-35-83-47" fill="none" stroke="#22D3EE" stroke-width="10" stroke-linecap="round"/>
+</svg>

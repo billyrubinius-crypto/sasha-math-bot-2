@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Чистая страница</title>
+  <desc>Белый лист с точными полями, карандашом и первой отметкой.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DBEAFE"/><stop offset="1" stop-color="#EDE9FE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M112 68h250l56 58v318H112z" fill="#FFF" stroke="#1E293B" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M362 68v62h56M166 68v376M198 172h148M198 226h122M198 280h146M198 334h96" fill="none" stroke="#93C5FD" stroke-width="12" stroke-linecap="round"/>
+  <path d="m288 390 104-196 34 18-104 196-47 30z" fill="#A78BFA" stroke="#1E293B" stroke-width="14" stroke-linejoin="round"/>
+  <path d="m275 438 47-30-34-18z" fill="#64748B"/><circle cx="218" cy="126" r="15" fill="#2563EB"/>
+</svg>

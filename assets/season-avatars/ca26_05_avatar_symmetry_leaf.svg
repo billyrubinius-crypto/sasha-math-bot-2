@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Лист симметрии</title>
+  <desc>Крупный кленовый лист с осью симметрии и многоугольной разметкой.</desc>
+  <defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#FED7AA"/><stop offset="1" stop-color="#FDE68A"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="m256 62 36 92 68-52-8 93 78-6-55 70 53 38-92 29 14 80-78-38-16 88-16-88-78 38 14-80-92-29 53-38-55-70 78 6-8-93 68 52z" fill="#EA580C" stroke="#342014" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M256 92v328M256 238l-96-55M256 274l105-55M256 318l-78 55M256 350l72 42" fill="none" stroke="#FFF7ED" stroke-width="13" stroke-linecap="round"/>
+  <path d="m218 180 38-88 38 88-38 58zM184 266l72-28 72 28-72 52z" fill="none" stroke="#7C3AED" stroke-width="10"/>
+</svg>

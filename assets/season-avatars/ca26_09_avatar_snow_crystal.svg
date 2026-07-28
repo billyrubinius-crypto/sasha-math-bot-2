@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Кристалл первого снега</title>
+  <desc>Крупная шестилучевая снежинка с геометрической разметкой.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DBEAFE"/><stop offset="1" stop-color="#C7D2FE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <g fill="none" stroke="#16213A" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 58v396M84 157l344 198M84 355l344-198"/>
+    <path d="m256 112-36-34M256 112l36-34M256 400l-36 34M256 400l36 34"/>
+    <path d="m131 184-48 14M131 184l-10-48M381 328l48-14M381 328l10 48"/>
+    <path d="m131 328-48-14M131 328l-10 48M381 184l48 14M381 184l10-48"/>
+  </g>
+  <circle cx="256" cy="256" r="55" fill="#F8FAFC" stroke="#6366F1" stroke-width="15"/>
+  <path d="m256 216 35 20v40l-35 20-35-20v-40z" fill="#38BDF8" stroke="#16213A" stroke-width="10"/>
+</svg>

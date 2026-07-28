@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Тёплое окно</title>
+  <desc>Светящееся окно с тетрадью и лампой в глубоком ноябрьском вечере.</desc>
+  <defs><linearGradient id="bg" x2="0" y2="1"><stop stop-color="#1E3A8A"/><stop offset="1" stop-color="#172033"/></linearGradient><radialGradient id="light"><stop stop-color="#FEF3C7"/><stop offset="1" stop-color="#F59E0B"/></radialGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect x="92" y="72" width="328" height="310" rx="35" fill="url(#light)" stroke="#FFF7ED" stroke-width="18"/>
+  <path d="M256 72v310M92 224h328" stroke="#8B5CF6" stroke-width="16"/>
+  <path d="M56 424h400" stroke="#FFF7ED" stroke-width="20" stroke-linecap="round"/>
+  <path d="M132 412h176l54-88H186z" fill="#FFF7ED" stroke="#172033" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M342 382v-92l-56-62M286 228l-50 70" fill="none" stroke="#172033" stroke-width="19" stroke-linecap="round"/>
+  <path d="m210 286 80 25-26 54-97-30z" fill="#F59E0B" stroke="#172033" stroke-width="13" stroke-linejoin="round"/>
+</svg>

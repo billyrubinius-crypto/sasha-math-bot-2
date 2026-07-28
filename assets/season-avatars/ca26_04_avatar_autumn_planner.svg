@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Осенний планер</title>
+  <desc>Учебный планер с недельной сеткой и первыми осенними листьями.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#FEF3C7"/><stop offset="1" stop-color="#D9F99D"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect x="96" y="112" width="320" height="306" rx="36" fill="#FFF7ED" stroke="#29331F" stroke-width="17"/>
+  <path d="M96 184h320M176 184v234M256 184v234M336 184v234M96 262h320M96 340h320" stroke="#A3A87D" stroke-width="9"/>
+  <path d="M154 86c44 10 72 42 64 92-46 5-78-21-88-63zM382 278c-9 51-41 81-88 80-8-45 18-82 62-98z" fill="#D97706" stroke="#29331F" stroke-width="13" stroke-linejoin="round"/>
+  <path d="m148 104 58 60M368 278l-60 67" stroke="#84CC16" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="216" cy="224" r="13" fill="#6366F1"/><circle cx="296" cy="302" r="13" fill="#6366F1"/>
+</svg>

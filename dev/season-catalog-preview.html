@@ -4,40 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Cosmic Academy — Season V2 Catalog Preview</title>
+  <title>Cosmic Academy — календарный каталог сезонов V2</title>
   <link rel="stylesheet" href="../styles/student.css">
   <link rel="stylesheet" href="../styles/season-cosmetics-preview.css">
 </head>
 <body class="season-catalog-preview">
   <main class="season-preview-shell">
     <header class="season-preview-header">
-      <p class="season-preview-kicker">Local dev preview · 2026–2027</p>
-      <h1>Космическая академия: 23 сезона</h1>
+      <p class="season-preview-kicker">Локальный preview · 28.07.2026–24.06.2027</p>
+      <h1>Учебный год в 23 календарных коллекциях</h1>
       <p class="season-preview-lead">
-        Локальная витрина аватаров, рамок, титулов и фонов. Данные загружаются из JSON,
-        а примерка работает без Telegram, Supabase и внешних ресурсов.
+        Реальные сезоны, школьный ритм и знакомые события дополнены математикой и лёгким языком Cosmic Academy.
+        Данные загружаются из JSON; стенд работает без Telegram, Supabase и внешних ресурсов.
       </p>
       <div class="season-preview-stats" aria-label="Сводка каталога">
-        <span class="season-preview-stat" id="presetStat">23 пресета</span>
+        <span class="season-preview-stat" id="presetStat">23 периода</span>
         <span class="season-preview-stat" id="itemStat">92 предмета</span>
         <span class="season-preview-stat">21 × 14 дней</span>
         <span class="season-preview-stat">2 межсезонья</span>
+        <span class="season-preview-stat">Москва · 00:00</span>
       </div>
     </header>
 
-    <section class="season-preview-toolbar" aria-label="Фильтры каталога">
+    <section class="season-preview-toolbar" aria-label="Управление каталогом">
       <label class="season-preview-control season-preview-search">
         Поиск
-        <input id="searchInput" type="search" placeholder="Название, тема или предмет" autocomplete="off">
+        <input id="searchInput" type="search" placeholder="Сезон, предмет или технический ID" autocomplete="off">
       </label>
       <label class="season-preview-control">
-        Сезон
+        Период
         <select id="seasonFilter">
-          <option value="all">Все 23 сезона</option>
+          <option value="all">Все 23 периода</option>
         </select>
       </label>
       <label class="season-preview-control">
-        Редкость предметов
+        Редкость
         <select id="rarityFilter">
           <option value="all">Все редкости</option>
           <option value="common">Common</option>
@@ -46,16 +47,22 @@
           <option value="legendary">Legendary</option>
         </select>
       </label>
-      <button class="season-theme-toggle" id="themeToggle" type="button" aria-pressed="false">
-        Тёмная тема
-      </button>
+      <label class="season-preview-control">
+        Ширина примерки
+        <select id="viewportFilter">
+          <option value="360">360 px</option>
+          <option value="390">390 px</option>
+          <option value="430">430 px</option>
+          <option value="768" selected>768 px</option>
+        </select>
+      </label>
+      <button class="season-control-button" id="nextPeriodButton" type="button">Следующий период</button>
+      <button class="season-control-button" id="themeToggle" type="button" aria-pressed="false">Тёмная тема</button>
     </section>
 
-    <p id="catalogStatus" class="season-preview-lead" role="status" aria-live="polite">Загрузка каталога…</p>
+    <p id="catalogStatus" class="season-preview-status" role="status" aria-live="polite">Загрузка каталога…</p>
     <section id="seasonGrid" class="season-grid" aria-label="Сезонные коллекции"></section>
-    <div id="emptyState" class="season-preview-empty" hidden>
-      По выбранным условиям ничего не найдено.
-    </div>
+    <div id="emptyState" class="season-preview-empty" hidden>По выбранным условиям ничего не найдено.</div>
   </main>
 
   <div class="season-modal" id="previewModal" role="dialog" aria-modal="true" aria-labelledby="previewModalTitle" hidden>
@@ -81,30 +88,21 @@
       const searchInput = document.getElementById("searchInput");
       const seasonFilter = document.getElementById("seasonFilter");
       const rarityFilter = document.getElementById("rarityFilter");
+      const viewportFilter = document.getElementById("viewportFilter");
+      const nextPeriodButton = document.getElementById("nextPeriodButton");
       const themeToggle = document.getElementById("themeToggle");
       const modal = document.getElementById("previewModal");
       const modalTitle = document.getElementById("previewModalTitle");
       const modalBody = document.getElementById("previewModalBody");
       const modalClose = document.getElementById("previewModalClose");
 
-      const slotIcons = {
-        avatar: "◉",
-        frame: "⬡",
-        title: "✦",
-        background: "▧"
-      };
-      const slotLabels = {
-        avatar: "Аватар",
-        frame: "Рамка",
-        title: "Титул",
-        background: "Фон"
-      };
-      const rarityLabels = {
-        common: "Common",
-        rare: "Rare",
-        epic: "Epic",
-        legendary: "Legendary"
-      };
+      const slotIcons = { avatar: "◉", frame: "◇", title: "✦", background: "▧" };
+      const slotLabels = { avatar: "Аватар", frame: "Рамка", title: "Титул", background: "Фон" };
+      const rarityLabels = { common: "Common", rare: "Rare", epic: "Epic", legendary: "Legendary" };
+      const monthNames = [
+        "января", "февраля", "марта", "апреля", "мая", "июня",
+        "июля", "августа", "сентября", "октября", "ноября", "декабря"
+      ];
 
       let catalog = null;
       let lastFocused = null;
@@ -132,6 +130,31 @@
         return preset.items.find((item) => item.slot === slot);
       }
 
+      function parseDate(value) {
+        const [year, month, day] = value.split("-").map(Number);
+        return new Date(year, month - 1, day, 12);
+      }
+
+      function formatDate(value, includeYear = false) {
+        const parsed = parseDate(value);
+        const year = includeYear ? ` ${parsed.getFullYear()}` : "";
+        return `${parsed.getDate()} ${monthNames[parsed.getMonth()]}${year}`;
+      }
+
+      function formatRange(preset) {
+        const start = parseDate(preset.start_date);
+        const end = parseDate(preset.end_date);
+        const crossesYear = start.getFullYear() !== end.getFullYear();
+        return `${formatDate(preset.start_date, crossesYear)} — ${formatDate(preset.end_date, true)}`;
+      }
+
+      function periodLabel(preset) {
+        if (preset.season_type === "interseason") {
+          return `межсезонье · ${preset.duration_days} дн. · provisional`;
+        }
+        return `соревнование ${preset.competition_season_no} · 14 дней`;
+      }
+
       function titleTierClass(titleItem) {
         return `title-tier-${titleItem.title_visual_tier}`;
       }
@@ -142,10 +165,10 @@
           <button
             class="season-item-button rarity-${escapeHtml(item.rarity)}"
             type="button"
-            data-sequence="${preset.sequence}"
+            data-sequence="${preset.sequence_no}"
             data-item-code="${escapeHtml(item.item_code)}"
             data-flagship="${isFlagship}"
-            aria-label="Примерить: ${escapeHtml(item.name)}, ${escapeHtml(rarityLabels[item.rarity])}, ${item.price} шестерёнок"
+            aria-label="Примерить ${escapeHtml(item.name)}, ${escapeHtml(rarityLabels[item.rarity])}, ${item.price} шестерёнок"
           >
             <span class="season-item-icon" aria-hidden="true">${slotIcons[item.slot]}</span>
             <span class="season-item-label">
@@ -157,6 +180,22 @@
         `;
       }
 
+      function technicalDetails(preset) {
+        return `
+          <details class="season-technical">
+            <summary>Технические ID и мотивы</summary>
+            <div class="season-technical-row">
+              <span class="season-tech-pill">${escapeHtml(preset.preset_code)}</span>
+              <span class="season-tech-pill">${escapeHtml(preset.bundle_code)}</span>
+              <span class="season-tech-pill">${escapeHtml(preset.collection_code)}</span>
+              <span class="season-tech-pill">${escapeHtml(preset.theme_key)}</span>
+              <span class="season-tech-pill">${escapeHtml(preset.primary_motif)}</span>
+              <span class="season-tech-pill">${escapeHtml(preset.secondary_motif)}</span>
+            </div>
+          </details>
+        `;
+      }
+
       function seasonCard(preset) {
         const avatar = getItem(preset, "avatar");
         const frame = getItem(preset, "frame");
@@ -165,22 +204,22 @@
         const visibleItems = rarityFilter.value === "all"
           ? preset.items
           : preset.items.filter((item) => item.rarity === rarityFilter.value);
-        const scheduleLabel = preset.schedule_type === "summer_interseason"
-          ? "межсезонье · provisional"
-          : "14 дней";
 
         return `
-          <article class="season-card">
+          <article class="season-card" data-preset-code="${escapeHtml(preset.preset_code)}">
             <div class="season-bg-canvas ${cssClassFromPayload(background.render_payload)}">
               <div class="season-card-topline">
-                <span class="season-card-number">${String(preset.sequence).padStart(2, "0")}</span>
-                <span class="season-schedule-pill" data-schedule="${escapeHtml(preset.schedule_type)}">${escapeHtml(scheduleLabel)}</span>
+                <span class="season-card-number">${String(preset.sequence_no).padStart(2, "0")}</span>
+                <div class="season-card-meta">
+                  <span class="season-period-pill" data-kind="${escapeHtml(preset.season_type)}">${escapeHtml(periodLabel(preset))}</span>
+                </div>
               </div>
               <div class="season-card-hero">
                 <div class="season-card-copy">
                   <p class="season-card-kicker">${escapeHtml(preset.theme_key.replaceAll("_", " "))}</p>
-                  <h2>${escapeHtml(preset.name)}</h2>
-                  <p class="season-card-description">${escapeHtml(preset.description)}</p>
+                  <h2>${escapeHtml(preset.suggested_name)}</h2>
+                  <p class="season-card-dates">${escapeHtml(formatRange(preset))} <small>· конец не включается</small></p>
+                  <p class="season-card-description">${escapeHtml(preset.short_description)}</p>
                   <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
                     ${escapeHtml(title.name)}
                   </span>
@@ -197,6 +236,7 @@
               <div class="season-items">
                 ${visibleItems.map((item) => itemButton(preset, item)).join("")}
               </div>
+              ${technicalDetails(preset)}
             </div>
           </article>
         `;
@@ -205,17 +245,22 @@
       function filteredPresets() {
         const query = searchInput.value.trim().toLocaleLowerCase("ru");
         return catalog.presets.filter((preset) => {
-          if (seasonFilter.value !== "all" && String(preset.sequence) !== seasonFilter.value) {
+          if (seasonFilter.value !== "all" && String(preset.sequence_no) !== seasonFilter.value) {
             return false;
           }
           if (!query) {
             return true;
           }
           const haystack = [
-            preset.name,
-            preset.description,
+            preset.preset_code,
+            preset.bundle_code,
+            preset.collection_code,
+            preset.suggested_name,
+            preset.short_description,
             preset.theme_key,
-            ...preset.items.flatMap((item) => [item.name, item.description, item.item_code])
+            preset.primary_motif,
+            preset.secondary_motif,
+            ...preset.items.flatMap((item) => [item.name, item.description, item.item_code, item.asset_key])
           ].join(" ").toLocaleLowerCase("ru");
           return haystack.includes(query);
         });
@@ -228,36 +273,30 @@
         const presets = filteredPresets();
         grid.innerHTML = presets.map(seasonCard).join("");
         emptyState.hidden = presets.length > 0;
-        status.textContent = `Показано сезонов: ${presets.length}. В каждой карточке отображаются ${
-          rarityFilter.value === "all" ? "все четыре предмета" : `предметы редкости ${rarityLabels[rarityFilter.value]}`
-        }.`;
+        const itemPhrase = rarityFilter.value === "all"
+          ? "по четыре предмета"
+          : `только предметы ${rarityLabels[rarityFilter.value]}`;
+        status.textContent = `Показано периодов: ${presets.length}; ${itemPhrase}. Порядок хронологический.`;
       }
 
-      function openPreview(preset, selectedItem, trigger) {
-        const avatar = getItem(preset, "avatar");
-        const frame = getItem(preset, "frame");
-        const title = getItem(preset, "title");
+      function modalProduct(preset, selectedItem) {
+        const selectedIsAvatar = selectedItem.slot === "avatar";
+        const avatar = selectedIsAvatar ? selectedItem : getItem(preset, "avatar");
+        const frame = selectedItem.slot === "frame" ? selectedItem : getItem(preset, "frame");
+        const title = selectedItem.slot === "title" ? selectedItem : getItem(preset, "title");
         const background = getItem(preset, "background");
-        const selectedFrameClass = selectedItem.slot === "frame"
-          ? cssClassFromPayload(selectedItem.render_payload)
-          : cssClassFromPayload(frame.render_payload);
-        const selectedTitle = selectedItem.slot === "title" ? selectedItem : title;
-        const selectedAvatar = selectedItem.slot === "avatar" ? selectedItem : avatar;
-
-        lastFocused = trigger;
-        modalTitle.textContent = `${preset.name} · ${selectedItem.name}`;
-        modalBody.innerHTML = `
+        return `
           <div class="season-mini-app ${cssClassFromPayload(background.render_payload)}">
             <div class="season-mini-topbar">
-              <strong>Космическая академия</strong>
+              <strong>Cosmic Academy</strong>
               <span class="season-mini-balance">⚙ 520</span>
             </div>
             <div class="season-mini-content">
               <section class="season-mini-shop">
-                <p class="season-card-kicker">Сезонная витрина · примерка</p>
-                <h3>${escapeHtml(preset.name)}</h3>
+                <p class="season-card-kicker">${escapeHtml(formatRange(preset))}</p>
+                <h3>${escapeHtml(preset.suggested_name)}</h3>
                 <div class="season-mini-product">
-                  <img src="${avatarRoot}${escapeHtml(selectedAvatar.asset_key)}.svg" alt="">
+                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="">
                   <div>
                     <h4>${escapeHtml(selectedItem.name)}</h4>
                     <p>${escapeHtml(selectedItem.description)}</p>
@@ -267,23 +306,30 @@
                       <span class="season-price-pill">${escapeHtml(slotLabels[selectedItem.slot])}</span>
                       ${preset.flagship_item_code === selectedItem.item_code ? '<span class="season-price-pill">Флагман</span>' : ""}
                     </div>
+                    <p class="season-mini-code">${escapeHtml(selectedItem.item_code)}<br>${escapeHtml(selectedItem.render_payload)}</p>
                   </div>
                 </div>
               </section>
               <aside class="season-mini-profile">
                 <p class="season-card-kicker">Профиль после примерки</p>
-                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${selectedFrameClass}">
-                  <img src="${avatarRoot}${escapeHtml(selectedAvatar.asset_key)}.svg" alt="${escapeHtml(selectedAvatar.name)}">
+                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}">
+                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}">
                 </div>
                 <h3>Ученик Академии</h3>
-                <span class="season-title-sample ${titleTierClass(selectedTitle)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
-                  ${escapeHtml(selectedTitle.name)}
+                <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
+                  ${escapeHtml(title.name)}
                 </span>
-                <p>Фон, рамка, титул и локальный SVG показаны в контексте условного профиля.</p>
+                <p>Локальная компоновка для проверки фона, рамки, титула и SVG. Production-интеграции здесь нет.</p>
               </aside>
             </div>
           </div>
         `;
+      }
+
+      function openPreview(preset, selectedItem, trigger) {
+        lastFocused = trigger;
+        modalTitle.textContent = `${preset.suggested_name} · ${selectedItem.name} · ${viewportFilter.value}px`;
+        modalBody.innerHTML = modalProduct(preset, selectedItem);
         modal.hidden = false;
         document.body.style.overflow = "hidden";
         modalClose.focus();
@@ -306,7 +352,19 @@
         try {
           localStorage.setItem("season-catalog-theme", theme);
         } catch (_) {
-          // Preview remains functional when storage is unavailable.
+          // Storage is optional for this local preview.
+        }
+      }
+
+      function setModalWidth(width) {
+        root.style.setProperty("--modal-preview-width", `${width}px`);
+        if (!modal.hidden && catalog && lastFocused) {
+          const preset = catalog.presets.find((entry) => entry.sequence_no === Number(lastFocused.dataset.sequence));
+          const item = preset?.items.find((entry) => entry.item_code === lastFocused.dataset.itemCode);
+          if (preset && item) {
+            modalTitle.textContent = `${preset.suggested_name} · ${item.name} · ${width}px`;
+            modalBody.innerHTML = modalProduct(preset, item);
+          }
         }
       }
 
@@ -317,27 +375,42 @@
             throw new Error(`HTTP ${response.status}`);
           }
           catalog = await response.json();
-          document.getElementById("presetStat").textContent = `${catalog.presets.length} пресета`;
-          document.getElementById("itemStat").textContent = `${catalog.presets.reduce((sum, preset) => sum + preset.items.length, 0)} предмета`;
+          catalog.presets.sort((a, b) => a.sequence_no - b.sequence_no);
+          document.getElementById("presetStat").textContent = `${catalog.presets.length} периода`;
+          document.getElementById("itemStat").textContent =
+            `${catalog.presets.reduce((sum, preset) => sum + preset.items.length, 0)} предмета`;
           for (const preset of catalog.presets) {
             const option = document.createElement("option");
-            option.value = String(preset.sequence);
-            option.textContent = `${String(preset.sequence).padStart(2, "0")} · ${preset.name}`;
+            option.value = String(preset.sequence_no);
+            const competition = preset.competition_season_no === null
+              ? "межсезонье"
+              : `соревнование ${preset.competition_season_no}`;
+            option.textContent = `${String(preset.sequence_no).padStart(2, "0")} · ${preset.suggested_name} · ${competition}`;
             seasonFilter.append(option);
           }
           renderCards();
         } catch (error) {
-          status.textContent = `Не удалось загрузить JSON: ${error.message}. Откройте preview через локальный HTTP-сервер.`;
+          status.textContent =
+            `Не удалось загрузить JSON: ${error.message}. Откройте preview через локальный HTTP-сервер.`;
           status.style.color = "#dc2626";
         }
       }
 
-      [searchInput, seasonFilter, rarityFilter].forEach((control) => {
-        control.addEventListener(control === searchInput ? "input" : "change", renderCards);
-      });
-
+      searchInput.addEventListener("input", renderCards);
+      seasonFilter.addEventListener("change", renderCards);
+      rarityFilter.addEventListener("change", renderCards);
+      viewportFilter.addEventListener("change", () => setModalWidth(viewportFilter.value));
       themeToggle.addEventListener("click", () => {
         setTheme(root.dataset.caTheme === "dark" ? "light" : "dark");
+      });
+      nextPeriodButton.addEventListener("click", () => {
+        if (!catalog) {
+          return;
+        }
+        const current = seasonFilter.value === "all" ? 0 : Number(seasonFilter.value);
+        seasonFilter.value = String((current % catalog.presets.length) + 1);
+        renderCards();
+        grid.scrollIntoView({ behavior: "smooth", block: "start" });
       });
 
       grid.addEventListener("click", (event) => {
@@ -345,7 +418,7 @@
         if (!trigger || !catalog) {
           return;
         }
-        const preset = catalog.presets.find((entry) => entry.sequence === Number(trigger.dataset.sequence));
+        const preset = catalog.presets.find((entry) => entry.sequence_no === Number(trigger.dataset.sequence));
         const item = preset?.items.find((entry) => entry.item_code === trigger.dataset.itemCode);
         if (preset && item) {
           openPreview(preset, item, trigger);
@@ -371,6 +444,7 @@
         initialTheme = "light";
       }
       setTheme(initialTheme === "dark" ? "dark" : "light");
+      setModalWidth(viewportFilter.value);
       loadCatalog();
     })();
   </script>
