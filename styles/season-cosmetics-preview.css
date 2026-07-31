@@ -3431,6 +3431,99 @@ body.v4-card-open { overflow: hidden; }
 .background-rarity-legendary .v4-scene-layer-a { animation:v4-scene-drift 5s ease-in-out infinite; }
 .background-rarity-legendary .v4-scene-layer-b { animation:v4-scene-flicker 4.4s steps(1) infinite; }
 
+/* Responsive scene camera.
+   Each approved background is drawn on an 8:5 artboard instead of stretching its
+   semantic objects to the aspect ratio of the whole app, a tall profile card or a
+   very wide leaderboard row. The host keeps the scene's ambient paint; the artboard
+   keeps furniture, windows, bags, corridors and other motifs in their intended shape. */
+.v4-scene-host {
+  isolation: isolate;
+  overflow: hidden;
+}
+.v4-scene-host::before {
+  content: none !important;
+}
+.v4-scene-host > .v4-scene-viewport {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Full Mini App: one complete, undistorted establishing shot at the top.
+   Below it the host's palette continues as an ambient backdrop under the content. */
+.app-equipped-scene {
+  position: absolute;
+  inset: 0;
+}
+#app-bg-layer::after {
+  z-index: 5;
+}
+.app-equipped-scene > .v4-scene-viewport {
+  top: clamp(58px, 8svh, 86px);
+  width: min(100%, 760px);
+  transform: translateX(-50%);
+}
+
+/* Expanded profile: retain the whole scene above the copy instead of turning its
+   main prop into a card-height object. */
+.season-profile-scene-art > .v4-scene-viewport {
+  top: 0;
+  width: 100%;
+  transform: translateX(-50%);
+}
+
+/* Leaderboards use a compact banner camera. The complete motif lives on the right,
+   while the ambient scene colour continues behind the readable name/title windows. */
+.lb-equipped-scene > .v4-scene-viewport {
+  top: 50%;
+  right: 7%;
+  left: auto;
+  width: auto;
+  height: 112%;
+  aspect-ratio: 8 / 5;
+  transform: translateY(-50%);
+}
+
+/* Square shop thumbnails and teacher previews show the same complete artboard with
+   letterboxed ambient paint rather than deforming it. */
+.shop-preview-v4-scene > .v4-scene-viewport,
+.season-v2-item-scene > .v4-scene-viewport,
+.season-v2-preview-scene > .v4-scene-viewport {
+  top: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%);
+}
+
+@media (max-width: 380px) {
+  .app-equipped-scene > .v4-scene-viewport {
+    top: clamp(54px, 7svh, 70px);
+  }
+  .lb-equipped-scene > .v4-scene-viewport {
+    right: 4%;
+    height: 104%;
+  }
+}
+
+@media (min-width: 760px) {
+  .app-equipped-scene > .v4-scene-viewport {
+    width: 760px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .app-equipped-scene > .v4-scene-viewport {
+    top: 0;
+    width: min(70vw, 760px);
+  }
+}
+
 .v4-catalog-copy { display:grid;gap:7px;padding:16px; }
 .v4-catalog-copy > small { color:#71809b;font-size:.55rem;text-transform:uppercase; }
 .v4-catalog-copy h3 { margin:0;font-size:.92rem;letter-spacing:-.015em; }

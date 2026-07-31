@@ -156,10 +156,13 @@
                 return;
             }
             if (window.SeasonCosmetics) {
-                const scene = SeasonCosmetics.createScene(eq && eq.background, '');
+                const scene = SeasonCosmetics.createScene(
+                    eq && eq.background,
+                    'app-equipped-scene'
+                );
                 if (scene) {
-                    layer.className = scene.className;
-                    while (scene.firstChild) layer.appendChild(scene.firstChild);
+                    layer.className = '';
+                    layer.appendChild(scene);
                     return;
                 }
             }

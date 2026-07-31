@@ -184,12 +184,14 @@
         }
         if (!approvedScene) return null;
         const scene = span(
-            `${extraClass || 'season-equipped-scene'} ${approvedScene} ` +
+            `${extraClass || 'season-equipped-scene'} v4-scene-host ${approvedScene} ` +
             `background-rarity-${rarity(backgroundItem)}`
         );
         scene.setAttribute('aria-hidden', 'true');
-        scene.appendChild(span('v4-scene-layer v4-scene-layer-a'));
-        scene.appendChild(span('v4-scene-layer v4-scene-layer-b'));
+        const viewport = span(`v4-scene-viewport ${approvedScene}`);
+        viewport.appendChild(span('v4-scene-layer v4-scene-layer-a'));
+        viewport.appendChild(span('v4-scene-layer v4-scene-layer-b'));
+        scene.appendChild(viewport);
         return scene;
     }
 

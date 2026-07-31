@@ -33,6 +33,7 @@ def main() -> int:
     teacher_core = read("js/teacher-core.js")
     renderer = read("js/season-cosmetics.js")
     student_css = read("styles/student.css")
+    cosmetics_css = read("styles/season-cosmetics-preview.css")
 
     require("where status = 'scheduled'" in foundation, "schedule only starts published rows")
     require("status = 'active'" in foundation, "runtime has an explicit active state")
@@ -130,6 +131,12 @@ def main() -> int:
             "legacy equipped frames are not supported by the V4 runtime")
     require("const LEGACY_BACKGROUNDS = new Set" in renderer and "legacySceneClass" in renderer,
             "legacy equipped backgrounds are not supported by the V4 runtime")
+    require("v4-scene-host" in renderer and "v4-scene-viewport" in renderer,
+            "approved backgrounds are still stretched without a responsive artboard")
+    require(".app-equipped-scene > .v4-scene-viewport" in cosmetics_css
+            and ".season-profile-scene-art > .v4-scene-viewport" in cosmetics_css
+            and ".lb-equipped-scene > .v4-scene-viewport" in cosmetics_css,
+            "responsive background cameras are missing for app, profile or leaderboard")
     require("LEGACY_FRAMES.forEach" in renderer and "has-legacy-frame" in renderer,
             "legacy frame classes are not restored on avatar hosts")
     require(".legacy-equipped-scene.bg-grid" in student_css
