@@ -2109,3 +2109,15 @@
         .pet-sleep-btn:disabled { opacity: .55; cursor: default; }
         .pet-mood-tired { border-color: var(--ca-border-soft); }
         .pet-card-mood.pet-mood-tired { color: var(--ca-text-secondary); }
+
+        /* Размер сезонного визуала в превью привязан к самой коробке превью, а не к константе.
+           Дефект: createAvatar вызывался с жёстким 68px, тогда как .shop-preview — 56px, на
+           экранах ≤380px 48px, а в плитках коллекции и витрины 44px. Картинка вылезала за
+           карточку (у .shop-preview-frame overflow: visible, потому что кольца рамок иначе
+           обрезаются), и это выглядело как «слишком большой аватар».
+           Инлайновый --display-size ставит сам рендерер, поэтому переопределение требует
+           !important — это единственный способ отдать размер под контроль CSS, не трогая
+           общий season-cosmetics.js, которым пользуются профиль, топы и учительские превью. */
+        .shop-preview { --ca-preview-art: calc(var(--ca-shop-preview, 56px) - 12px); }
+        .coll-tile .shop-preview, .showcase-tile .shop-preview { --ca-preview-art: 34px; }
+        .shop-preview .v4-avatar { --display-size: var(--ca-preview-art) !important; }

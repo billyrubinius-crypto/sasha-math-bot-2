@@ -572,7 +572,7 @@
                 // prefers-reduced-motion без отдельного кода.
                 p.classList.add('shop-preview-frame');
                 if (approvedSeasonVisual) {
-                    p.appendChild(window.SeasonCosmetics.createAvatar({ frame: seasonItem }, 68, 'shop', 'A'));
+                    p.appendChild(window.SeasonCosmetics.createAvatar({ frame: seasonItem }, 44, 'shop', 'A'));
                 } else {
                     const demo = document.createElement('div');
                     demo.className = 'shop-preview-avatar-demo';
@@ -585,7 +585,7 @@
                 }
             } else if (item.slot === 'avatar' && approvedSeasonVisual) {
                 p.classList.add('shop-preview-frame');
-                p.appendChild(window.SeasonCosmetics.createAvatar({ avatar: seasonItem }, 68, 'shop', 'A'));
+                p.appendChild(window.SeasonCosmetics.createAvatar({ avatar: seasonItem }, 44, 'shop', 'A'));
             } else if (item.slot === 'background') {
                 // Настоящая миниатюра фона — тот же класс bg-*, что и у глобального слоя
                 // #app-bg-layer, только в масштабе превью; whitelist BG_CLASSES не меняется.
