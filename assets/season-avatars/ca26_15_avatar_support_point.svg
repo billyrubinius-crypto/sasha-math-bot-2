@@ -1,11 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <title>Точка опоры</title>
-  <desc>Прочная геометрическая опора и восходящие ступени как образ ответственности.</desc>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#CCFBF1"/><stop offset="1" stop-color="#BFDBFE"/></linearGradient></defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
-  <path d="M62 398h388" stroke="#1C2B2A" stroke-width="22" stroke-linecap="round"/>
-  <path d="M92 398v-72h88v-74h88v-74h88v-74h74v294z" fill="#2563EB" opacity=".9" stroke="#1C2B2A" stroke-width="17" stroke-linejoin="round"/>
-  <path d="M104 322h70M192 248h70M280 174h70M368 100h54" stroke="#F0FDFA" stroke-width="13" stroke-linecap="round"/>
-  <path d="m116 324 107-90 72 27 92-123" fill="none" stroke="#F59E0B" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="116" cy="324" r="23" fill="#0F766E" stroke="#1C2B2A" stroke-width="11"/><circle cx="387" cy="138" r="23" fill="#F59E0B" stroke="#1C2B2A" stroke-width="11"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+  <title>Ещё попытка</title>
+  <desc>Жук снова карабкается вверх.</desc>
+  <defs>
+    <linearGradient id="bg-15" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F97316"/>
+      <stop offset="1" stop-color="#78350F"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg-15)"/>
+  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
+  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
+  <path d="M256 123v318" stroke="#451A03" stroke-width="18"/><ellipse cx="256" cy="294" rx="139" ry="151" fill="#F97316" stroke="#451A03" stroke-width="18"/>
+    <path d="M256 147q-82-73-132 1M256 147q82-73 132 1" fill="none" stroke="#451A03" stroke-width="18" stroke-linecap="round"/>
+    <path d="M125 270 66 224M123 332l-70 28M387 270l59-46M389 332l70 28" stroke="#451A03" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="201" cy="263" r="27" fill="#F8FAFC"/><circle cx="311" cy="263" r="27" fill="#F8FAFC"/><circle cx="206" cy="270" r="15" fill="#172033"/><circle cx="306" cy="270" r="15" fill="#172033"/>
+    <path d="M215 355q41-27 82 0" fill="none" stroke="#7C2D12" stroke-width="13" stroke-linecap="round"/>
+    <path d="m392 96 48 35-48 35" fill="none" stroke="#F8FAFC" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

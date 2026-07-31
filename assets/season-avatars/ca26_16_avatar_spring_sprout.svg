@@ -1,12 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <title>Весенний росток</title>
-  <desc>Весенний росток с парой листьев, симметричной линией роста и светом.</desc>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DCFCE7"/><stop offset="1" stop-color="#FEF3C7"/></linearGradient></defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
-  <circle cx="384" cy="116" r="58" fill="#F59E0B" opacity=".88"/>
-  <path d="M72 412c98-72 262-72 368 0" fill="#16A34A" stroke="#21301F" stroke-width="17" stroke-linejoin="round"/>
-  <path d="M256 400V176" stroke="#21301F" stroke-width="20" stroke-linecap="round"/>
-  <path d="M250 264c-100 6-133-55-123-126 86-5 135 42 123 126zM262 316c100 6 133-55 123-126-86-5-135 42-123 126z" fill="#16A34A" stroke="#21301F" stroke-width="16" stroke-linejoin="round"/>
-  <path d="M244 250 148 164M268 300l94-86" stroke="#F0FDF4" stroke-width="12" stroke-linecap="round"/>
-  <path d="m256 176 18-36 39-6-28-27 7-39-36 18-36-18 7 39-28 27 39 6z" fill="#8B5CF6" stroke="#21301F" stroke-width="11" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+  <title>Новый рост</title>
+  <desc>Росток, у которого появилась идея.</desc>
+  <defs>
+    <linearGradient id="bg-16" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#86EFAC"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg-16)"/>
+  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
+  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
+  <path d="M256 208q-12-117-120-112 8 100 120 112zM256 208q12-117 120-112-8 100-120 112z" fill="#4ADE80" stroke="#166534" stroke-width="18" stroke-linejoin="round"/>
+    <path d="M256 188v91" stroke="#166534" stroke-width="19" stroke-linecap="round"/>
+    <path d="M126 267h260l-34 174H160z" fill="#F97316" stroke="#7C2D12" stroke-width="18" stroke-linejoin="round"/>
+    <path d="M109 267h294" stroke="#7C2D12" stroke-width="28" stroke-linecap="round"/>
+    <circle cx="209" cy="337" r="27" fill="#1F2937"/><circle cx="303" cy="337" r="27" fill="#1F2937"/>
+    <circle cx="200" cy="327" r="8" fill="#fff"/><circle cx="294" cy="327" r="8" fill="#fff"/>
+    <path d="M218 390q38 25 76 0" fill="none" stroke="#7C2D12" stroke-width="13" stroke-linecap="round"/>
+    <path d="M411 85v56M383 113h56" stroke="#FEF3C7" stroke-width="15" stroke-linecap="round"/>
 </svg>
