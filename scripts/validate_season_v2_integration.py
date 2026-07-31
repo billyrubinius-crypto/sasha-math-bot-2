@@ -31,6 +31,7 @@ def main() -> int:
     teacher = read("js/teacher-students.js")
     teacher_core = read("js/teacher-core.js")
     renderer = read("js/season-cosmetics.js")
+    student_css = read("styles/student.css")
 
     require("where status = 'scheduled'" in foundation, "schedule only starts published rows")
     require("status = 'active'" in foundation, "runtime has an explicit active state")
@@ -109,6 +110,15 @@ def main() -> int:
     for token in ("AVATARS", "FRAMES", "BACKGROUNDS", "TITLE_VISUALS"):
         require(f"const {token} = new Set" in renderer, f"renderer allowlist {token} missing")
     require("hasSecretCombo" in renderer, "secret legendary combo missing")
+    require("const LEGACY_FRAMES = new Set" in renderer and "legacyFrameClass" in renderer,
+            "legacy equipped frames are not supported by the V4 runtime")
+    require("const LEGACY_BACKGROUNDS = new Set" in renderer and "legacySceneClass" in renderer,
+            "legacy equipped backgrounds are not supported by the V4 runtime")
+    require("LEGACY_FRAMES.forEach" in renderer and "has-legacy-frame" in renderer,
+            "legacy frame classes are not restored on avatar hosts")
+    require(".legacy-equipped-scene.bg-grid" in student_css
+            and ".season-avatar-host.has-legacy-frame" in student_css,
+            "legacy cosmetics runtime CSS missing")
 
     if errors:
         print(f"FAILED: {len(errors)} integration error(s)", file=sys.stderr)

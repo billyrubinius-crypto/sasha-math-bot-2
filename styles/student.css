@@ -1629,6 +1629,37 @@
             font-weight: 850;
         }
 
+        /* Старые магазинные рамки продолжают жить на внешнем контейнере аватара.
+           V4-рамки по-прежнему рисуются внутри .v4-avatar и этим блоком не затрагиваются. */
+        .season-avatar-host.has-legacy-frame {
+            border-radius: 50%;
+        }
+        .avatar-container.season-avatar-host.frame-orbit,
+        .lb-avatar.season-avatar-host.frame-orbit,
+        .season-profile-avatar.season-avatar-host.frame-orbit {
+            isolation: isolate;
+            padding: 0;
+            overflow: visible;
+            background: transparent;
+            animation: none;
+        }
+        .avatar-container.season-avatar-host.frame-orbit::before,
+        .lb-avatar.season-avatar-host.frame-orbit::before,
+        .season-profile-avatar.season-avatar-host.frame-orbit::before {
+            position: absolute;
+            z-index: 0;
+            inset: -3px;
+            border-radius: 50%;
+            background: conic-gradient(#00bcd4, #3f51b5, #00bcd4);
+            animation: frameSpin 3.5s linear infinite;
+            content: "";
+            pointer-events: none;
+        }
+        .season-avatar-host.frame-orbit > .v4-avatar {
+            position: relative;
+            z-index: 1;
+        }
+
         .lb-item {
             position: relative;
             min-height: 66px;
@@ -1656,6 +1687,39 @@
             content: "";
         }
         .lb-equipped-scene .v4-scene-layer { animation: none !important; }
+        /* Старые фоны магазина в топах и раскрываемом профиле. Значения payload и
+           оформление самих предметов сохранены; добавлен только недостающий runtime-слой. */
+        .legacy-equipped-scene {
+            background-color: #111827;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: cover;
+        }
+        .legacy-equipped-scene.bg-grid {
+            background-color: var(--ca-surface-nested);
+            background-image:
+                linear-gradient(rgba(128,128,128,.22) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(128,128,128,.22) 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        .legacy-equipped-scene.bg-space {
+            background-color: #11142a;
+            background-image:
+                radial-gradient(circle at 22% 22%, rgba(63,81,181,.62), transparent 46%),
+                radial-gradient(circle at 78% 72%, rgba(156,39,176,.58), transparent 43%);
+        }
+        .legacy-equipped-scene.bg-aurora {
+            background-color: #10212a;
+            background-image:
+                linear-gradient(160deg, rgba(38,166,154,.58), transparent 43%),
+                linear-gradient(20deg, rgba(126,87,194,.58), transparent 49%);
+        }
+        .legacy-equipped-scene.bg-draft {
+            background-color: #dcd6c7;
+            background-image:
+                repeating-linear-gradient(0deg, transparent, transparent 15px,
+                rgba(96,96,96,.24) 15px, rgba(96,96,96,.24) 16px);
+        }
         .lb-me { box-shadow: inset 4px 0 var(--ca-accent); }
 
         .lb-avatar {

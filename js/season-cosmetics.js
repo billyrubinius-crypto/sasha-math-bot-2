@@ -23,6 +23,12 @@
     ]);
     const TITLE_VISUALS = new Set(['plain', 'pulse', 'signal', 'mono', 'glitch']);
     const RARITIES = new Set(['common', 'rare', 'epic', 'legendary']);
+    const LEGACY_FRAMES = new Set([
+        'frame-notebook', 'frame-winter', 'frame-fire100', 'frame-legend-1',
+        'frame-legend-2', 'frame-legend-3', 'frame-legend-4', 'frame-pulsar',
+        'frame-orbit'
+    ]);
+    const LEGACY_BACKGROUNDS = new Set(['bg-grid', 'bg-space', 'bg-aurora', 'bg-draft']);
     const SECRET_ITEMS = new Set([
         'ca26_03_title_route_author',
         'ca26_08_frame_lamp_light',
@@ -60,6 +66,11 @@
         return visual ? `frame-v4-${hyphenate(visual)}` : '';
     }
 
+    function legacyFrameClass(item) {
+        const payload = String(item && item.payload || '');
+        return LEGACY_FRAMES.has(payload) ? payload : '';
+    }
+
     function sceneClass(item) {
         const visual = visualFromPayload('background', item && item.payload);
         if (!visual) return '';
@@ -69,6 +80,11 @@
             empty_class: 'empty-class-v4'
         };
         return `scene-${exceptions[visual] || hyphenate(visual)}`;
+    }
+
+    function legacySceneClass(item) {
+        const payload = String(item && item.payload || '');
+        return LEGACY_BACKGROUNDS.has(payload) ? payload : '';
     }
 
     function titleVisual(item) {
@@ -158,6 +174,14 @@
 
     function createScene(backgroundItem, extraClass) {
         const approvedScene = sceneClass(backgroundItem);
+        const legacyScene = legacySceneClass(backgroundItem);
+        if (legacyScene) {
+            const scene = span(
+                `${extraClass || 'season-equipped-scene'} legacy-equipped-scene ${legacyScene}`
+            );
+            scene.setAttribute('aria-hidden', 'true');
+            return scene;
+        }
         if (!approvedScene) return null;
         const scene = span(
             `${extraClass || 'season-equipped-scene'} ${approvedScene} ` +
@@ -171,6 +195,10 @@
 
     function replaceAvatar(container, eq, size, mode, fallbackText) {
         if (!container) return;
+        LEGACY_FRAMES.forEach((className) => container.classList.remove(className));
+        const legacyFrame = legacyFrameClass(eq && eq.frame);
+        if (legacyFrame) container.classList.add(legacyFrame);
+        container.classList.toggle('has-legacy-frame', !!legacyFrame);
         container.replaceChildren(createAvatar(eq || {}, size, mode, fallbackText));
         container.classList.add('season-avatar-host');
     }
@@ -180,6 +208,8 @@
         createScene,
         frameClass,
         hasSecretCombo,
+        legacyFrameClass,
+        legacySceneClass,
         replaceAvatar,
         sceneClass,
         titleVisual,
