@@ -2089,3 +2089,21 @@
                 50%      { transform: translateY(-4px); }
             }
         }
+
+        /* Сон — вторая ось заботы (миграция 065). Бесплатная: платится вниманием, а не
+           бубликами, поэтому кнопка оформлена вторичной, а не акцентной. */
+        .pet-mood-sleeping { border-color: var(--ca-accent-magenta); }
+        .pet-card-mood.pet-mood-sleeping { color: var(--ca-accent-magenta); }
+        .pet-card-rest:empty { display: none; }
+        .pet-card-rest { margin: 0; color: var(--ca-text-secondary); font-size: var(--text-small); }
+        .pet-rest-sleeping { color: var(--ca-accent-magenta); }
+        .pet-rest-rested   { color: var(--ca-accent-turquoise); }
+        .pet-rest-tired    { color: var(--ca-text-secondary); }
+        .pet-sleep-btn {
+            display: inline-flex; align-items: center;
+            padding: 10px 14px;
+            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-pill);
+            background: transparent; color: var(--ca-text-secondary);
+            font-size: var(--text-small); font-weight: 600; cursor: pointer;
+        }
+        .pet-sleep-btn:disabled { opacity: .55; cursor: default; }

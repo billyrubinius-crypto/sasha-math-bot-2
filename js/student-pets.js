@@ -15,11 +15,20 @@
         };
 
         // Подписи настроения задаёт сервер кодом; клиент только переводит код в текст.
+        // sleeping — общее состояние (overall_mood), остальные приходят и как ось питания.
         const PET_MOODS = {
+            sleeping:    { badge: '😴', short: 'Спит',         long: 'Спит' },
             happy:       { badge: '😊', short: 'Доволен',      long: 'Сыт и доволен' },
             fed:         { badge: '🙂', short: 'Накормлен',    long: 'Накормлен на сегодня' },
             hungry_soon: { badge: '😐', short: 'Скоро проголодается', long: 'Сегодня последний сытый день' },
             hungry:      { badge: '😢', short: 'Голоден',      long: 'Проголодался и грустит' }
+        };
+
+        // Вторая ось заботы — отдых. Бесплатная: сон платится вниманием, а не бубликами.
+        const PET_REST = {
+            sleeping: 'Спит',
+            rested:   'Выспался и бодрый',
+            tired:    'Давно не спал'
         };
 
         let petState = null;
@@ -41,6 +50,20 @@
             const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
             if (Number.isNaN(date.getTime())) return '';
             return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        }
+
+        // Относительное время вместо абсолютного: сервер отдаёт timestamptz, а часовой пояс
+        // устройства может не совпадать с московским — «через 5 ч» honest, «в 07:30» нет.
+        function petRelative(iso, bare) {
+            const target = iso ? new Date(iso) : null;
+            if (!target || Number.isNaN(target.getTime())) return bare ? 'какое-то время' : 'скоро';
+            const minutes = Math.max(0, Math.round((target - Date.now()) / 60000));
+            const hours = Math.floor(minutes / 60);
+            const rest = minutes % 60;
+            const text = hours > 0
+                ? `${hours} ч${rest > 0 ? ' ' + rest + ' мин' : ''}`
+                : `${minutes} мин`;
+            return bare ? text : `через ${text}`;
         }
 
         function petPluralDays(n) {
@@ -72,12 +95,14 @@
             const visual = petVisual(petState);
             if (!visual) { petHide(); return; }   // неизвестный визуал — молча не рендерим
 
+            // На плитке — общее состояние: худшее из двух осей заботы, сон показывается отдельно.
+            const overall = petState.overall_mood || petState.mood;
             const art = document.getElementById('pet-tile-art');
-            const mood = PET_MOODS[petState.mood] || PET_MOODS.hungry;
+            const mood = PET_MOODS[overall] || PET_MOODS.hungry;
             art.textContent = visual.glyph;
             art.className = `pet-art ${visual.cls}`;
             document.getElementById('pet-tile-mood').textContent = mood.badge;
-            tile.className = `pet-tile pet-mood-${petState.mood}`;
+            tile.className = `pet-tile pet-mood-${overall}`;
             tile.setAttribute('aria-label', `${visual.name}: ${mood.short}. Открыть карточку питомца`);
             tile.style.display = 'grid';
             header.classList.add('has-pet');
@@ -97,7 +122,8 @@
             if (!petState) return;
             const visual = petVisual(petState);
             if (!visual) return;
-            const mood = PET_MOODS[petState.mood] || PET_MOODS.hungry;
+            const overall = petState.overall_mood || petState.mood;
+            const mood = PET_MOODS[overall] || PET_MOODS.hungry;
             const days = Number(petState.days_left) || 0;
             const price = Number(petState.feed_price) || 0;
             const max = Number(petState.max_prepaid_days) || 0;
@@ -107,7 +133,28 @@
             art.className = `pet-card-art pet-art ${visual.cls}`;
             document.getElementById('pet-card-name').textContent = visual.name;
             document.getElementById('pet-card-mood').textContent = mood.long;
-            document.getElementById('pet-card-mood').className = `pet-card-mood pet-mood-${petState.mood}`;
+            document.getElementById('pet-card-mood').className = `pet-card-mood pet-mood-${overall}`;
+
+            // Ось отдыха отдельной строкой: две оси заботы независимы и показываются раздельно.
+            const restEl = document.getElementById('pet-card-rest');
+            const sleepBtn = document.getElementById('pet-sleep-btn');
+            const rest = petState.rest_state;
+            if (rest) {
+                let restText = PET_REST[rest] || '';
+                if (rest === 'sleeping') {
+                    restText = `Спит, проснётся ${petRelative(petState.sleep_ends_at)}`;
+                } else if (rest === 'rested' && petState.rested_until) {
+                    restText = `Выспался, бодрый ещё ${petRelative(petState.rested_until, true)}`;
+                }
+                restEl.textContent = restText;
+                restEl.className = `pet-card-rest pet-rest-${rest}`;
+                sleepBtn.textContent = rest === 'sleeping' ? 'Уже спит' : 'Уложить спать';
+                sleepBtn.disabled = !petState.can_sleep || petBusy;
+                sleepBtn.style.display = 'inline-flex';
+            } else {
+                restEl.textContent = '';
+                sleepBtn.style.display = 'none';
+            }
 
             document.getElementById('pet-card-satiety').textContent = days > 0
                 ? `Сыт до ${petFormatDate(petState.satiety_until)} — это ещё ${days} ${petPluralDays(days)}`
@@ -172,6 +219,30 @@
 
         function feedPetFill(btn) {
             feedPet(Number(btn && btn.dataset.days) || 1, btn);
+        }
+
+        // Сон бесплатен и заканчивается сам через pet_sleep_hours: будить руками не нужно,
+        // иначе механика наказывала бы за то, что человек не открыл приложение в нужный час.
+        async function putPetToSleep(btn) {
+            if (petBusy || (btn && btn.disabled)) return;
+            petBusy = true;
+            const sleepBtn = document.getElementById('pet-sleep-btn');
+            const errorEl = document.getElementById('pet-card-error');
+            const restore = sleepBtn.textContent;
+            sleepBtn.disabled = true;
+            errorEl.textContent = '';
+            sleepBtn.textContent = 'Укладываем...';
+            try {
+                const { error } = await db.rpc('put_pet_to_sleep_self');
+                if (error) throw error;
+                await loadPetBlock();
+            } catch (error) {
+                sleepBtn.textContent = restore;
+                errorEl.textContent = error.message || String(error);
+            } finally {
+                petBusy = false;
+                renderPetCard();
+            }
         }
 
         // Кормление: ровно один RPC за действие, кнопка блокируется синхронно ДО await.

@@ -620,11 +620,14 @@
                 <h3 id="pet-card-name"></h3>
                 <p class="pet-card-mood" id="pet-card-mood"></p>
                 <p class="pet-card-satiety" id="pet-card-satiety"></p>
+                <p class="pet-card-rest" id="pet-card-rest"></p>
                 <div class="pet-card-actions">
                     <button type="button" class="pet-feed-btn" id="pet-feed-btn"
                             onclick="feedPet(1, this)">Покормить</button>
                     <button type="button" class="pet-feed-more" id="pet-feed-more"
                             style="display:none;" onclick="feedPetFill(this)"></button>
+                    <button type="button" class="pet-sleep-btn" id="pet-sleep-btn"
+                            style="display:none;" onclick="putPetToSleep(this)">Уложить спать</button>
                 </div>
                 <small class="pet-card-total" id="pet-card-total"></small>
                 <div class="pet-card-error" id="pet-card-error" role="alert"></div>
