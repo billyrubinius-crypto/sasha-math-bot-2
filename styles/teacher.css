@@ -238,3 +238,179 @@
             .day-label { padding-top: 0; margin-bottom: 2px; }
             .action-buttons { flex-direction: column; }
         }
+/* Season V2: управление утверждённым каталогом и расписанием. */
+.season-v2-plan-card {
+    border: 1px solid #e4e7ec;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: #fff;
+}
+.season-v2-plan-head,
+.season-v2-card-actions,
+.season-v2-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.season-v2-status {
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+}
+.season-v2-status--catalog { background: #f2f4f7; color: #475467; }
+.season-v2-status--draft { background: #fff4e5; color: #a15c00; }
+.season-v2-status--scheduled { background: #e8f1ff; color: #175cd3; }
+.season-v2-status--active { background: #e7f8ef; color: #087443; }
+.season-v2-status--closed,
+.season-v2-status--archived { background: #eef0f3; color: #475467; }
+.season-v2-rarity-line {
+    margin: 7px 0;
+    color: #667085;
+    font-size: 11px;
+}
+.season-v2-card-actions {
+    justify-content: flex-start;
+}
+.season-v2-card-actions button {
+    width: auto;
+    margin: 5px 0 0;
+}
+
+.season-v2-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: none;
+    place-items: center;
+    padding: 16px;
+    background: rgb(15 23 42 / 62%);
+}
+.season-v2-modal.open { display: grid; }
+.season-v2-modal-card {
+    position: relative;
+    width: min(760px, 100%);
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    box-sizing: border-box;
+    border-radius: 18px;
+    padding: 20px;
+    background: #f8fafc;
+    box-shadow: 0 22px 70px rgb(15 23 42 / 35%);
+}
+.season-v2-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+}
+#season-v2-editor-fields > label,
+.season-v2-date-grid label {
+    display: grid;
+    gap: 5px;
+    margin: 10px 0;
+    font-size: 12px;
+    font-weight: 700;
+}
+#season-v2-editor-fields input,
+#season-v2-editor-fields textarea,
+#season-v2-editor-fields select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #d0d5dd;
+    border-radius: 9px;
+    padding: 9px;
+    font: inherit;
+    background: #fff;
+}
+#season-v2-editor-fields textarea { min-height: 70px; resize: vertical; }
+.season-v2-date-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+#season-v2-items {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+.season-v2-item-editor {
+    display: grid;
+    gap: 7px;
+    border: 1px solid #e4e7ec;
+    border-left-width: 4px;
+    border-radius: 11px;
+    padding: 10px;
+    background: #fff;
+}
+.season-v2-item-editor.rarity-common { border-left-color: #98a2b3; }
+.season-v2-item-editor.rarity-rare { border-left-color: #2e90fa; }
+.season-v2-item-editor.rarity-epic { border-left-color: #9b51e0; }
+.season-v2-item-editor.rarity-legendary { border-left-color: #f79009; }
+.season-v2-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.season-v2-preview-card {
+    position: relative;
+    isolation: isolate;
+    min-height: 210px;
+    overflow: hidden;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 18px;
+    background: #151a26;
+    color: #fff;
+}
+.season-v2-preview-card--light {
+    color: #172033;
+    background: #f7f9fc;
+}
+.season-v2-preview-label {
+    position: absolute;
+    top: 8px;
+    left: 9px;
+    z-index: 3;
+    padding: 3px 6px;
+    border-radius: 999px;
+    color: #fff;
+    background: rgb(13 18 30 / 68%);
+    font-size: 9px;
+    font-weight: 800;
+}
+.season-v2-preview-scene {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+}
+.season-v2-preview-copy {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid rgb(255 255 255 / 28%);
+    border-radius: 12px;
+    background: rgb(13 18 30 / 62%);
+    backdrop-filter: blur(8px);
+}
+.season-v2-title { font-size: 12px; }
+
+@media (max-width: 560px) {
+    .season-v2-date-grid,
+    #season-v2-items,
+    .season-v2-preview-grid { grid-template-columns: 1fr; }
+    .season-v2-preview-card { flex-direction: column; }
+}

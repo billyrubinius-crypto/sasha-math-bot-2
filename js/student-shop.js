@@ -34,15 +34,26 @@
             const section = document.getElementById('collections-section');
             const wrap = document.getElementById('collections-list');
             try {
+                const { data: visibleSeasons, error: seasonsError } = await db
+                    .from('seasons')
+                    .select('id,status')
+                    .in('status', ['active', 'closed', 'archived']);
+                if (seasonsError) throw seasonsError;
+                const visibleSeasonIds = (visibleSeasons || []).map((season) => season.id);
+                if (!visibleSeasonIds.length) { section.style.display = 'none'; return; }
+
                 const { data: bundles, error } = await db
                     .from('season_bundles')
                     .select('season_id, bundle')
+                    .in('season_id', visibleSeasonIds)
                     .order('season_id', { ascending: false });
                 if (error) throw error;
                 if (!bundles || !bundles.length) { section.style.display = 'none'; return; }
 
                 const [{ data: rotationItems, error: itemsError }, ownership] = await Promise.all([
-                    db.from('shop_items').select('item_code,name,rotation_bundle,slot,item_kind,render_payload').eq('availability', 'rotation'),
+                    db.from('shop_items')
+                        .select('item_code,name,description,rarity,rotation_bundle,slot,item_kind,render_payload,visual_key,motion_policy')
+                        .eq('availability', 'rotation'),
                     loadCollectionOwnership()
                 ]);
                 if (itemsError) throw itemsError;
@@ -436,11 +447,9 @@
         // информационная плашка, не гарантия: реальное закрытие сезона — ручное нажатие кнопки
         // учителем (close_season, G8), может случиться позже расчётных 14 дней. Клампим нулём,
         // чтобы просроченный, но ещё не закрытый сезон не показывал отрицательные дни.
-        function daysLeftInSeason(startDate) {
-            const [sy, sm, sd] = startDate.split('-').map(Number);
-            const [ty, tm, td] = getTodayMSK().split('-').map(Number);
-            const elapsed = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(sy, sm - 1, sd)) / 86400000);
-            return Math.max(0, 14 - elapsed);
+        function daysLeftInSeason(endsAt) {
+            const remaining = new Date(endsAt).getTime() - Date.now();
+            return Math.max(0, Math.ceil(remaining / 86400000));
         }
 
         async function loadShop() {
@@ -450,7 +459,7 @@
             try {
                 const [itemsRes, bundleRes, ownedRes, achRes, stRes, eqRes, seasonRes, customTitleRes] = await Promise.all([
                     db.from('shop_items')
-                        .select('item_code,name,item_kind,slot,price,availability,rotation_bundle,condition_achievement,render_payload')
+                        .select('item_code,name,description,item_kind,slot,price,availability,rotation_bundle,condition_achievement,render_payload,rarity,currency,visual_key,motion_policy')
                         .eq('active', true).order('sort_order'),
                     db.rpc('ensure_season_rotation'),
                     db.from('student_items').select('item_code,quantity').eq('student_id', currentUser.id),
@@ -459,7 +468,7 @@
                     db.from('student_equipment').select('slot,item_code').eq('student_id', currentUser.id),
                     // Только для плашки «уйдёт через N дней» (S4) — не создаёт сезон, ensure_season_rotation
                     // и getCurrentSeasonId (лидерборд) уже отвечают за ленивое создание.
-                    db.from('seasons').select('start_date').is('end_date', null).order('id', { ascending: false }).limit(1).maybeSingle(),
+                    db.from('seasons').select('ends_at').eq('status', 'active').order('id', { ascending: false }).limit(1).maybeSingle(),
                     db.from('student_custom_titles')
                         .select('title_text,status,teacher_comment')
                         .eq('student_id', currentUser.id).maybeSingle()
@@ -474,7 +483,7 @@
                 const balance = stRes.data ? stRes.data.huikons : 0;
                 // slot → item_code надетого предмета (для кнопок Надеть/Снять на купленном)
                 const equippedBySlot = new Map((eqRes.data || []).map(r => [r.slot, r.item_code]));
-                const daysLeft = seasonRes.data ? daysLeftInSeason(seasonRes.data.start_date) : null;
+                const daysLeft = seasonRes.data?.ends_at ? daysLeftInSeason(seasonRes.data.ends_at) : null;
                 const customTitle = customTitleRes.data || null;
                 balanceEl.innerText = `Баланс: ${balance} ${pluralBubliks(balance)} 🥯`;
 
@@ -525,6 +534,13 @@
         function shopPreview(item) {
             const p = document.createElement('div');
             p.className = 'shop-preview';
+            const seasonItem = {
+                item_code: item.item_code,
+                payload: item.render_payload,
+                rarity: item.rarity,
+                motion_policy: item.motion_policy
+            };
+            const approvedSeasonVisual = window.SeasonCosmetics?.visualFromPayload(item.slot, item.render_payload);
             if (item.slot === 'name_color') {
                 // Пример ника настоящим цветом; 'gold' — тем же градиентным классом, что и
                 // на профиле/лидерборде (.nick-gold), валидный hex — тем же regex-фильтром,
@@ -544,31 +560,49 @@
                 // профиле/лидерборде, поэтому frame-orbit вращается и гасится по
                 // prefers-reduced-motion без отдельного кода.
                 p.classList.add('shop-preview-frame');
-                const demo = document.createElement('div');
-                demo.className = 'shop-preview-avatar-demo';
-                if (FRAME_CLASSES.has(item.render_payload)) demo.classList.add(item.render_payload);
-                const inner = document.createElement('span');
-                inner.className = 'avatar-placeholder';
-                inner.textContent = 'A';
-                demo.appendChild(inner);
-                p.appendChild(demo);
+                if (approvedSeasonVisual) {
+                    p.appendChild(window.SeasonCosmetics.createAvatar({ frame: seasonItem }, 68, 'shop', 'A'));
+                } else {
+                    const demo = document.createElement('div');
+                    demo.className = 'shop-preview-avatar-demo';
+                    if (FRAME_CLASSES.has(item.render_payload)) demo.classList.add(item.render_payload);
+                    const inner = document.createElement('span');
+                    inner.className = 'avatar-placeholder';
+                    inner.textContent = 'A';
+                    demo.appendChild(inner);
+                    p.appendChild(demo);
+                }
+            } else if (item.slot === 'avatar' && approvedSeasonVisual) {
+                p.classList.add('shop-preview-frame');
+                p.appendChild(window.SeasonCosmetics.createAvatar({ avatar: seasonItem }, 68, 'shop', 'A'));
             } else if (item.slot === 'background') {
                 // Настоящая миниатюра фона — тот же класс bg-*, что и у глобального слоя
                 // #app-bg-layer, только в масштабе превью; whitelist BG_CLASSES не меняется.
-                if (BG_CLASSES.has(item.render_payload)) p.classList.add(item.render_payload);
+                if (approvedSeasonVisual) {
+                    const scene = window.SeasonCosmetics.createScene(seasonItem, 'shop-preview-v4-scene');
+                    if (scene) p.appendChild(scene);
+                } else if (BG_CLASSES.has(item.render_payload)) {
+                    p.classList.add(item.render_payload);
+                }
             } else if (item.slot === 'title') {
                 // Компактный ОБЩИЙ пример титула — без текста конкретного товара:
                 // extraction регуляркой из item.name внутри превью повторяла бы проблемное
                 // решение bb89030.
                 const demo = document.createElement('div');
-                demo.className = 'shop-preview-title-demo';
-                const icon = document.createElement('span');
-                icon.className = 'shop-preview-title-demo-icon';
-                icon.textContent = '🏷️';
-                const bar = document.createElement('span');
-                bar.className = 'shop-preview-title-demo-bar';
-                demo.appendChild(icon);
-                demo.appendChild(bar);
+                demo.className = approvedSeasonVisual
+                    ? `shop-preview-title-v4 rarity-title-${item.rarity || 'common'} title-visual-${window.SeasonCosmetics.titleVisual(seasonItem)}`
+                    : 'shop-preview-title-demo';
+                if (approvedSeasonVisual) {
+                    demo.textContent = item.name;
+                } else {
+                    const icon = document.createElement('span');
+                    icon.className = 'shop-preview-title-demo-icon';
+                    icon.textContent = '🏷️';
+                    const bar = document.createElement('span');
+                    bar.className = 'shop-preview-title-demo-bar';
+                    demo.appendChild(icon);
+                    demo.appendChild(bar);
+                }
                 p.appendChild(demo);
             } else if (item.slot === 'crown') {
                 p.textContent = '👑';
@@ -607,6 +641,23 @@
             name.className = 'shop-name';
             name.textContent = item.name;
             body.appendChild(name);
+            if (item.rarity) {
+                const rarity = document.createElement('span');
+                rarity.className = `shop-rarity shop-rarity--${item.rarity}`;
+                rarity.textContent = ({
+                    common: 'Обычный',
+                    rare: 'Редкий',
+                    epic: 'Эпический',
+                    legendary: 'Легендарный'
+                })[item.rarity] || item.rarity;
+                body.appendChild(rarity);
+            }
+            if (item.description) {
+                const description = document.createElement('div');
+                description.className = 'shop-desc shop-item-description';
+                description.textContent = item.description;
+                body.appendChild(description);
+            }
             const desc = document.createElement('div');
             desc.className = 'shop-desc';
             desc.textContent = `${item.price} ${pluralBubliks(item.price)} 🥯`;
@@ -831,6 +882,8 @@
                 if (slot === 'background' && (!itemCode || renderPayload)) {
                     applyAppBackground(itemCode ? { background: { payload: renderPayload } } : {});
                 }
+                const { data: eqRows, error: equipmentError } = await equipmentQuery(currentUser.id, false);
+                if (!equipmentError) applyProfileCosmetics(buildEquipMap(eqRows));
                 await loadShop();
             } catch (e) {
                 alert('Не удалось: ' + (e.message || e));

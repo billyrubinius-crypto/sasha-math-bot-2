@@ -12,6 +12,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="shared.js"></script>
     <link rel="stylesheet" href="styles/student.css">
+    <link rel="stylesheet" href="styles/season-v3-preview.css">
+    <link rel="stylesheet" href="styles/season-cosmetics-preview.css">
 </head>
 <body>
 
@@ -570,6 +572,23 @@
         </div>
     </div>
 
+    <div id="season-profile-overlay" class="season-profile-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="season-profile-name" hidden>
+        <button type="button" class="season-profile-backdrop" aria-label="Закрыть визитку"
+                onclick="closeSeasonProfileCard()"></button>
+        <article class="season-profile-card">
+            <button type="button" class="season-profile-close" aria-label="Закрыть"
+                    onclick="closeSeasonProfileCard()">✕</button>
+            <div class="season-profile-scene" id="season-profile-scene"></div>
+            <div class="season-profile-avatar" id="season-profile-avatar"></div>
+            <div class="season-profile-copy">
+                <h3 id="season-profile-name"></h3>
+                <p id="season-profile-title"></p>
+                <small id="season-profile-meta"></small>
+            </div>
+        </article>
+    </div>
+
     <!-- НИЖНЕЕ МЕНЮ.
          Контракт: ровно пять .nav-btn в порядке Профиль → Домашка → Лидеры → Магазин → Ещё
          (switchTab подсвечивает их по индексу 0–4), тот же onclick, тот же .nav-icon внутри.
@@ -613,6 +632,7 @@
         </button>
     </div>
 
+    <script src="js/season-cosmetics.js"></script>
     <script src="js/student-core.js"></script>
     <script src="js/student-assignments.js"></script>
     <script src="js/student-week.js"></script>

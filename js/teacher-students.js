@@ -1,6 +1,6 @@
 // teacher-students.js — ученики, сезоны, индивидуальные задания, пробники (R02)
 
-        // --- ПЛАНИРОВАНИЕ СЕЗОНОВ (миграция 051) ---
+        // --- ПЛАНИРОВАНИЕ СЕЗОНОВ V2 (миграции 057–058) ---
         // Проектный часовой пояс — Europe/Moscow (МСК = UTC+3 круглый год, как и в
         // moscowDateTimeToInstant ученического приложения). Учитель вводит время в МСК, на
         // сервер уходит явный timestamptz со смещением +03:00 — часовой пояс устройства и UTC
@@ -26,37 +26,29 @@
             }) + ' МСК';
         }
 
-        // Точное плановое время, если оно есть (сезоны с миграции 051); у исторических сезонов
-        // окна нет — тогда показываем только календарную дату из start_date/end_date, а не
-        // придумываем время.
-        function seasonMoment(iso, fallbackDate) {
-            if (iso) return formatMsk(iso);
-            if (!fallbackDate) return '—';
-            const d = new Date(fallbackDate);
-            return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('ru-RU');
-        }
-
         const SEASON_STATUS_LABELS = {
-            planned:   { text: 'Запланирован', color: '#1565c0', bg: '#e3f2fd' },
-            active:    { text: 'Текущий',      color: '#2e7d32', bg: '#e8f5e9' },
-            completed: { text: 'Завершён',     color: '#666',    bg: '#eee'    }
+            catalog_only: { text: 'Только каталог', className: 'catalog' },
+            draft:        { text: 'Черновик', className: 'draft' },
+            scheduled:    { text: 'Запланирован', className: 'scheduled' },
+            active:       { text: 'Текущий', className: 'active' },
+            closed:       { text: 'Закрыт', className: 'closed' },
+            archived:     { text: 'Архив', className: 'archived' }
         };
 
-        // Коды ошибок валидации приходят из RPC (admin_create_season_self/admin_update_season_self);
-        // текст для учителя живёт здесь, чтобы сообщения были на русском и в одном месте.
         const SEASON_ERROR_TEXT = {
-            season_number_required:   'Укажите номер сезона.',
-            season_number_taken:      'Сезон с таким номером уже существует.',
-            season_number_too_small:  'Номер должен быть больше номера последнего сезона.',
-            title_required:           'Укажите название сезона (до 60 символов).',
-            window_required:          'Укажите и дату начала, и дату окончания.',
-            window_order:             'Окончание должно быть позже начала.',
-            start_in_past:            'Начало должно быть в будущем.',
-            season_overlap:           'Даты пересекаются с другим сезоном — сезоны идут последовательно.',
-            season_not_planned:       'Изменять и удалять можно только запланированный сезон.',
-            season_not_found:         'Сезон не найден.',
-            season_has_data:          'К сезону уже привязаны данные — удалить нельзя.',
-            forbidden:                'Недостаточно прав.'
+            title_required: 'Укажите название сезона (до 60 символов).',
+            description_required: 'Добавьте описание сезона (до 500 символов).',
+            window_required: 'Укажите начало и окончание.',
+            window_order: 'Окончание должно быть позже начала.',
+            start_in_past: 'Опубликовать сезон с началом в прошлом нельзя.',
+            season_overlap: 'Даты пересекаются с опубликованным сезоном.',
+            season_gap: 'Между опубликованными сезонами не должно быть разрыва.',
+            four_items_required: 'В периоде должно быть ровно четыре предмета.',
+            invalid_item_payload: 'Один из предметов содержит недопустимые данные.',
+            season_not_editable: 'Активный или завершённый сезон редактировать нельзя.',
+            catalog_only_period: 'Этот период остаётся только в каталоге и никогда не запускается.',
+            markup_not_allowed: 'HTML-разметка в текстах запрещена.',
+            forbidden: 'Недостаточно прав.'
         };
 
         function seasonErrorText(e) {
@@ -72,99 +64,261 @@
             box.style.display = text ? 'block' : 'none';
         }
 
+        let seasonV2Rows = [];
+        let seasonV2Editing = null;
+
+        function toMskInput(iso) {
+            if (!iso) return '';
+            const parts = new Intl.DateTimeFormat('sv-SE', {
+                timeZone: 'Europe/Moscow',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            }).formatToParts(new Date(iso));
+            const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+            return `${value.year}-${value.month}-${value.day}T${value.hour}:${value.minute}`;
+        }
+
+        function seasonItemMap(row) {
+            return Object.fromEntries((row.items || []).map((item) => [item.slot, {
+                item_code: item.item_code,
+                slot: item.slot,
+                name: item.name,
+                description: item.description,
+                rarity: item.rarity,
+                payload: item.render_payload,
+                render_payload: item.render_payload,
+                price: Number(item.price),
+                motion_policy: item.motion_policy
+            }]));
+        }
+
+        function seasonPreviewCard(row, target) {
+            target.replaceChildren();
+            const eq = seasonItemMap(row);
+            const grid = document.createElement('div');
+            grid.className = 'season-v2-preview-grid';
+
+            [
+                { label: 'Магазин · 112 px', size: 112, mode: 'expanded', theme: 'dark' },
+                { label: 'Профиль · 48 px', size: 48, mode: 'profile', theme: 'light' },
+                { label: 'Оба топа · 32 px', size: 32, mode: 'compact', theme: 'dark' },
+                { label: 'Раскрытие · 160 px', size: 160, mode: 'expanded', theme: 'dark' }
+            ].forEach((preview) => {
+                const card = document.createElement('div');
+                card.className = `season-v2-preview-card season-v2-preview-card--${preview.theme}`;
+                const scene = window.SeasonCosmetics?.createScene(eq.background, 'season-v2-preview-scene');
+                if (scene) card.appendChild(scene);
+
+                const label = document.createElement('small');
+                label.className = 'season-v2-preview-label';
+                label.textContent = preview.label;
+                card.appendChild(label);
+
+                const avatar = window.SeasonCosmetics?.createAvatar(eq, preview.size, preview.mode, 'A');
+                if (avatar) card.appendChild(avatar);
+
+                const copy = document.createElement('div');
+                copy.className = 'season-v2-preview-copy';
+                const name = document.createElement('strong');
+                name.textContent = row.title;
+                const title = document.createElement('span');
+                title.className = `season-v2-title rarity-title-${eq.title?.rarity || 'common'} title-visual-${window.SeasonCosmetics?.titleVisual(eq.title) || 'plain'}`;
+                title.textContent = eq.title?.name || '';
+                copy.append(name, title);
+                card.appendChild(copy);
+                grid.appendChild(card);
+            });
+            target.appendChild(grid);
+        }
+
         async function loadSeasons() {
             const box = document.getElementById('season-list');
             if (!box) return;
-            box.innerHTML = '<div style="font-size:13px; color:#999;">Загрузка сезонов…</div>';
+            box.textContent = 'Загрузка сезонов…';
             try {
-                const { data, error } = await db.rpc('admin_list_seasons_self');
+                const { data, error } = await db.rpc('admin_list_season_v2_self');
                 if (error) throw error;
-                const rows = data || [];
-                if (!rows.length) {
-                    box.innerHTML = '<div style="font-size:13px; color:#999;">Сезонов пока нет.</div>';
-                    return;
-                }
+                seasonV2Rows = Array.isArray(data) ? data : [];
+                box.replaceChildren();
+                seasonV2Rows.forEach((row) => {
+                    const meta = SEASON_STATUS_LABELS[row.status] || { text: row.status, className: 'draft' };
+                    const card = document.createElement('article');
+                    card.className = 'season-v2-plan-card';
+                    const head = document.createElement('div');
+                    head.className = 'season-v2-plan-head';
+                    const title = document.createElement('strong');
+                    title.textContent = `${String(row.sequence_no).padStart(2, '0')} · ${row.title}`;
+                    const badge = document.createElement('span');
+                    badge.className = `season-v2-status season-v2-status--${meta.className}`;
+                    badge.textContent = meta.text;
+                    head.append(title, badge);
 
-                let html = '';
-                rows.forEach(s => {
-                    const meta = SEASON_STATUS_LABELS[s.status] || { text: s.status, color: '#666', bg: '#eee' };
-                    html += `<div style="border:1px solid #eee; border-radius:8px; padding:10px; margin-bottom:8px;">`;
-                    html += `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">`;
-                    html += `<b style="word-break:break-word;">№${s.season_id}${s.title ? ' — ' + esc(s.title) : ''}</b>`;
-                    html += `<span class="badge" style="background:${meta.bg}; color:${meta.color}; flex-shrink:0;">${meta.text}</span>`;
-                    html += `</div>`;
-                    html += `<div class="card-meta" style="margin-top:6px;">Начало: ${esc(seasonMoment(s.starts_at, s.start_date))}</div>`;
-                    html += `<div class="card-meta">Окончание: ${esc(seasonMoment(s.ends_at, s.end_date))}</div>`;
-                    if (s.status === 'active') {
-                        html += `<div class="card-meta">Участников в лигах: ${s.participants}</div>`;
+                    const dates = document.createElement('div');
+                    dates.className = 'card-meta';
+                    dates.textContent = `${formatMsk(row.starts_at)} — ${formatMsk(row.ends_at)}`;
+                    const items = document.createElement('div');
+                    items.className = 'season-v2-rarity-line';
+                    items.textContent = (row.items || []).map((item) => `${item.slot}: ${item.rarity}`).join(' · ');
+                    card.append(head, dates, items);
+
+                    const actions = document.createElement('div');
+                    actions.className = 'season-v2-card-actions';
+                    const preview = document.createElement('button');
+                    preview.className = 'btn-secondary';
+                    preview.type = 'button';
+                    preview.textContent = 'Предпросмотр';
+                    preview.onclick = () => openSeasonV2Editor(row.preset_code, true);
+                    actions.appendChild(preview);
+                    if (row.status === 'draft' || row.status === 'scheduled') {
+                        const edit = document.createElement('button');
+                        edit.className = 'btn-secondary';
+                        edit.type = 'button';
+                        edit.textContent = 'Редактировать';
+                        edit.onclick = () => openSeasonV2Editor(row.preset_code, false);
+                        actions.appendChild(edit);
                     }
-                    if (s.status === 'completed') {
-                        html += `<div class="card-meta">Итогов в архиве: ${s.archived}</div>`;
-                    }
-                    if (s.is_overdue) {
-                        html += `<div class="warning-text" style="text-align:left; margin-top:6px;">Срок вышел — сезон завершится при следующем открытии приложения.</div>`;
-                    }
-                    if (s.status === 'planned') {
-                        html += `<button class="btn-secondary" style="margin-top:8px;" onclick="deleteSeason(${Number(s.season_id)})">🗑 Отменить план</button>`;
-                    }
-                    html += `</div>`;
+                    card.appendChild(actions);
+                    box.appendChild(card);
                 });
-                box.innerHTML = html;
             } catch (e) {
-                box.innerHTML = '<div style="font-size:13px; color:#b00;">Не удалось загрузить сезоны.</div>';
+                box.textContent = 'Не удалось загрузить сезоны.';
+                log('❌ Season V2: ' + (e.message || e));
             }
         }
 
-        // Создание сезона. Клиентская проверка — только чтобы не гонять заведомо неверную форму;
-        // настоящая валидация (номер, уникальность, порядок дат, пересечение окон, роль) живёт
-        // в admin_create_season_self. Скрытая кнопка правами не является: ученик, вызвав RPC
-        // напрямую, получит forbidden — app_role проверяется на сервере, а прямая запись в
-        // seasons отозвана у anon/authenticated (миграция 043).
-        async function createSeason() {
-            const btn = document.getElementById('btn-create-season');
-            if (btn.disabled) return;
+        function openSeasonV2Editor(presetCode, previewOnly) {
+            const row = seasonV2Rows.find((item) => item.preset_code === presetCode);
+            if (!row) return;
+            seasonV2Editing = structuredClone(row);
+            const modal = document.getElementById('season-v2-modal');
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            document.getElementById('season-v2-modal-title').textContent =
+                `${String(row.sequence_no).padStart(2, '0')} · ${row.title}`;
+            document.getElementById('season-v2-title').value = row.title;
+            document.getElementById('season-v2-description').value = row.description;
+            document.getElementById('season-v2-starts-at').value = toMskInput(row.starts_at);
+            document.getElementById('season-v2-ends-at').value = toMskInput(row.ends_at);
+            document.getElementById('season-v2-title').oninput = (event) => {
+                seasonV2Editing.title = event.target.value;
+                seasonPreviewCard(seasonV2Editing, document.getElementById('season-v2-live-preview'));
+            };
+            document.getElementById('season-v2-editor-fields').hidden = previewOnly;
+            document.getElementById('season-v2-save-draft').hidden = previewOnly;
+            document.getElementById('season-v2-schedule').hidden = previewOnly || row.catalog_only;
             showSeasonFormError('');
+            renderSeasonV2Items(previewOnly);
+            seasonPreviewCard(seasonV2Editing, document.getElementById('season-v2-live-preview'));
+        }
 
-            const number = Number(document.getElementById('season-number').value);
-            const title = document.getElementById('season-title').value.trim();
-            const startsAt = mskLocalToIso(document.getElementById('season-starts-at').value);
-            const endsAt = mskLocalToIso(document.getElementById('season-ends-at').value);
+        function closeSeasonV2Editor() {
+            const modal = document.getElementById('season-v2-modal');
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            seasonV2Editing = null;
+        }
 
-            if (!Number.isInteger(number) || number <= 0) return showSeasonFormError(SEASON_ERROR_TEXT.season_number_required);
-            if (!title) return showSeasonFormError(SEASON_ERROR_TEXT.title_required);
-            if (!startsAt || !endsAt) return showSeasonFormError(SEASON_ERROR_TEXT.window_required);
-            if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) return showSeasonFormError(SEASON_ERROR_TEXT.window_order);
-            if (new Date(startsAt).getTime() <= Date.now()) return showSeasonFormError(SEASON_ERROR_TEXT.start_in_past);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && document.getElementById('season-v2-modal')?.classList.contains('open')) {
+                closeSeasonV2Editor();
+            }
+        });
 
-            btn.disabled = true;
+        document.addEventListener('click', (event) => {
+            if (event.target?.id === 'season-v2-modal') closeSeasonV2Editor();
+        });
+
+        function renderSeasonV2Items(previewOnly) {
+            const list = document.getElementById('season-v2-items');
+            list.replaceChildren();
+            (seasonV2Editing.items || []).forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = `season-v2-item-editor rarity-${item.rarity}`;
+                const label = document.createElement('strong');
+                label.textContent = `${item.slot} · ${item.rarity}`;
+                card.appendChild(label);
+                if (!previewOnly) {
+                    const name = document.createElement('input');
+                    name.value = item.name;
+                    name.maxLength = 80;
+                    name.setAttribute('aria-label', `Название ${item.slot}`);
+                    const description = document.createElement('textarea');
+                    description.value = item.description;
+                    description.maxLength = 500;
+                    description.setAttribute('aria-label', `Описание ${item.slot}`);
+                    const price = document.createElement('input');
+                    price.type = 'number';
+                    price.min = '1';
+                    price.value = item.price;
+                    price.setAttribute('aria-label', `Цена ${item.slot}`);
+                    const visual = document.createElement('select');
+                    visual.setAttribute('aria-label', `Визуал ${item.slot}`);
+                    const options = [...new Set(seasonV2Rows.flatMap((row) =>
+                        (row.items || []).filter((candidate) => candidate.slot === item.slot)
+                            .map((candidate) => candidate.render_payload)))];
+                    options.forEach((payload) => {
+                        const option = document.createElement('option');
+                        option.value = payload;
+                        option.textContent = payload.replace(/^(avatar|frame|scene|title)_v4_/, '');
+                        option.selected = payload === item.render_payload;
+                        visual.appendChild(option);
+                    });
+                    const update = () => {
+                        Object.assign(seasonV2Editing.items[index], {
+                            name: name.value,
+                            description: description.value,
+                            price: Number(price.value),
+                            render_payload: visual.value
+                        });
+                        seasonPreviewCard(seasonV2Editing, document.getElementById('season-v2-live-preview'));
+                    };
+                    [name, description, price, visual].forEach((field) => field.addEventListener('input', update));
+                    card.append(name, description, price, visual);
+                } else {
+                    const name = document.createElement('span');
+                    name.textContent = item.name;
+                    card.appendChild(name);
+                }
+                list.appendChild(card);
+            });
+        }
+
+        async function saveSeasonV2(schedule) {
+            if (!seasonV2Editing) return;
+            const title = document.getElementById('season-v2-title').value.trim();
+            const description = document.getElementById('season-v2-description').value.trim();
+            const startsAt = mskLocalToIso(document.getElementById('season-v2-starts-at').value);
+            const endsAt = mskLocalToIso(document.getElementById('season-v2-ends-at').value);
+            const buttons = [
+                document.getElementById('season-v2-save-draft'),
+                document.getElementById('season-v2-schedule')
+            ];
+            buttons.forEach((button) => { button.disabled = true; });
             try {
-                const { error } = await db.rpc('admin_create_season_self', {
-                    p_season_number: number,
+                const items = seasonV2Editing.items.map((item) => ({
+                    item_code: item.item_code,
+                    slot: item.slot,
+                    name: item.name.trim(),
+                    description: item.description.trim(),
+                    price: Number(item.price),
+                    render_payload: item.render_payload
+                }));
+                const { error } = await db.rpc('admin_save_season_v2_self', {
+                    p_preset_code: seasonV2Editing.preset_code,
                     p_title: title,
+                    p_description: description,
                     p_starts_at: startsAt,
-                    p_ends_at: endsAt
+                    p_ends_at: endsAt,
+                    p_items: items,
+                    p_schedule: !!schedule
                 });
                 if (error) throw error;
-                document.getElementById('season-number').value = '';
-                document.getElementById('season-title').value = '';
-                document.getElementById('season-starts-at').value = '';
-                document.getElementById('season-ends-at').value = '';
+                closeSeasonV2Editor();
                 await loadSeasons();
             } catch (e) {
                 showSeasonFormError(seasonErrorText(e));
             } finally {
-                btn.disabled = false;
-            }
-        }
-
-        async function deleteSeason(seasonId) {
-            if (!confirm(`Отменить запланированный сезон №${seasonId}?`)) return;
-            try {
-                const { error } = await db.rpc('admin_delete_season_self', { p_season_id: seasonId });
-                if (error) throw error;
-                await loadSeasons();
-            } catch (e) {
-                alert(seasonErrorText(e));
+                buttons.forEach((button) => { button.disabled = false; });
             }
         }
 
@@ -269,9 +423,9 @@
 
         // Закрытие сезона (G8, лиги — L01/L02): вся операция — одна транзакция RPC close_season
         // (миграция 006, расширена close_league_season в 019): архив мест всех учеников, награды
-        // топ-3 (100/60/30), лиговые переходы и Корона, обнуление очков, открытие следующего
-        // сезона. Клиент не считает места/переходы — только вызывает эту одну RPC. Сезон,
-        // открытый сегодня, RPC закрыть не даст. Кнопка блокируется синхронно до подтверждения
+        // топ-3 (100/60/30), лиговые переходы и Корона, обнуление очков. Следующий период
+        // открывается только если его плановое время уже наступило. Клиент не считает места/
+        // переходы — только вызывает эту одну RPC. Кнопка блокируется синхронно до подтверждения
         // диалогом (confirm блокирует поток) и до ответа RPC — двойной клик не создаёт вторую
         // параллельную цепочку запросов.
         async function closeSeason() {
@@ -282,12 +436,12 @@
                 const { data: seasons, error } = await db.from('seasons').select('id, start_date').is('end_date', null).order('id', { ascending: false }).limit(1);
                 if (error) throw error;
                 if (!seasons || !seasons.length) {
-                    alert('Нет открытого сезона — он появится, когда кто-то откроет лидерборд.');
+                    alert('Сейчас нет активного сезона. Следующий включится автоматически по расписанию.');
                     return;
                 }
                 const season = seasons[0];
                 const startText = new Date(season.start_date).toLocaleDateString('ru-RU');
-                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, лиговые переходы и Корона будут посчитаны сервером, очки всех учеников обнулятся. Общий топ за все сезоны при этом не уменьшится.\n\nСразу откроется следующий сезон: подошедший по плану, либо новый, если запланированного на сейчас нет. Действие необратимо.`)) return;
+                if (!confirm(`Закрыть сезон №${season.id} (идёт с ${startText})?\n\nИтоги уйдут в архив, топ-3 получат 100/60/30 бубликов, лиговые переходы и Корона будут посчитаны сервером, очки всех учеников обнулятся. Общий топ за все сезоны при этом не уменьшится.\n\nБудущий период раньше его плановой даты не включится. Действие необратимо.`)) return;
 
                 const { data, error: rpcError } = await db.rpc('close_season_self');
                 if (rpcError) throw rpcError;
@@ -295,7 +449,10 @@
                     // Сезон успел завершиться по расписанию (ends_at) между чтением и вызовом.
                     alert('Сезон уже был завершён — повторное закрытие ничего не изменило.');
                 } else {
-                    alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\nТекущим стал сезон №${data.next_season_id}.`);
+                    const nextText = data.next_season_id
+                        ? `Текущим стал сезон №${data.next_season_id}.`
+                        : 'Следующий сезон включится автоматически по расписанию.';
+                    alert(`Сезон №${data.season_id} закрыт!\nУчеников в архиве: ${data.archived}, наград топ-3 выдано: ${data.awarded}.\n${nextText}`);
                 }
                 document.getElementById('season-preview').innerHTML = '';
                 await loadSeasons();

@@ -8,16 +8,25 @@
         // student_equipment + встроенный shop_items (render_payload/name) одним embed-запросом.
         function equipmentQuery(idsOrOne, isList) {
             const q = db.from('student_equipment')
-                .select('student_id, slot, item_code, variant, shop_items(render_payload, name)');
+                .select('student_id, slot, item_code, variant, shop_items(render_payload, name, description, rarity, visual_key, motion_policy)');
             return isList ? q.in('student_id', idsOrOne) : q.eq('student_id', idsOrOne);
         }
 
-        // Массив строк экипировки → карта slot → {item_code, variant, payload, name}
+        // Массив строк экипировки → безопасная карта slot → публичные свойства предмета.
         function buildEquipMap(rows) {
             const map = {};
             (rows || []).forEach(r => {
                 const si = r.shop_items || {};
-                map[r.slot] = { item_code: r.item_code, variant: r.variant, payload: si.render_payload, name: si.name };
+                map[r.slot] = {
+                    item_code: r.item_code,
+                    variant: r.variant,
+                    payload: si.render_payload,
+                    name: si.name,
+                    description: si.description,
+                    rarity: si.rarity,
+                    visual_key: si.visual_key,
+                    motion_policy: si.motion_policy
+                };
             });
             return map;
         }
@@ -78,8 +87,21 @@
             const layer = document.getElementById('app-bg-layer');
             if (!layer) return;
             BG_CLASSES.forEach(c => layer.classList.remove(c));
+            layer.replaceChildren();
             const payload = eq && eq.background ? eq.background.payload : null;
-            if (payload && BG_CLASSES.has(payload)) layer.classList.add(payload);
+            if (payload && BG_CLASSES.has(payload)) {
+                layer.className = payload;
+                return;
+            }
+            if (window.SeasonCosmetics) {
+                const scene = SeasonCosmetics.createScene(eq && eq.background, '');
+                if (scene) {
+                    layer.className = scene.className;
+                    while (scene.firstChild) layer.appendChild(scene.firstChild);
+                    return;
+                }
+            }
+            layer.className = '';
         }
 
         function applyProfileCosmetics(eq) {
@@ -94,9 +116,100 @@
                 titleRow.style.display = 'none';
                 titleEl.textContent = '';
             }
-            applyAvatarFrame(document.getElementById('user-avatar-container'), eq);
+            const avatarHost = document.getElementById('user-avatar-container');
+            const fallback = currentUser.photo_url
+                ? {
+                    imageUrl: normalizeUrl(currentUser.photo_url),
+                    alt: currentUser.first_name ? `Аватар ${currentUser.first_name}` : 'Аватар ученика'
+                }
+                : ((currentUser.first_name || '?')[0].toUpperCase());
+            if (window.SeasonCosmetics) {
+                SeasonCosmetics.replaceAvatar(avatarHost, eq, 48, 'profile', fallback);
+                avatarHost.tabIndex = 0;
+                avatarHost.setAttribute('role', 'button');
+                avatarHost.setAttribute('aria-label', 'Открыть визитку');
+                avatarHost.onclick = () => openSeasonProfileCard({
+                    name: currentUser.first_name || '',
+                    meta: 'Ваш профиль',
+                    eq,
+                    fallback
+                }, avatarHost);
+                avatarHost.onkeydown = (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        avatarHost.click();
+                    }
+                };
+            } else {
+                applyAvatarFrame(avatarHost, eq);
+            }
             applyAppBackground(eq);
         }
+
+        let seasonProfileTrigger = null;
+        let seasonProfileHistoryEntry = false;
+
+        function openSeasonProfileCard(user, trigger) {
+            if (!window.SeasonCosmetics) return;
+            const overlay = document.getElementById('season-profile-overlay');
+            const sceneHost = document.getElementById('season-profile-scene');
+            const avatarHost = document.getElementById('season-profile-avatar');
+            const title = equippedTitleText(user.eq && user.eq.title);
+
+            sceneHost.replaceChildren();
+            const scene = SeasonCosmetics.createScene(user.eq && user.eq.background, 'season-profile-scene-art');
+            if (scene) sceneHost.appendChild(scene);
+            SeasonCosmetics.replaceAvatar(
+                avatarHost,
+                user.eq || {},
+                160,
+                'expanded',
+                user.fallback || (user.name || '?')[0].toUpperCase()
+            );
+            document.getElementById('season-profile-name').textContent = user.name || '';
+            document.getElementById('season-profile-title').textContent = title || 'Без титула';
+            document.getElementById('season-profile-title').className =
+                `rarity-title-${(user.eq && user.eq.title && user.eq.title.rarity) || 'common'}`;
+            document.getElementById('season-profile-meta').textContent = user.meta || '';
+            seasonProfileTrigger = trigger || null;
+            overlay.hidden = false;
+            document.body.classList.add('season-profile-open');
+            avatarHost.tabIndex = 0;
+            avatarHost.setAttribute('role', 'button');
+            avatarHost.setAttribute('aria-label', 'Закрыть визитку');
+            avatarHost.onclick = () => closeSeasonProfileCard();
+            avatarHost.onkeydown = (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    closeSeasonProfileCard();
+                }
+            };
+            if (!seasonProfileHistoryEntry) {
+                history.pushState({ seasonProfileCard: true }, '');
+                seasonProfileHistoryEntry = true;
+            }
+            overlay.querySelector('.season-profile-close').focus();
+        }
+
+        function closeSeasonProfileCard(fromPopstate) {
+            const overlay = document.getElementById('season-profile-overlay');
+            if (!overlay || overlay.hidden) return;
+            overlay.hidden = true;
+            document.body.classList.remove('season-profile-open');
+            if (seasonProfileTrigger) seasonProfileTrigger.focus();
+            seasonProfileTrigger = null;
+            if (seasonProfileHistoryEntry) {
+                seasonProfileHistoryEntry = false;
+                if (!fromPopstate) history.back();
+            }
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeSeasonProfileCard();
+        });
+        window.addEventListener('popstate', () => {
+            if (seasonProfileHistoryEntry) closeSeasonProfileCard(true);
+        });
 
         // --- ПРОФИЛЬ И ИСТОРИЯ ---
         async function loadProfile(isRetryAfterInsert) {
@@ -686,25 +799,50 @@
             const li = document.createElement('li');
             li.className = ['lb-item', isMe ? 'lb-me' : '', modifiers || ''].filter(Boolean).join(' ');
 
+            if (window.SeasonCosmetics) {
+                const scene = SeasonCosmetics.createScene(eq && eq.background, 'lb-equipped-scene');
+                if (scene) li.appendChild(scene);
+            }
+
             const rank = document.createElement('div');
             rank.className = 'lb-rank'; rank.textContent = rankText;
 
-            const avatar = document.createElement('div');
+            const avatar = document.createElement('button');
+            avatar.type = 'button';
             avatar.className = 'lb-avatar';
-            avatar.textContent = name ? name[0].toUpperCase() : '?';
-            applyAvatarFrame(avatar, eq);
+            avatar.setAttribute('aria-label', `Открыть визитку ${name || 'ученика'}`);
+            if (window.SeasonCosmetics) {
+                SeasonCosmetics.replaceAvatar(
+                    avatar, eq || {}, 32, 'compact', name ? name[0].toUpperCase() : '?'
+                );
+                avatar.addEventListener('click', () => openSeasonProfileCard({
+                    name: name || '',
+                    meta: isMe ? 'Это вы' : 'Публичная экипировка',
+                    eq: eq || {},
+                    fallback: isMe && currentUser.photo_url
+                        ? {
+                            imageUrl: normalizeUrl(currentUser.photo_url),
+                            alt: currentUser.first_name ? `Аватар ${currentUser.first_name}` : 'Аватар ученика'
+                        }
+                        : (name ? name[0].toUpperCase() : '?')
+                }, avatar));
+            } else {
+                avatar.textContent = name ? name[0].toUpperCase() : '?';
+                applyAvatarFrame(avatar, eq);
+            }
 
             const wrap = document.createElement('div');
             wrap.className = 'lb-name-wrap';
             const line = document.createElement('div');
-            line.className = 'lb-name-line';
+            line.className = 'lb-name-line lb-readable-window';
             renderNick(line, name || '', eq, isMe ? ' (Вы)' : '');
             wrap.appendChild(line);
             if (eq.title) {
                 const title = equippedTitleText(eq.title);
                 if (title) {
                     const t = document.createElement('div');
-                    t.className = 'lb-title'; t.textContent = title;
+                    t.className = `lb-title lb-readable-window rarity-title-${eq.title.rarity || 'common'}`;
+                    t.textContent = title;
                     wrap.appendChild(t);
                 }
             }
@@ -936,4 +1074,3 @@
                 globalTopBusy = false;
             }
         }
-
