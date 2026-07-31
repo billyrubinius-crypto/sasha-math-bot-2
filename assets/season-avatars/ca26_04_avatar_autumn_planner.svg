@@ -1,20 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
-  <title>Вне расписания</title>
-  <desc>Кот с расписанием, которое уже не актуально.</desc>
-  <defs>
-    <linearGradient id="bg-4" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#FDBA74"/>
-      <stop offset="1" stop-color="#64748B"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg-4)"/>
-  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
-  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
-  <path d="M119 244 142 105l108 76 120-76 23 139z" fill="#475569" stroke="#172033" stroke-width="18" stroke-linejoin="round"/>
-    <rect x="108" y="182" width="296" height="258" rx="122" fill="#64748B" stroke="#172033" stroke-width="18"/>
-    <circle cx="195" cy="282" r="27" fill="#0F172A"/><circle cx="317" cy="282" r="27" fill="#0F172A"/>
-    <circle cx="187" cy="273" r="8" fill="#fff"/><circle cx="309" cy="273" r="8" fill="#fff"/>
-    <path d="m238 331 18 17 18-17" fill="#FB7185" stroke="#172033" stroke-width="9" stroke-linejoin="round"/><path d="M256 348v25m0 0q-28 23-53 0m53 0q28 23 53 0" fill="none" stroke="#172033" stroke-width="10" stroke-linecap="round"/>
-    <g stroke="#172033" stroke-width="8"><path d="M170 340 72 320M170 366 68 374M342 340l98-20M342 366l102 8"/></g>
-    <rect x="319" y="88" width="121" height="92" rx="14" fill="#FFF7ED" stroke="#9A3412" stroke-width="11"/><path d="M340 118h78M340 145h54" stroke="#F97316" stroke-width="11" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Осенний планер</title>
+  <desc>Учебный планер с недельной сеткой и первыми осенними листьями.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#FEF3C7"/><stop offset="1" stop-color="#D9F99D"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <rect x="96" y="112" width="320" height="306" rx="36" fill="#FFF7ED" stroke="#29331F" stroke-width="17"/>
+  <path d="M96 184h320M176 184v234M256 184v234M336 184v234M96 262h320M96 340h320" stroke="#A3A87D" stroke-width="9"/>
+  <path d="M154 86c44 10 72 42 64 92-46 5-78-21-88-63zM382 278c-9 51-41 81-88 80-8-45 18-82 62-98z" fill="#D97706" stroke="#29331F" stroke-width="13" stroke-linejoin="round"/>
+  <path d="m148 104 58 60M368 278l-60 67" stroke="#84CC16" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="216" cy="224" r="13" fill="#6366F1"/><circle cx="296" cy="302" r="13" fill="#6366F1"/>
 </svg>

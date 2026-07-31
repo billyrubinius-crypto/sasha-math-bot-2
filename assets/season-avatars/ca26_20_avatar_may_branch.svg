@@ -1,19 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
-  <title>Локальный дождь</title>
-  <desc>Облако с персональным прогнозом.</desc>
-  <defs>
-    <linearGradient id="bg-20" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#7DD3FC"/>
-      <stop offset="1" stop-color="#2563EB"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg-20)"/>
-  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
-  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
-  <path d="M107 354q-55-60 11-111 5-88 96-86 49-81 126-26 89-8 91 83 77 39 34 116-22 76-109 56-62 60-123 5-77 24-126-37z" fill="#BAE6FD" stroke="#0369A1" stroke-width="18"/>
-    <circle cx="203" cy="281" r="27" fill="#0C4A6E"/><circle cx="317" cy="281" r="27" fill="#0C4A6E"/>
-    <circle cx="194" cy="272" r="8" fill="#fff"/><circle cx="308" cy="272" r="8" fill="#fff"/>
-    <path d="M216 345q40-24 80 0" fill="none" stroke="#0369A1" stroke-width="13" stroke-linecap="round"/>
-    <path d="M170 410l-24 48M256 410l-24 48M342 410l-24 48" stroke="#38BDF8" stroke-width="18" stroke-linecap="round"/>
-    <path d="M380 91h62v62h-62z" fill="#F8FAFC" stroke="#0369A1" stroke-width="10"/><path d="m390 125 14 14 28-35" fill="none" stroke="#22C55E" stroke-width="9"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Ветвь мая</title>
+  <desc>Цветущая майская ветвь, солнечный круг и спокойная линия памяти.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#ECFCCB"/><stop offset="1" stop-color="#FEF3C7"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <circle cx="382" cy="124" r="70" fill="#EAB308" opacity=".85"/>
+  <path d="M80 410c142-18 135-174 340-286" fill="none" stroke="#22301E" stroke-width="25" stroke-linecap="round"/>
+  <path d="M158 346c-74 5-100-34-92-82 69-5 98 27 92 82zM248 260c-67-10-84-53-65-97 63 9 84 44 65 97zM314 214c12-70 55-87 99-66-10 64-48 85-99 66z" fill="#22C55E" stroke="#22301E" stroke-width="14" stroke-linejoin="round"/>
+  <g fill="#F7FEE7" stroke="#6366F1" stroke-width="10">
+    <path d="m183 313 18-24 30 4 2 30 25 17-15 27-29-7-23 20-21-22 13-28z"/>
+    <path d="m325 180 18-24 30 4 2 30 25 17-15 27-29-7-23 20-21-22 13-28z"/>
+  </g>
+  <path d="M72 436h368" stroke="#6366F1" stroke-width="13" stroke-linecap="round"/>
 </svg>

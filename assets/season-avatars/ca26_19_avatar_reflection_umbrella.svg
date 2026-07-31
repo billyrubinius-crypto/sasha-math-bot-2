@@ -1,19 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
-  <title>Метод тыка</title>
-  <desc>Утка выбирает ответ клювом.</desc>
-  <defs>
-    <linearGradient id="bg-19" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#FDE047"/>
-      <stop offset="1" stop-color="#38BDF8"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg-19)"/>
-  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
-  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
-  <circle cx="253" cy="283" r="159" fill="#FDE047" stroke="#A16207" stroke-width="18"/>
-    <path d="M120 190q18-93 112-96-18 76-112 96z" fill="#FEF08A" stroke="#A16207" stroke-width="16"/>
-    <circle cx="196" cy="252" r="27" fill="#1F2937"/><circle cx="310" cy="252" r="27" fill="#1F2937"/>
-    <circle cx="187" cy="243" r="8" fill="#fff"/><circle cx="301" cy="243" r="8" fill="#fff"/>
-    <path d="m182 321 74-42 98 42-98 57z" fill="#FB923C" stroke="#9A3412" stroke-width="16" stroke-linejoin="round"/>
-    <circle cx="409" cy="111" r="48" fill="#F8FAFC" stroke="#2563EB" stroke-width="12"/><text x="391" y="131" fill="#2563EB" font-family="sans-serif" font-weight="900" font-size="62">?</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Зонт отражений</title>
+  <desc>Весенний зонт отражается в луже с расходящимися геометрическими кругами.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#BAE6FD"/><stop offset="1" stop-color="#DDD6FE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M72 244c22-106 96-166 184-166s162 60 184 166c-58-28-95-26-184 0-89-26-126-28-184 0z" fill="#A855F7" stroke="#1B2738" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M256 92v252c0 71 86 74 86 3" fill="none" stroke="#1B2738" stroke-width="20" stroke-linecap="round"/>
+  <path d="M256 92c-56 40-78 89-78 139M256 92c56 40 78 89 78 139" fill="none" stroke="#F0F9FF" stroke-width="13"/>
+  <ellipse cx="256" cy="408" rx="166" ry="42" fill="none" stroke="#0EA5E9" stroke-width="15"/><ellipse cx="256" cy="408" rx="100" ry="24" fill="none" stroke="#64748B" stroke-width="12"/>
+  <path d="M116 72l-18 45M390 64l-20 52M438 160l-15 39" stroke="#0EA5E9" stroke-width="13" stroke-linecap="round"/>
 </svg>

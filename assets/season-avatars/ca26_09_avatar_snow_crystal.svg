@@ -1,18 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
-  <title>Не тает</title>
-  <desc>Снежное существо сохраняет форму.</desc>
-  <defs>
-    <linearGradient id="bg-9" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#BAE6FD"/>
-      <stop offset="1" stop-color="#F8FAFC"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg-9)"/>
-  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
-  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
-  <path d="M136 387q-47-39-14-91-25-62 40-93 22-79 102-48 69-45 111 25 73 14 62 88 50 63-9 111-29 72-102 46-63 44-112-10-50 12-78-28z" fill="#F8FAFC" stroke="#0EA5E9" stroke-width="18"/>
-    <circle cx="203" cy="287" r="27" fill="#164E63"/><circle cx="317" cy="287" r="27" fill="#164E63"/>
-    <circle cx="194" cy="278" r="9" fill="#fff"/><circle cx="308" cy="278" r="9" fill="#fff"/>
-    <path d="M212 359q48 23 96 0" fill="none" stroke="#0E7490" stroke-width="13" stroke-linecap="round"/>
-    <path d="M256 82v74M219 99l37 29 37-29" fill="none" stroke="#E0F2FE" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Кристалл первого снега</title>
+  <desc>Крупная шестилучевая снежинка с геометрической разметкой.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DBEAFE"/><stop offset="1" stop-color="#C7D2FE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <g fill="none" stroke="#16213A" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 58v396M84 157l344 198M84 355l344-198"/>
+    <path d="m256 112-36-34M256 112l36-34M256 400l-36 34M256 400l36 34"/>
+    <path d="m131 184-48 14M131 184l-10-48M381 328l48-14M381 328l10 48"/>
+    <path d="m131 328-48-14M131 328l-10 48M381 184l48 14M381 184l10-48"/>
+  </g>
+  <circle cx="256" cy="256" r="55" fill="#F8FAFC" stroke="#6366F1" stroke-width="15"/>
+  <path d="m256 216 35 20v40l-35 20-35-20v-40z" fill="#38BDF8" stroke="#16213A" stroke-width="10"/>
 </svg>

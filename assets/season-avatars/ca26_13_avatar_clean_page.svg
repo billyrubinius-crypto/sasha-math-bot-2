@@ -1,18 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
-  <title>Ошибка на полях</title>
-  <desc>Чернильная клякса смотрит с полей тетради.</desc>
-  <defs>
-    <linearGradient id="bg-13" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#E2E8F0"/>
-      <stop offset="1" stop-color="#334155"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="118" fill="url(#bg-13)"/>
-  <circle cx="80" cy="78" r="58" fill="#fff" opacity=".17"/>
-  <circle cx="438" cy="420" r="94" fill="#fff" opacity=".1"/>
-  <path d="M113 385q-38-69 31-105-32-71 45-93 21-78 88-42 71-45 103 29 78 8 50 84 58 51-8 102 9 73-66 64-54 50-105 1-75 30-87-39z" fill="#172033" stroke="#020617" stroke-width="18"/>
-    <circle cx="207" cy="282" r="32" fill="#F8FAFC"/><circle cx="317" cy="282" r="32" fill="#F8FAFC"/><circle cx="214" cy="290" r="17" fill="#0F172A"/><circle cx="310" cy="290" r="17" fill="#0F172A"/>
-    <path d="M219 362q37 26 74 0" fill="none" stroke="#F8FAFC" stroke-width="13" stroke-linecap="round"/>
-    <path d="M75 83h362v346" fill="none" stroke="#F8FAFC" stroke-width="17" opacity=".92"/><path d="M110 83v346" stroke="#F87171" stroke-width="10"/>
-    <path d="m365 120 40 37-49 31" fill="none" stroke="#EF4444" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Чистая страница</title>
+  <desc>Белый лист с точными полями, карандашом и первой отметкой.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#DBEAFE"/><stop offset="1" stop-color="#EDE9FE"/></linearGradient></defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M112 68h250l56 58v318H112z" fill="#FFF" stroke="#1E293B" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M362 68v62h56M166 68v376M198 172h148M198 226h122M198 280h146M198 334h96" fill="none" stroke="#93C5FD" stroke-width="12" stroke-linecap="round"/>
+  <path d="m288 390 104-196 34 18-104 196-47 30z" fill="#A78BFA" stroke="#1E293B" stroke-width="14" stroke-linejoin="round"/>
+  <path d="m275 438 47-30-34-18z" fill="#64748B"/><circle cx="218" cy="126" r="15" fill="#2563EB"/>
 </svg>

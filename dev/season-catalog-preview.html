@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Cosmic Academy — утверждённый каталог сезонов V4</title>
+  <title>Cosmic Academy — календарный каталог сезонов V2</title>
   <link rel="stylesheet" href="../styles/student.css">
   <link rel="stylesheet" href="../styles/season-cosmetics-preview.css">
 </head>
 <body class="season-catalog-preview">
   <main class="season-preview-shell">
     <header class="season-preview-header">
-      <p class="season-preview-kicker">Утверждённая ревизия 4 · локальный preview</p>
-      <h1>23 коллекции, которые хочется собрать</h1>
+      <p class="season-preview-kicker">Локальный preview · 28.07.2026–24.06.2027</p>
+      <h1>Учебный год в 23 календарных коллекциях</h1>
       <p class="season-preview-lead">
-        Крупные персонажи, разные материалы рамок, мемные титулы и самостоятельные фоновые сцены.
-        Период 01 показан только как часть каталога; первым автоматически включится период 02 — 1 августа 2026.
+        Реальные сезоны, школьный ритм и знакомые события дополнены математикой и лёгким языком Cosmic Academy.
+        Данные загружаются из JSON; стенд работает без Telegram, Supabase и внешних ресурсов.
       </p>
       <div class="season-preview-stats" aria-label="Сводка каталога">
         <span class="season-preview-stat" id="presetStat">23 периода</span>
@@ -23,15 +23,8 @@
         <span class="season-preview-stat">21 × 14 дней</span>
         <span class="season-preview-stat">2 межсезонья</span>
         <span class="season-preview-stat">Москва · 00:00</span>
-        <span class="season-preview-stat season-preview-stat--launch">Автозапуск: 01.08 · период 02</span>
       </div>
     </header>
-
-    <aside class="season-planning-note">
-      <strong>Контракт учительского сайта:</strong>
-      будущий период редактируется как черновик, проверяется здесь в 32/48/112/160 px и публикуется в расписание.
-      Редкость не редактируется вручную, ранний запуск запрещён.
-    </aside>
 
     <section class="season-preview-toolbar" aria-label="Управление каталогом">
       <label class="season-preview-control season-preview-search">
@@ -163,28 +156,7 @@
       }
 
       function titleTierClass(titleItem) {
-        return `title-tier-${titleItem.title_visual_tier} title-visual-${titleItem.visual_key.replaceAll("_", "-")}`;
-      }
-
-      function backgroundLayers() {
-        return `
-          <i class="season-bg-layer season-bg-layer-a" aria-hidden="true"></i>
-          <i class="season-bg-layer season-bg-layer-b" aria-hidden="true"></i>
-        `;
-      }
-
-      function framedAvatar(preset, avatar, frame, sizeClass = "season-avatar-size-catalog", clickable = true) {
-        const tag = clickable ? "button" : "span";
-        const buttonAttrs = clickable
-          ? ` type="button" data-avatar-sequence="${preset.sequence_no}" data-sequence="${preset.sequence_no}" data-item-code="${escapeHtml(avatar.item_code)}" aria-label="Открыть аватар ${escapeHtml(avatar.name)}"`
-          : "";
-        return `
-          <${tag} class="season-avatar-shell season-frame ${sizeClass} rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}"${buttonAttrs}>
-            <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}" loading="lazy">
-            <i class="season-frame-strand season-frame-strand-a" aria-hidden="true"></i>
-            <i class="season-frame-strand season-frame-strand-b" aria-hidden="true"></i>
-          </${tag}>
-        `;
+        return `title-tier-${titleItem.title_visual_tier}`;
       }
 
       function itemButton(preset, item) {
@@ -236,13 +208,10 @@
         return `
           <article class="season-card" data-preset-code="${escapeHtml(preset.preset_code)}">
             <div class="season-bg-canvas ${cssClassFromPayload(background.render_payload)}">
-              ${backgroundLayers()}
               <div class="season-card-topline">
                 <span class="season-card-number">${String(preset.sequence_no).padStart(2, "0")}</span>
                 <div class="season-card-meta">
                   <span class="season-period-pill" data-kind="${escapeHtml(preset.season_type)}">${escapeHtml(periodLabel(preset))}</span>
-                  ${preset.sequence_no === 1 ? '<span class="season-period-pill season-period-pill--catalog">только каталог</span>' : ""}
-                  ${preset.sequence_no === 2 ? '<span class="season-period-pill season-period-pill--launch">автозапуск 1 августа</span>' : ""}
                 </div>
               </div>
               <div class="season-card-hero">
@@ -251,11 +220,13 @@
                   <h2>${escapeHtml(preset.suggested_name)}</h2>
                   <p class="season-card-dates">${escapeHtml(formatRange(preset))} <small>· конец не включается</small></p>
                   <p class="season-card-description">${escapeHtml(preset.short_description)}</p>
-                  <span class="season-title-sample ${titleTierClass(title)} rarity-${escapeHtml(title.rarity)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
+                  <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
                     ${escapeHtml(title.name)}
                   </span>
                 </div>
-                ${framedAvatar(preset, avatar, frame)}
+                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}">
+                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}" loading="lazy">
+                </div>
               </div>
             </div>
             <div class="season-card-body">
@@ -316,7 +287,6 @@
         const background = getItem(preset, "background");
         return `
           <div class="season-mini-app ${cssClassFromPayload(background.render_payload)}">
-            ${backgroundLayers()}
             <div class="season-mini-topbar">
               <strong>Cosmic Academy</strong>
               <span class="season-mini-balance">⚙ 520</span>
@@ -341,17 +311,15 @@
                 </div>
               </section>
               <aside class="season-mini-profile">
-                <p class="season-card-kicker">Раскрытая карточка · 160 px</p>
-                ${framedAvatar(preset, avatar, frame, "season-avatar-size-expanded", false)}
+                <p class="season-card-kicker">Профиль после примерки</p>
+                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}">
+                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}">
+                </div>
                 <h3>Ученик Академии</h3>
-                <span class="season-title-sample ${titleTierClass(title)} rarity-${escapeHtml(title.rarity)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
+                <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
                   ${escapeHtml(title.name)}
                 </span>
-                <div class="season-size-previews" aria-label="Компактные размеры">
-                  <span><b>Профиль · 48</b>${framedAvatar(preset, avatar, frame, "season-avatar-size-profile", false)}</span>
-                  <span><b>Топ · 32</b>${framedAvatar(preset, avatar, frame, "season-avatar-size-compact", false)}</span>
-                </div>
-                <p>Нажатие на аватар в каталоге открывает эту карточку. Production-интеграции здесь нет.</p>
+                <p>Локальная компоновка для проверки фона, рамки, титула и SVG. Production-интеграции здесь нет.</p>
               </aside>
             </div>
           </div>
@@ -363,7 +331,6 @@
         modalTitle.textContent = `${preset.suggested_name} · ${selectedItem.name} · ${viewportFilter.value}px`;
         modalBody.innerHTML = modalProduct(preset, selectedItem);
         modal.hidden = false;
-        modal.querySelector(".season-modal-panel").scrollTop = 0;
         document.body.style.overflow = "hidden";
         modalClose.focus();
       }
@@ -447,15 +414,6 @@
       });
 
       grid.addEventListener("click", (event) => {
-        const avatarTrigger = event.target.closest("[data-avatar-sequence]");
-        if (avatarTrigger && catalog) {
-          const preset = catalog.presets.find((entry) => entry.sequence_no === Number(avatarTrigger.dataset.avatarSequence));
-          const avatar = preset && getItem(preset, "avatar");
-          if (preset && avatar) {
-            openPreview(preset, avatar, avatarTrigger);
-          }
-          return;
-        }
         const trigger = event.target.closest("[data-item-code]");
         if (!trigger || !catalog) {
           return;
