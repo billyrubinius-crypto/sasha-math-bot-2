@@ -45,6 +45,68 @@
             return title.item_code === 'title_custom' ? (title.variant || '') : titleText(title.name);
         }
 
+        const SEASON_PROFILE_EQUIPMENT_SLOTS = [
+            { slot: 'avatar', label: 'Аватар' },
+            { slot: 'frame', label: 'Рамка' },
+            { slot: 'title', label: 'Титул' },
+            { slot: 'background', label: 'Фон' }
+        ];
+        const SEASON_PROFILE_RARITY_LABELS = {
+            common: 'Обычный',
+            rare: 'Редкий',
+            epic: 'Эпический',
+            legendary: 'Легендарный'
+        };
+
+        function seasonEquipmentName(item, slot) {
+            if (!item) return '';
+            if (slot === 'title') return equippedTitleText(item) || item.name || '';
+            return item.name || '';
+        }
+
+        function seasonEquipmentCatalogMark(item) {
+            const match = String(item && item.item_code || '').match(/^ca26_(\d{2})_/);
+            return match ? ` · S${match[1]}` : '';
+        }
+
+        function renderSeasonProfileEquipment(eq) {
+            const host = document.getElementById('season-profile-equipment');
+            if (!host) return;
+            host.replaceChildren();
+
+            const heading = document.createElement('strong');
+            heading.className = 'season-profile-equipment-heading';
+            heading.textContent = 'Надето';
+            host.appendChild(heading);
+
+            const list = document.createElement('div');
+            list.className = 'season-profile-equipment-list';
+            SEASON_PROFILE_EQUIPMENT_SLOTS.forEach(({ slot, label }) => {
+                const item = eq && eq[slot];
+                if (!item) return;
+                const row = document.createElement('div');
+                row.className = 'season-profile-equipment-item';
+                const slotName = document.createElement('span');
+                slotName.textContent = label + seasonEquipmentCatalogMark(item);
+                const itemName = document.createElement('b');
+                itemName.textContent = seasonEquipmentName(item, slot) || label;
+                const rarity = SEASON_PROFILE_RARITY_LABELS[item.rarity] ? item.rarity : 'common';
+                const rarityName = document.createElement('i');
+                rarityName.className = `season-profile-equipment-rarity--${rarity}`;
+                rarityName.textContent = SEASON_PROFILE_RARITY_LABELS[rarity];
+                row.append(slotName, itemName, rarityName);
+                list.appendChild(row);
+            });
+
+            if (!list.childElementCount) {
+                const empty = document.createElement('span');
+                empty.className = 'season-profile-equipment-empty';
+                empty.textContent = 'Нет надетых предметов';
+                list.appendChild(empty);
+            }
+            host.appendChild(list);
+        }
+
         // Применить цвет ника к элементу: 'gold' — градиент, валидный hex — цвет, иначе дефолт
         function applyNickColor(el, payload) {
             el.classList.remove('nick-gold');
@@ -187,6 +249,7 @@
             document.getElementById('season-profile-title').textContent = title || 'Без титула';
             document.getElementById('season-profile-title').className =
                 `rarity-title-${(user.eq && user.eq.title && user.eq.title.rarity) || 'common'}`;
+            renderSeasonProfileEquipment(user.eq || {});
             document.getElementById('season-profile-meta').textContent = user.meta || '';
             avatarHost.tabIndex = 0;
             avatarHost.setAttribute('role', 'button');

@@ -1862,6 +1862,68 @@
         .season-profile-copy h3 { color: #f7f9ff; font-size: 23px; }
         .season-profile-copy p { font-size: 14px; font-weight: 800; }
         .season-profile-copy small { color: #9eacc2; font-size: 11px; }
+        .season-profile-equipment {
+            display: grid;
+            gap: 6px;
+            margin: 7px 0 4px;
+            padding: 10px;
+            border: 1px solid rgba(215, 229, 255, .16);
+            border-radius: 13px;
+            background: rgba(7, 13, 24, .62);
+            text-align: left;
+            backdrop-filter: blur(7px);
+        }
+        .season-profile-equipment-heading {
+            color: #cbd6ea;
+            font-size: 10px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+        .season-profile-equipment-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+        .season-profile-equipment-item {
+            display: grid;
+            min-width: 0;
+            gap: 3px;
+            padding: 9px;
+            border: 1px solid rgba(215, 229, 255, .14);
+            border-radius: 10px;
+            background: #151e32;
+        }
+        .season-profile-equipment-item span {
+            overflow: hidden;
+            color: #71809a;
+            font-size: 8px;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .season-profile-equipment-item b {
+            min-width: 0;
+            overflow: hidden;
+            color: #eef3ff;
+            font-size: 10px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .season-profile-equipment-item i {
+            font-size: 9px;
+            font-style: normal;
+            font-weight: 850;
+        }
+        .season-profile-equipment-rarity--common { color: #a7b1c2; }
+        .season-profile-equipment-rarity--rare { color: #69b6ff; }
+        .season-profile-equipment-rarity--epic { color: #b594ff; }
+        .season-profile-equipment-rarity--legendary { color: #f7c96e; }
+        .season-profile-equipment-empty {
+            grid-column: 1 / -1;
+            color: #8998b2;
+            font-size: 11px;
+        }
         body.season-profile-open { overflow: hidden; }
 
         @media (max-width: 380px) {

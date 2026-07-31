@@ -70,6 +70,8 @@ def main() -> int:
         require("js/season-cosmetics.js" in html, f"{label} safe renderer missing")
 
     require('id="season-profile-overlay"' in student_html, "expanded profile card missing")
+    require('id="season-profile-equipment"' in student_html,
+            "expanded profile equipment summary missing")
     require("SeasonCosmetics.replaceAvatar" in progress, "student avatar renderer not wired")
     require("SeasonCosmetics.createScene" in progress, "leaderboard background renderer not wired")
     require("history.pushState({ seasonProfileCard: true }" in progress,
@@ -82,6 +84,11 @@ def main() -> int:
             "future collection items are still loaded")
     require("openOwnSeasonProfileCard" in progress and "openOwnSeasonProfileCard(this)" in student_html,
             "stable own mini-profile trigger missing")
+    require("renderSeasonProfileEquipment" in progress
+            and "SEASON_PROFILE_EQUIPMENT_SLOTS" in progress
+            and "SEASON_PROFILE_RARITY_LABELS" in progress
+            and "seasonEquipmentCatalogMark" in progress,
+            "expanded profile does not list equipped cosmetics")
 
     require('id="season-v2-modal"' in teacher_html, "teacher goods preview modal missing")
     require("admin_list_season_v2_self" in teacher, "teacher read-model not wired")
