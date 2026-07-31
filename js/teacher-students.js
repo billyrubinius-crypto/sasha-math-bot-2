@@ -24,9 +24,7 @@
 
         const SEASON_ERROR_TEXT = {
             title_required: 'Укажите название сезона (до 60 символов).',
-            season_number_required: 'Укажите номер регулярного сезона от 1 до 999.',
-            season_number_taken: 'Такой номер уже используется другим сезоном.',
-            interseason_has_no_number: 'Межсезонье не имеет номера соревновательного сезона.',
+            season_number_required: 'Укажите номер сезона от 1 до 999.',
             scheduled_season_not_found: 'Редактировать можно только запланированный сезон.',
             markup_not_allowed: 'HTML-разметка в текстах запрещена.',
             forbidden: 'Недостаточно прав.'
@@ -43,10 +41,7 @@
         let seasonV2EditingCode = null;
 
         function seasonDisplayLabel(row) {
-            if (row.season_type === 'regular') {
-                return `Сезон №${row.display_number ?? row.competition_season_no ?? '—'}`;
-            }
-            return `Межсезонье · период ${String(row.sequence_no).padStart(2, '0')}`;
+            return `Сезон №${row.display_number ?? row.sequence_no ?? '—'}`;
         }
 
         function seasonItemMap(row) {
@@ -186,20 +181,17 @@
             titleLabel.appendChild(titleInput);
             editor.appendChild(titleLabel);
 
-            let numberInput = null;
-            if (row.season_type === 'regular') {
-                const numberLabel = document.createElement('label');
-                numberLabel.className = 'season-v2-inline-number';
-                numberLabel.textContent = 'Номер';
-                numberInput = document.createElement('input');
-                numberInput.type = 'number';
-                numberInput.min = '1';
-                numberInput.max = '999';
-                numberInput.step = '1';
-                numberInput.value = row.display_number ?? row.competition_season_no ?? '';
-                numberLabel.appendChild(numberInput);
-                editor.appendChild(numberLabel);
-            }
+            const numberLabel = document.createElement('label');
+            numberLabel.className = 'season-v2-inline-number';
+            numberLabel.textContent = 'Номер';
+            const numberInput = document.createElement('input');
+            numberInput.type = 'number';
+            numberInput.min = '1';
+            numberInput.max = '999';
+            numberInput.step = '1';
+            numberInput.value = row.display_number ?? row.sequence_no ?? '';
+            numberLabel.appendChild(numberInput);
+            editor.appendChild(numberLabel);
 
             const errorBox = document.createElement('div');
             errorBox.className = 'season-v2-inline-error';
@@ -228,7 +220,7 @@
 
         async function saveSeasonV2InlineMeta(row, titleInput, numberInput, button, errorBox) {
             const title = titleInput.value.trim();
-            const displayNumber = row.season_type === 'regular' ? Number(numberInput.value) : null;
+            const displayNumber = Number(numberInput.value);
             button.disabled = true;
             errorBox.hidden = true;
             try {

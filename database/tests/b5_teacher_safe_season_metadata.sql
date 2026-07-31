@@ -1,39 +1,8 @@
--- Post-migration checks for 059_teacher_safe_season_metadata.sql.
+-- Security checks introduced by 059 and retained after later metadata migrations.
 begin;
 
 do $test$
-declare
-  v_count integer;
 begin
-  select count(*) into v_count
-    from public.seasons s
-    join public.season_v2_presets p on p.preset_code = s.preset_code
-   where p.season_type = 'regular'
-     and s.display_number is not null;
-  if v_count <> 21 then
-    raise exception 'expected display numbers for 21 regular seasons, got %', v_count;
-  end if;
-
-  if exists (
-    select 1
-      from public.seasons s
-      join public.season_v2_presets p on p.preset_code = s.preset_code
-     where p.season_type = 'interseason'
-       and s.display_number is not null
-  ) then
-    raise exception 'interseason periods must not have display numbers';
-  end if;
-
-  if exists (
-    select display_number
-      from public.seasons
-     where preset_code is not null and display_number is not null
-     group by display_number
-    having count(*) > 1
-  ) then
-    raise exception 'regular season display numbers must be unique';
-  end if;
-
   if to_regprocedure(
        'public.admin_update_scheduled_season_meta_self(text,integer,text)') is null then
     raise exception 'safe teacher metadata RPC is missing';

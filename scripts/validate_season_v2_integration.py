@@ -23,6 +23,7 @@ def main() -> int:
     foundation = read("database/migrations/057_season_v2_foundation.sql")
     seed = read("database/migrations/058_season_v2_catalog_seed.sql")
     safe_teacher = read("database/migrations/059_teacher_safe_season_metadata.sql")
+    editable_labels = read("database/migrations/060_teacher_edit_all_scheduled_season_labels.sql")
     student_html = read("index.html")
     teacher_html = read("teacher.html")
     progress = read("js/student-progress.js")
@@ -55,6 +56,12 @@ def main() -> int:
             "full teacher season mutation must be disabled")
     require("revoke all on function public.close_season_self()" in safe_teacher,
             "manual season closure must be disabled")
+    require("drop index if exists public.idx_seasons_v2_display_number" in editable_labels,
+            "public season number is still incorrectly unique")
+    require("'display_number', coalesce(s.display_number, p.sequence_no)" in editable_labels,
+            "all season rows do not receive public display numbers")
+    require("interseason_has_no_number" not in editable_labels,
+            "technical interseason type still blocks public label editing")
 
     for html, label in ((student_html, "student"), (teacher_html, "teacher")):
         require("styles/season-v3-preview.css" in html, f"{label} approved base CSS missing")
@@ -83,6 +90,9 @@ def main() -> int:
             "scheduled-season metadata editor must stay inside its season card")
     require("text: 'Запланирован'" in teacher,
             "scheduled season status is not translated")
+    require("Межсезонье" not in teacher and "период" not in teacher
+            and "период" not in teacher_html,
+            "technical season type leaks into teacher labels")
     require('id="season-v2-save-meta"' not in teacher_html,
             "full-screen season metadata save action returned")
     require("closeSeasonV2Preview" in teacher_core,
