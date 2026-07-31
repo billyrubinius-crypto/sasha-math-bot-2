@@ -25,6 +25,7 @@ def main() -> int:
     safe_teacher = read("database/migrations/059_teacher_safe_season_metadata.sql")
     editable_labels = read("database/migrations/060_teacher_edit_all_scheduled_season_labels.sql")
     public_numbering = read("database/migrations/061_public_season_numbering_from_zero.sql")
+    current_public_number = read("database/migrations/067_current_season_public_number.sql")
     student_html = read("index.html")
     teacher_html = read("teacher.html")
     progress = read("js/student-progress.js")
@@ -69,6 +70,11 @@ def main() -> int:
             "automatic August season is not numbered zero")
     require("p_display_number not between 0 and 999" in public_numbering,
             "teacher cannot save Season №0")
+    require("preset_code = 'ca26_02_before_start'" in current_public_number
+            and "set display_number = 0" in current_public_number,
+            "current August season is not forcibly numbered zero")
+    require("season_display_number" in current_public_number,
+            "league read model does not expose the public season number")
 
     for html, label in ((student_html, "student"), (teacher_html, "teacher")):
         require("styles/season-v3-preview.css" in html, f"{label} approved base CSS missing")
@@ -95,6 +101,11 @@ def main() -> int:
             and "SEASON_PROFILE_RARITY_LABELS" in progress
             and "seasonEquipmentCatalogMark" in progress,
             "expanded profile does not list equipped cosmetics")
+    require("value >= 2 ? value - 2 : null" in progress
+            and "if (value === 1) return 'Архив'" in progress,
+            "profile equipment still exposes technical catalog sequence numbers")
+    require("snap.season_display_number" in progress,
+            "league UI still labels the current season with an internal database id")
 
     require('id="season-v2-modal"' in teacher_html, "teacher goods preview modal missing")
     require("admin_list_season_v2_self" in teacher, "teacher read-model not wired")

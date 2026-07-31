@@ -635,6 +635,19 @@
         return String(place).padStart(2, "0");
       }
 
+      function publicSeasonNumber(sequence) {
+        const value = Number(sequence);
+        return Number.isInteger(value) && value >= 2 ? value - 2 : null;
+      }
+
+      function publicSeasonLabel(sequence, compact = false) {
+        const value = Number(sequence);
+        if (value === 1) return compact ? "АРХИВ" : "Архив";
+        const publicNumber = publicSeasonNumber(value);
+        if (publicNumber === null) return compact ? "—" : "Сезон";
+        return compact ? `№${publicNumber}` : `Сезон №${publicNumber}`;
+      }
+
       function leaderboardRow(user) {
         return `
           <li class="v4-leader-row${user.id === "me" ? " is-me" : ""}">
@@ -687,8 +700,8 @@
           const legendarySlot = Object.keys(slotNames).find((slot) => rarityFor(season, slot) === "legendary");
           const secret = [3, 8, 13, 18].includes(season);
           return `
-            <span class="${secret ? "is-secret-piece" : ""}" title="Период ${season}: легендарный ${slotNames[legendarySlot].toLowerCase()}">
-              <b>${String(season).padStart(2, "0")}</b>
+            <span class="${secret ? "is-secret-piece" : ""}" title="${publicSeasonLabel(season)}: легендарный ${slotNames[legendarySlot].toLowerCase()}">
+              <b>${publicSeasonLabel(season, true)}</b>
               <small>${label}</small>
               <i>${slotNames[legendarySlot][0]}</i>
             </span>
@@ -702,7 +715,7 @@
             <div class="v4-bg-preview scene-${background.visual}">
               <span class="v4-scene-layer v4-scene-layer-a"></span>
               <span class="v4-scene-layer v4-scene-layer-b"></span>
-              <b>${String(index + 1).padStart(2, "0")}</b>
+              <b>${publicSeasonLabel(index + 1, true)}</b>
             </div>
             <h3>${escapeHtml(background.name)}</h3>
             <p>${escapeHtml(background.line)}</p>
@@ -754,7 +767,7 @@
         return `
           <article class="v4-catalog-card catalog-slot-${entry.slot}${isSecretPiece ? " is-secret-piece" : ""}">
             <div class="v4-catalog-visual">
-              <span class="v4-catalog-season">S${String(entry.season).padStart(2, "0")}</span>
+              <span class="v4-catalog-season">${publicSeasonLabel(entry.season, true)}</span>
               <span class="v4-catalog-rarity rarity-${entry.rarity}">${rarityNames[entry.rarity]}</span>
               ${catalogPreview(entry)}
             </div>
@@ -804,7 +817,7 @@
         const items = [signal.title, signal.frame, signal.avatar, signal.background];
         document.getElementById("secretItems").innerHTML = items.map((entry) => `
           <article>
-            <span>S${String(entry.season).padStart(2, "0")}</span>
+            <span>${publicSeasonLabel(entry.season, true)}</span>
             <small>${slotNames[entry.slot]}</small>
             <strong>${escapeHtml(entry.name)}</strong>
             <i>легендарный</i>
@@ -817,7 +830,7 @@
           const entry = user[slot];
           return `
             <span>
-              <small>${slotNames[slot]} · S${String(entry.season).padStart(2, "0")}</small>
+              <small>${slotNames[slot]} · ${publicSeasonLabel(entry.season)}</small>
               <strong>${escapeHtml(entry.name)}</strong>
               <i class="rarity-${entry.rarity}">${rarityNames[entry.rarity]}</i>
             </span>

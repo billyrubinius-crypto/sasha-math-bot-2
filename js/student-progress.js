@@ -64,9 +64,22 @@
             return item.name || '';
         }
 
+        function publicSeasonNumberFromSequence(sequence) {
+            const value = Number(sequence);
+            return Number.isInteger(value) && value >= 2 ? value - 2 : null;
+        }
+
+        function publicSeasonLabelFromSequence(sequence) {
+            const value = Number(sequence);
+            if (value === 1) return 'Архив';
+            const publicNumber = publicSeasonNumberFromSequence(value);
+            return publicNumber === null ? '' : `Сезон №${publicNumber}`;
+        }
+
         function seasonEquipmentCatalogMark(item) {
             const match = String(item && item.item_code || '').match(/^ca26_(\d{2})_/);
-            return match ? ` · S${match[1]}` : '';
+            const label = match ? publicSeasonLabelFromSequence(match[1]) : '';
+            return label ? ` · ${label}` : '';
         }
 
         function renderSeasonProfileEquipment(eq) {
@@ -696,7 +709,7 @@
             try {
                 const { data, error } = await db
                     .from('season_results')
-                    .select('season_id, points, place, seasons(title,display_number,preset_code)')
+                    .select('season_id, points, place, seasons(title,display_number,preset_code,sequence_no)')
                     .eq('student_id', currentUser.id)
                     .order('season_id', { ascending: false })
                     .limit(10);
@@ -722,7 +735,7 @@
                         && season?.display_number !== undefined
                         ? `Сезон №${season.display_number}${season.title ? ` · ${season.title}` : ''}`
                         : (season?.preset_code
-                            ? `Межсезонье${season.title ? ` · ${season.title}` : ''}`
+                            ? `${publicSeasonLabelFromSequence(season.sequence_no) || 'Сезон'}${season.title ? ` · ${season.title}` : ''}`
                             : `Сезон №${item.season_id}`);
                     reason.textContent = `${seasonLabel} — ${placeDisplay} место`;
                     info.appendChild(reason);
@@ -954,12 +967,16 @@
             return li;
         }
 
-        // Подпись сезона в шапке лиги: название безопаснее внутреннего id строки seasons.
+        // Подпись сезона в шапке лиги использует только публичный номер, а не внутренний id.
         function leagueSeasonLabel(snap) {
-            if (!snap || !snap.season_id) return '';
+            if (!snap || snap.season_id === null || snap.season_id === undefined) return '';
+            const publicNumber = snap.season_display_number;
+            const numberLabel = publicNumber !== null && publicNumber !== undefined
+                ? `Сезон №${publicNumber}`
+                : 'Сезон';
             return snap.season_title
-                ? `«${esc(snap.season_title)}»`
-                : `Сезон №${snap.season_id}`;
+                ? `${numberLabel} · «${esc(snap.season_title)}»`
+                : numberLabel;
         }
 
         // Полный список своей лиги. Раньше он строился из preview_league_close, который отдаёт
@@ -993,7 +1010,8 @@
                 if (!snap || !snap.in_season) {
                     // Участия в текущем сезоне нет: с миграции 052 оно появляется не при
                     // регистрации, а после первого фактического начисления очков за домашку.
-                    html += '<div class="league-note">Ты ещё не в битве лиг этого сезона. Участие открывается сразу после первого начисления очков сезона — за принятую учителем домашку.</div>';
+                    const seasonLabel = leagueSeasonLabel(snap);
+                    html += `<div class="league-note">${seasonLabel ? `${seasonLabel} идёт. ` : ''}Ты ещё не в битве лиг этого сезона. Участие открывается сразу после первого начисления очков сезона — за принятую учителем домашку.</div>`;
                     html += renderLeagueLadder(tier);
                     box.innerHTML = html;
                     return;

@@ -36,7 +36,7 @@
             try {
                 const { data: visibleSeasons, error: seasonsError } = await db
                     .from('seasons')
-                    .select('id,status,title,display_number,preset_code')
+                    .select('id,status,title,display_number,preset_code,sequence_no')
                     .in('status', ['active', 'closed', 'archived']);
                 if (seasonsError) throw seasonsError;
                 const visibleSeasonIds = (visibleSeasons || []).map((season) => season.id);
@@ -81,7 +81,7 @@
                         && season?.display_number !== undefined
                         ? `Сезон №${season.display_number}${season.title ? ` · ${season.title}` : ''}`
                         : (season?.preset_code
-                            ? `Межсезонье${season.title ? ` · ${season.title}` : ''}`
+                            ? `${publicSeasonLabelFromSequence(season.sequence_no) || 'Сезон'}${season.title ? ` · ${season.title}` : ''}`
                             : `Сезон №${b.season_id}`);
                     block.appendChild(title);
 
@@ -913,4 +913,3 @@
                 });
             if (error) throw error;
         }
-
