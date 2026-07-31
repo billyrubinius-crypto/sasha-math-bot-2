@@ -19,18 +19,46 @@ CSS_PATH = ROOT / "styles" / "season-cosmetics-preview.css"
 PREVIEW_PATH = ROOT / "dev" / "season-catalog-preview.html"
 CONTENT_DOC_PATH = ROOT / "docs" / "SEASON_V2_CONTENT_CATALOG.md"
 VISUAL_DOC_PATH = ROOT / "docs" / "SEASON_V2_VISUAL_GUIDE.md"
+INTEGRATION_DOC_PATH = ROOT / "docs" / "SEASON_V2_INTEGRATION_CONTRACT.md"
 
 ROOT_FIELDS = {
     "schema_version",
+    "catalog_revision",
     "catalog_code",
     "academic_year",
     "timezone",
     "calendar_policy",
+    "launch_policy",
+    "visual_contract",
     "regular_season_duration_days",
     "currency",
     "price_profiles",
     "rarity_rotation",
+    "secret_combo",
     "presets",
+}
+LAUNCH_POLICY_FIELDS = {
+    "activation_mode",
+    "first_automatic_sequence_no",
+    "first_automatic_start_date",
+    "sequence_1_activation",
+    "manual_activation_before_first_start",
+}
+VISUAL_CONTRACT_FIELDS = {
+    "profile_avatar_px",
+    "leaderboard_avatar_px",
+    "expanded_avatar_px",
+    "catalog_avatar_px",
+    "frame_outset_ratio",
+    "compact_motion",
+    "reduced_motion",
+}
+SECRET_COMBO_FIELDS = {
+    "combo_code",
+    "reveal_after_sequence_no",
+    "required_item_codes",
+    "effect_key",
+    "public_hint",
 }
 PRICE_PROFILE_FIELDS = {"regular", "summer", "collection_completion_bonus"}
 PRICE_TIER_FIELDS = {"common", "rare", "epic", "legendary"}
@@ -76,7 +104,9 @@ ITEM_REQUIRED_FIELDS = {
     "sort_order",
     "is_active",
 }
-ITEM_OPTIONAL_FIELDS = {"title_visual_tier", "title_icon_hint"}
+ITEM_VISUAL_FIELDS = {"visual_key", "motion_policy"}
+ITEM_TITLE_FIELDS = {"title_visual_tier", "title_icon_hint"}
+ITEM_OPTIONAL_FIELDS = ITEM_VISUAL_FIELDS | ITEM_TITLE_FIELDS
 
 SLOTS = ("avatar", "frame", "title", "background")
 RARITIES = ("common", "rare", "epic", "legendary")
@@ -99,29 +129,29 @@ TITLE_TIER_BY_RARITY = {
     "legendary": "radiant",
 }
 CALENDAR = (
-    (1, None, "interseason", "2026-07-28", "2026-08-01", 4, "Летняя практика"),
-    (2, None, "interseason", "2026-08-01", "2026-09-03", 33, "Перед стартом"),
-    (3, 1, "regular", "2026-09-03", "2026-09-17", 14, "Новый маршрут"),
-    (4, 2, "regular", "2026-09-17", "2026-10-01", 14, "Осенний старт"),
-    (5, 3, "regular", "2026-10-01", "2026-10-15", 14, "Геометрия листопада"),
-    (6, 4, "regular", "2026-10-15", "2026-10-29", 14, "Дождливые задачи"),
-    (7, 5, "regular", "2026-10-29", "2026-11-12", 14, "Точки связи"),
-    (8, 6, "regular", "2026-11-12", "2026-11-26", 14, "Свет в окне"),
-    (9, 7, "regular", "2026-11-26", "2026-12-10", 14, "Первый снег"),
-    (10, 8, "regular", "2026-12-10", "2026-12-24", 14, "Предновогодний отсчёт"),
-    (11, 9, "regular", "2026-12-24", "2027-01-07", 14, "Новогодняя мастерская"),
-    (12, 10, "regular", "2027-01-07", "2027-01-21", 14, "Морозный старт"),
-    (13, 11, "regular", "2027-01-21", "2027-02-04", 14, "Чистый лист"),
-    (14, 12, "regular", "2027-02-04", "2027-02-18", 14, "Февральский ритм"),
-    (15, 13, "regular", "2027-02-18", "2027-03-04", 14, "Сила характера"),
-    (16, 14, "regular", "2027-03-04", "2027-03-18", 14, "Весеннее вдохновение"),
+    (1, None, "interseason", "2026-07-28", "2026-08-01", 4, "Режим энергосбережения"),
+    (2, None, "interseason", "2026-08-01", "2026-09-03", 33, "Нулевой заряд"),
+    (3, 1, "regular", "2026-09-03", "2026-09-17", 14, "Неверный поворот"),
+    (4, 2, "regular", "2026-09-17", "2026-10-01", 14, "Вне расписания"),
+    (5, 3, "regular", "2026-10-01", "2026-10-15", 14, "Протокол симметрии"),
+    (6, 4, "regular", "2026-10-15", "2026-10-29", 14, "Дедлайн 23:59"),
+    (7, 5, "regular", "2026-10-29", "2026-11-12", 14, "Сообщение доставлено"),
+    (8, 6, "regular", "2026-11-12", "2026-11-26", 14, "Ночная смена"),
+    (9, 7, "regular", "2026-11-26", "2026-12-10", 14, "Холодный статик"),
+    (10, 8, "regular", "2026-12-10", "2026-12-24", 14, "Ещё пять минут"),
+    (11, 9, "regular", "2026-12-24", "2027-01-07", 14, "Гирлянда 00:00"),
+    (12, 10, "regular", "2027-01-07", "2027-01-21", 14, "Слабая частота"),
+    (13, 11, "regular", "2027-01-21", "2027-02-04", 14, "Ошибка на полях"),
+    (14, 12, "regular", "2027-02-04", "2027-02-18", 14, "Восемь вкладок"),
+    (15, 13, "regular", "2027-02-18", "2027-03-04", 14, "Ещё попытка"),
+    (16, 14, "regular", "2027-03-04", "2027-03-18", 14, "Новый рост"),
     (17, 15, "regular", "2027-03-18", "2027-04-01", 14, "Точка равновесия"),
-    (18, 16, "regular", "2027-04-01", "2027-04-15", 14, "Время первых"),
-    (19, 17, "regular", "2027-04-15", "2027-04-29", 14, "Апрельская геометрия"),
-    (20, 18, "regular", "2027-04-29", "2027-05-13", 14, "Майская весна"),
-    (21, 19, "regular", "2027-05-13", "2027-05-27", 14, "Последний звонок"),
-    (22, 20, "regular", "2027-05-27", "2027-06-10", 14, "Экзаменационный рывок"),
-    (23, 21, "regular", "2027-06-10", "2027-06-24", 14, "Начало лета"),
+    (18, 16, "regular", "2027-04-01", "2027-04-15", 14, "Турист с Альфы-7"),
+    (19, 17, "regular", "2027-04-15", "2027-04-29", 14, "Метод тыка"),
+    (20, 18, "regular", "2027-04-29", "2027-05-13", 14, "Локальный дождь"),
+    (21, 19, "regular", "2027-05-13", "2027-05-27", 14, "Вышел первым"),
+    (22, 20, "regular", "2027-05-27", "2027-06-10", 14, "Загрузка 2%"),
+    (23, 21, "regular", "2027-06-10", "2027-06-24", 14, "Официально свободен"),
 )
 
 
@@ -173,6 +203,7 @@ def css_class_from_payload(payload: str) -> str:
 def validate_root(catalog: dict[str, Any], check: Validation) -> None:
     check.exact_keys(catalog, ROOT_FIELDS, "catalog")
     check.require(catalog.get("schema_version") == 2, "catalog.schema_version: expected 2")
+    check.require(catalog.get("catalog_revision") == 4, "catalog.catalog_revision: expected approved revision 4")
     check.require(
         catalog.get("catalog_code") == "cosmic_academy_2026_2027_v2",
         "catalog.catalog_code: unexpected value",
@@ -182,6 +213,60 @@ def validate_root(catalog: dict[str, Any], check: Validation) -> None:
     check.require(catalog.get("calendar_policy") == "fixed_2026_2027", "catalog.calendar_policy: unexpected value")
     check.require(catalog.get("regular_season_duration_days") == 14, "catalog.regular_season_duration_days: expected 14")
     check.require(catalog.get("currency") == "gears", "catalog.currency: expected gears")
+
+    launch_policy = catalog.get("launch_policy")
+    check.exact_keys(launch_policy, LAUNCH_POLICY_FIELDS, "catalog.launch_policy")
+    if isinstance(launch_policy, dict):
+        check.require(launch_policy.get("activation_mode") == "scheduled", "launch_policy.activation_mode: expected scheduled")
+        check.require(
+            launch_policy.get("first_automatic_sequence_no") == 2,
+            "launch_policy.first_automatic_sequence_no: expected 2",
+        )
+        check.require(
+            launch_policy.get("first_automatic_start_date") == "2026-08-01",
+            "launch_policy.first_automatic_start_date: expected 2026-08-01",
+        )
+        check.require(
+            launch_policy.get("sequence_1_activation") == "catalog_only",
+            "launch_policy.sequence_1_activation: expected catalog_only",
+        )
+        check.require(
+            launch_policy.get("manual_activation_before_first_start") is False,
+            "launch_policy.manual_activation_before_first_start: expected false",
+        )
+
+    visual_contract = catalog.get("visual_contract")
+    check.exact_keys(visual_contract, VISUAL_CONTRACT_FIELDS, "catalog.visual_contract")
+    if isinstance(visual_contract, dict):
+        expected_visual_contract = {
+            "profile_avatar_px": 48,
+            "leaderboard_avatar_px": 32,
+            "expanded_avatar_px": 160,
+            "catalog_avatar_px": 112,
+            "frame_outset_ratio": 0.035,
+            "compact_motion": "static",
+            "reduced_motion": "static",
+        }
+        check.require(visual_contract == expected_visual_contract, "catalog.visual_contract: unexpected value")
+
+    secret_combo = catalog.get("secret_combo")
+    check.exact_keys(secret_combo, SECRET_COMBO_FIELDS, "catalog.secret_combo")
+    if isinstance(secret_combo, dict):
+        check.snake(secret_combo.get("combo_code"), "catalog.secret_combo.combo_code")
+        check.snake(secret_combo.get("effect_key"), "catalog.secret_combo.effect_key")
+        check.require(
+            secret_combo.get("reveal_after_sequence_no") == 18,
+            "catalog.secret_combo.reveal_after_sequence_no: expected 18",
+        )
+        required_codes = secret_combo.get("required_item_codes")
+        check.require(
+            isinstance(required_codes, list) and len(required_codes) == 4 and len(set(required_codes)) == 4,
+            "catalog.secret_combo.required_item_codes: expected four unique codes",
+        )
+        if isinstance(required_codes, list):
+            for index, item_code in enumerate(required_codes):
+                check.snake(item_code, f"catalog.secret_combo.required_item_codes[{index}]")
+        check.require(secret_combo.get("public_hint") is False, "catalog.secret_combo.public_hint: expected false")
 
     prices = catalog.get("price_profiles")
     check.exact_keys(prices, PRICE_PROFILE_FIELDS, "catalog.price_profiles")
@@ -348,6 +433,11 @@ def validate_presets(catalog: dict[str, Any], check: Validation) -> tuple[list[d
                 check.snake(item.get(key), f"{item_path}.{key}")
                 if isinstance(item.get(key), str):
                     unique_values[key].append(item[key])
+            check.require(
+                ITEM_VISUAL_FIELDS <= actual_fields,
+                f"{item_path}: visual_key and motion_policy are required",
+            )
+            check.snake(item.get("visual_key"), f"{item_path}.visual_key")
             for key in ("name", "description"):
                 check.require(
                     isinstance(item.get(key), str) and bool(item[key].strip()),
@@ -364,6 +454,8 @@ def validate_presets(catalog: dict[str, Any], check: Validation) -> tuple[list[d
             check.require(item.get("currency") == "gears", f"{item_path}.currency: expected gears")
             check.require(item.get("availability") == "rotation", f"{item_path}.availability: expected rotation")
             check.require(item.get("is_active") is True, f"{item_path}.is_active: expected true")
+            expected_motion = "static" if rarity in {"common", "rare"} else ("subtle" if rarity == "epic" else "expressive")
+            check.require(item.get("motion_policy") == expected_motion, f"{item_path}.motion_policy: rarity policy mismatch")
             check.require(item.get("sort_order") == (item_index + 1) * 10, f"{item_path}.sort_order: unexpected value")
             if rarity in expected_prices:
                 check.require(item.get("price") == expected_prices[rarity], f"{item_path}.price: profile mismatch")
@@ -371,14 +463,14 @@ def validate_presets(catalog: dict[str, Any], check: Validation) -> tuple[list[d
                 total += item["price"]
 
             if slot == "title":
-                check.require(ITEM_OPTIONAL_FIELDS <= actual_fields, f"{item_path}: title fields are required")
+                check.require(ITEM_TITLE_FIELDS <= actual_fields, f"{item_path}: title fields are required")
                 check.require(
                     item.get("title_visual_tier") == TITLE_TIER_BY_RARITY.get(rarity),
                     f"{item_path}.title_visual_tier: rarity tier mismatch",
                 )
                 check.snake(item.get("title_icon_hint"), f"{item_path}.title_icon_hint")
             else:
-                check.require(not actual_fields & ITEM_OPTIONAL_FIELDS, f"{item_path}: title fields only belong to title slot")
+                check.require(not actual_fields & ITEM_TITLE_FIELDS, f"{item_path}: title fields only belong to title slot")
 
             if item.get("item_code") == preset.get("flagship_item_code"):
                 flagship_matches += 1
@@ -422,6 +514,35 @@ def validate_counts(presets: list[dict[str, Any]], items: list[dict[str, Any]], 
     for slot, expected in expected_matrix.items():
         check.require(dict(matrix[slot]) == expected, f"rarity matrix {slot}: got {dict(matrix[slot])}")
     check.require(len({preset.get("theme_key") for preset in presets}) == 23, "presets.theme_key: expected 23 unique values")
+
+
+def validate_cross_contracts(catalog: dict[str, Any], items: list[dict[str, Any]], check: Validation) -> None:
+    item_by_code = {
+        item.get("item_code"): item
+        for item in items
+        if isinstance(item.get("item_code"), str)
+    }
+    combo = catalog.get("secret_combo")
+    if isinstance(combo, dict) and isinstance(combo.get("required_item_codes"), list):
+        combo_items = [item_by_code.get(code) for code in combo["required_item_codes"]]
+        check.require(all(combo_items), "secret_combo: every required item code must exist")
+        if all(combo_items):
+            check.require(
+                {item.get("slot") for item in combo_items if isinstance(item, dict)} == set(SLOTS),
+                "secret_combo: required items must cover all four slots",
+            )
+            check.require(
+                all(item.get("rarity") == "legendary" for item in combo_items if isinstance(item, dict)),
+                "secret_combo: every required item must be legendary",
+            )
+
+    visual_keys_by_slot: defaultdict[str, list[str]] = defaultdict(list)
+    for item in items:
+        if item.get("slot") in {"avatar", "frame", "background"} and isinstance(item.get("visual_key"), str):
+            visual_keys_by_slot[str(item["slot"])].append(item["visual_key"])
+    for slot, keys in visual_keys_by_slot.items():
+        duplicates = sorted(key for key, count in Counter(keys).items() if count > 1)
+        check.require(not duplicates, f"visual_key {slot}: duplicates: {', '.join(duplicates)}")
 
 
 def validate_assets_and_preview(items: list[dict[str, Any]], check: Validation) -> None:
@@ -494,8 +615,16 @@ def validate_assets_and_preview(items: list[dict[str, Any]], check: Validation) 
     except OSError as exc:
         check.errors.append(f"docs: cannot read {VISUAL_DOC_PATH}: {exc}")
         visual_doc = ""
+    try:
+        integration_doc = INTEGRATION_DOC_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        check.errors.append(f"docs: cannot read {INTEGRATION_DOC_PATH}: {exc}")
+        integration_doc = ""
     check.require("## Версия 2: календарно-сезонная концепция" in content_doc, "content doc: missing V2 heading")
     check.require("50% реальный сезон" in visual_doc, "visual doc: missing 50/30/20 formula")
+    check.require("1 августа 2026" in integration_doc, "integration doc: missing first automatic launch date")
+    check.require("Учительское планирование" in integration_doc, "integration doc: missing teacher planning contract")
+    check.require("предпросмотр" in integration_doc.lower(), "integration doc: missing preview contract")
 
 
 def print_summary(presets: list[dict[str, Any]], items: list[dict[str, Any]]) -> None:
@@ -524,6 +653,7 @@ def main() -> int:
         validate_root(catalog, check)
         presets, items = validate_presets(catalog, check)
         validate_counts(presets, items, check)
+        validate_cross_contracts(catalog, items, check)
         validate_assets_and_preview(items, check)
     else:
         presets, items = [], []
