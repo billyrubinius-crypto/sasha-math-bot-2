@@ -18,6 +18,7 @@
         // sleeping — общее состояние (overall_mood), остальные приходят и как ось питания.
         const PET_MOODS = {
             sleeping:    { badge: '😴', short: 'Спит',         long: 'Спит' },
+            tired:       { badge: '🥱', short: 'Не выспался',  long: 'Выспаться бы' },
             happy:       { badge: '😊', short: 'Доволен',      long: 'Сыт и доволен' },
             fed:         { badge: '🙂', short: 'Накормлен',    long: 'Накормлен на сегодня' },
             hungry_soon: { badge: '😐', short: 'Скоро проголодается', long: 'Сегодня последний сытый день' },

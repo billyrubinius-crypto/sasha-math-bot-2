@@ -2107,3 +2107,5 @@
             font-size: var(--text-small); font-weight: 600; cursor: pointer;
         }
         .pet-sleep-btn:disabled { opacity: .55; cursor: default; }
+        .pet-mood-tired { border-color: var(--ca-border-soft); }
+        .pet-card-mood.pet-mood-tired { color: var(--ca-text-secondary); }
