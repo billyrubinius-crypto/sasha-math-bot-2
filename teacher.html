@@ -169,23 +169,11 @@
 
     <div id="season-v2-modal" class="season-v2-modal" aria-hidden="true">
         <div class="season-v2-modal-card" role="dialog" aria-modal="true" aria-labelledby="season-v2-modal-title">
-            <button class="season-v2-modal-close" type="button" onclick="closeSeasonV2Editor()" aria-label="Закрыть">✕</button>
+            <button class="season-v2-modal-close" type="button" onclick="closeSeasonV2Preview()" aria-label="Закрыть">✕</button>
             <h3 id="season-v2-modal-title">Сезон</h3>
             <div id="season-v2-live-preview"></div>
-            <div id="season-v2-meta-editor">
-                <label>Название
-                    <input id="season-v2-title" type="text" maxlength="60">
-                </label>
-                <label id="season-v2-number-wrap">Номер сезона
-                    <input id="season-v2-number" type="number" min="1" max="999" step="1">
-                </label>
-            </div>
             <h4 class="season-v2-items-heading">Товары периода</h4>
             <div id="season-v2-items"></div>
-            <div id="season-form-error" class="warning-text" style="display:none; text-align:left;"></div>
-            <div class="season-v2-modal-actions">
-                <button id="season-v2-save-meta" class="btn-primary" type="button" onclick="saveSeasonV2Meta()">Сохранить номер и название</button>
-            </div>
         </div>
     </div>
 

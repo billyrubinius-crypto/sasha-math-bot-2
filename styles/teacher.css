@@ -247,8 +247,7 @@
     background: #fff;
 }
 .season-v2-plan-head,
-.season-v2-card-actions,
-.season-v2-modal-actions {
+.season-v2-card-actions {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -267,6 +266,27 @@
 .season-v2-status--active { background: #e7f8ef; color: #087443; }
 .season-v2-status--closed,
 .season-v2-status--archived { background: #eef0f3; color: #475467; }
+.season-v2-head-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.season-v2-edit-btn {
+    width: auto;
+    min-height: 28px;
+    margin: 0;
+    padding: 5px 9px;
+    border: 1px solid #bfdbfe;
+    border-radius: 999px;
+    color: #175cd3;
+    background: #f5f9ff;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.season-v2-edit-btn:hover { background: #e8f1ff; }
 .season-v2-rarity-line {
     margin: 7px 0;
     color: #667085;
@@ -279,6 +299,52 @@
     width: auto;
     margin: 5px 0 0;
 }
+.season-v2-inline-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px auto;
+    align-items: end;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+.season-v2-inline-editor > label {
+    display: grid;
+    gap: 4px;
+    color: #475467;
+    font-size: 11px;
+    font-weight: 700;
+}
+.season-v2-inline-editor input {
+    width: 100%;
+    min-height: 34px;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+.season-v2-inline-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.season-v2-inline-actions button {
+    width: auto;
+    min-height: 34px;
+    margin: 0;
+    padding: 7px 10px;
+    white-space: nowrap;
+}
+.season-v2-inline-error {
+    grid-column: 1 / -1;
+    color: var(--danger);
+    font-size: 12px;
+}
+.season-v2-inline-error[hidden] { display: none; }
 
 .season-v2-modal {
     position: fixed;
@@ -311,29 +377,6 @@
     border-radius: 50%;
     background: #fff;
     cursor: pointer;
-}
-#season-v2-meta-editor {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr);
-    gap: 10px;
-}
-#season-v2-meta-editor[hidden],
-#season-v2-number-wrap[hidden] { display: none; }
-#season-v2-meta-editor > label {
-    display: grid;
-    gap: 5px;
-    margin: 10px 0;
-    font-size: 12px;
-    font-weight: 700;
-}
-#season-v2-meta-editor input {
-    width: 100%;
-    box-sizing: border-box;
-    border: 1px solid #d0d5dd;
-    border-radius: 9px;
-    padding: 9px;
-    font: inherit;
-    background: #fff;
 }
 .season-v2-items-heading { margin: 18px 0 8px; }
 #season-v2-items {
@@ -437,8 +480,9 @@
 .season-v2-title { font-size: 12px; }
 
 @media (max-width: 560px) {
-    #season-v2-meta-editor,
     #season-v2-items,
     .season-v2-preview-grid { grid-template-columns: 1fr; }
     .season-v2-preview-card { flex-direction: column; }
+    .season-v2-inline-editor { grid-template-columns: minmax(0, 1fr) 82px; }
+    .season-v2-inline-actions { grid-column: 1 / -1; }
 }

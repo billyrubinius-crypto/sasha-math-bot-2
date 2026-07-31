@@ -38,15 +38,9 @@
             return key ? SEASON_ERROR_TEXT[key] : (raw || 'Не удалось сохранить сезон');
         }
 
-        function showSeasonFormError(text) {
-            const box = document.getElementById('season-form-error');
-            if (!box) return;
-            box.textContent = text || '';
-            box.style.display = text ? 'block' : 'none';
-        }
-
         let seasonV2Rows = [];
-        let seasonV2Editing = null;
+        let seasonV2Previewing = null;
+        let seasonV2EditingCode = null;
 
         function seasonDisplayLabel(row) {
             if (row.season_type === 'regular') {
@@ -128,7 +122,19 @@
                     const badge = document.createElement('span');
                     badge.className = `season-v2-status season-v2-status--${meta.className}`;
                     badge.textContent = meta.text;
-                    head.append(title, badge);
+                    const headControls = document.createElement('div');
+                    headControls.className = 'season-v2-head-controls';
+                    headControls.appendChild(badge);
+                    if (row.status === 'scheduled') {
+                        const edit = document.createElement('button');
+                        edit.className = 'season-v2-edit-btn';
+                        edit.type = 'button';
+                        edit.textContent = '✏️ Изменить';
+                        edit.setAttribute('aria-label', `Изменить ${seasonDisplayLabel(row)}`);
+                        edit.onclick = () => openSeasonV2InlineEditor(row.preset_code, card);
+                        headControls.appendChild(edit);
+                    }
+                    head.append(title, headControls);
 
                     const dates = document.createElement('div');
                     dates.className = 'card-meta';
@@ -145,17 +151,12 @@
                     preview.className = 'btn-secondary';
                     preview.type = 'button';
                     preview.textContent = 'Товары и предпросмотр';
-                    preview.onclick = () => openSeasonV2Editor(row.preset_code, true);
+                    preview.onclick = () => openSeasonV2Preview(row.preset_code);
                     actions.appendChild(preview);
-                    if (row.status === 'scheduled') {
-                        const edit = document.createElement('button');
-                        edit.className = 'btn-secondary';
-                        edit.type = 'button';
-                        edit.textContent = 'Редактировать';
-                        edit.onclick = () => openSeasonV2Editor(row.preset_code, false);
-                        actions.appendChild(edit);
-                    }
                     card.appendChild(actions);
+                    if (seasonV2EditingCode === row.preset_code) {
+                        renderSeasonV2InlineEditor(row, card);
+                    }
                     box.appendChild(card);
                 });
             } catch (e) {
@@ -164,53 +165,124 @@
             }
         }
 
-        function openSeasonV2Editor(presetCode, previewOnly) {
+        function openSeasonV2InlineEditor(presetCode, card) {
+            const row = seasonV2Rows.find((item) => item.preset_code === presetCode);
+            if (!row || row.status !== 'scheduled') return;
+            document.querySelectorAll('.season-v2-inline-editor').forEach((editor) => editor.remove());
+            seasonV2EditingCode = presetCode;
+            renderSeasonV2InlineEditor(row, card);
+        }
+
+        function renderSeasonV2InlineEditor(row, card) {
+            const editor = document.createElement('div');
+            editor.className = 'season-v2-inline-editor';
+
+            const titleLabel = document.createElement('label');
+            titleLabel.textContent = 'Название';
+            const titleInput = document.createElement('input');
+            titleInput.type = 'text';
+            titleInput.maxLength = 60;
+            titleInput.value = row.title || '';
+            titleLabel.appendChild(titleInput);
+            editor.appendChild(titleLabel);
+
+            let numberInput = null;
+            if (row.season_type === 'regular') {
+                const numberLabel = document.createElement('label');
+                numberLabel.className = 'season-v2-inline-number';
+                numberLabel.textContent = 'Номер';
+                numberInput = document.createElement('input');
+                numberInput.type = 'number';
+                numberInput.min = '1';
+                numberInput.max = '999';
+                numberInput.step = '1';
+                numberInput.value = row.display_number ?? row.competition_season_no ?? '';
+                numberLabel.appendChild(numberInput);
+                editor.appendChild(numberLabel);
+            }
+
+            const errorBox = document.createElement('div');
+            errorBox.className = 'season-v2-inline-error';
+            errorBox.hidden = true;
+
+            const buttons = document.createElement('div');
+            buttons.className = 'season-v2-inline-actions';
+            const save = document.createElement('button');
+            save.className = 'btn-primary season-v2-inline-save';
+            save.type = 'button';
+            save.textContent = 'Сохранить';
+            save.onclick = () => saveSeasonV2InlineMeta(row, titleInput, numberInput, save, errorBox);
+            const cancel = document.createElement('button');
+            cancel.className = 'btn-secondary season-v2-inline-cancel';
+            cancel.type = 'button';
+            cancel.textContent = 'Отмена';
+            cancel.onclick = () => {
+                seasonV2EditingCode = null;
+                editor.remove();
+            };
+            buttons.append(save, cancel);
+            editor.append(errorBox, buttons);
+            card.appendChild(editor);
+            titleInput.focus();
+        }
+
+        async function saveSeasonV2InlineMeta(row, titleInput, numberInput, button, errorBox) {
+            const title = titleInput.value.trim();
+            const displayNumber = row.season_type === 'regular' ? Number(numberInput.value) : null;
+            button.disabled = true;
+            errorBox.hidden = true;
+            try {
+                const { error } = await db.rpc('admin_update_scheduled_season_meta_self', {
+                    p_preset_code: row.preset_code,
+                    p_title: title,
+                    p_display_number: displayNumber
+                });
+                if (error) throw error;
+                seasonV2EditingCode = null;
+                await loadSeasons();
+            } catch (e) {
+                errorBox.textContent = seasonErrorText(e);
+                errorBox.hidden = false;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function openSeasonV2Preview(presetCode) {
             const row = seasonV2Rows.find((item) => item.preset_code === presetCode);
             if (!row) return;
             // Работает и в WebView без structuredClone.
-            seasonV2Editing = JSON.parse(JSON.stringify(row));
+            seasonV2Previewing = JSON.parse(JSON.stringify(row));
             const modal = document.getElementById('season-v2-modal');
             modal.classList.add('open');
             modal.setAttribute('aria-hidden', 'false');
             document.getElementById('season-v2-modal-title').textContent =
                 `${seasonDisplayLabel(row)} · ${row.title}`;
-            document.getElementById('season-v2-title').value = row.title;
-            document.getElementById('season-v2-title').oninput = (event) => {
-                seasonV2Editing.title = event.target.value;
-                seasonPreviewCard(seasonV2Editing, document.getElementById('season-v2-live-preview'));
-            };
-            const numberWrap = document.getElementById('season-v2-number-wrap');
-            numberWrap.hidden = row.season_type !== 'regular';
-            document.getElementById('season-v2-number').value =
-                row.display_number ?? row.competition_season_no ?? '';
-            document.getElementById('season-v2-meta-editor').hidden = previewOnly;
-            document.getElementById('season-v2-save-meta').hidden = previewOnly;
-            showSeasonFormError('');
-            renderSeasonV2Items();
-            seasonPreviewCard(seasonV2Editing, document.getElementById('season-v2-live-preview'));
+            renderSeasonV2Items(seasonV2Previewing);
+            seasonPreviewCard(seasonV2Previewing, document.getElementById('season-v2-live-preview'));
         }
 
-        function closeSeasonV2Editor() {
+        function closeSeasonV2Preview() {
             const modal = document.getElementById('season-v2-modal');
             modal.classList.remove('open');
             modal.setAttribute('aria-hidden', 'true');
-            seasonV2Editing = null;
+            seasonV2Previewing = null;
         }
 
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && document.getElementById('season-v2-modal')?.classList.contains('open')) {
-                closeSeasonV2Editor();
+                closeSeasonV2Preview();
             }
         });
 
         document.addEventListener('click', (event) => {
-            if (event.target?.id === 'season-v2-modal') closeSeasonV2Editor();
+            if (event.target?.id === 'season-v2-modal') closeSeasonV2Preview();
         });
 
-        function renderSeasonV2Items() {
+        function renderSeasonV2Items(row) {
             const list = document.getElementById('season-v2-items');
             list.replaceChildren();
-            (seasonV2Editing.items || []).forEach((item) => {
+            (row.items || []).forEach((item) => {
                 const card = document.createElement('div');
                 card.className = `season-v2-item-editor rarity-${item.rarity}`;
                 const label = document.createElement('strong');
@@ -261,30 +333,6 @@
                 card.append(visual, name, description, price);
                 list.appendChild(card);
             });
-        }
-
-        async function saveSeasonV2Meta() {
-            if (!seasonV2Editing) return;
-            const title = document.getElementById('season-v2-title').value.trim();
-            const displayNumber = seasonV2Editing.season_type === 'regular'
-                ? Number(document.getElementById('season-v2-number').value)
-                : null;
-            const button = document.getElementById('season-v2-save-meta');
-            button.disabled = true;
-            try {
-                const { error } = await db.rpc('admin_update_scheduled_season_meta_self', {
-                    p_preset_code: seasonV2Editing.preset_code,
-                    p_title: title,
-                    p_display_number: displayNumber
-                });
-                if (error) throw error;
-                closeSeasonV2Editor();
-                await loadSeasons();
-            } catch (e) {
-                showSeasonFormError(seasonErrorText(e));
-            } finally {
-                button.disabled = false;
-            }
         }
 
         async function loadStudents() {

@@ -117,6 +117,8 @@
         }
 
         function switchTab(tab, el) {
+            if (typeof closeSeasonV2Preview === 'function') closeSeasonV2Preview();
+            if (typeof closeQuestModal === 'function' && tab !== 'quests') closeQuestModal();
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.content-area').forEach(c => c.classList.remove('active'));
             el.classList.add('active');

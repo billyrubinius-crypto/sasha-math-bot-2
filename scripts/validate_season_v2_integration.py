@@ -28,6 +28,7 @@ def main() -> int:
     progress = read("js/student-progress.js")
     shop = read("js/student-shop.js")
     teacher = read("js/teacher-students.js")
+    teacher_core = read("js/teacher-core.js")
     renderer = read("js/season-cosmetics.js")
 
     require("where status = 'scheduled'" in foundation, "schedule only starts published rows")
@@ -74,10 +75,18 @@ def main() -> int:
     require("openOwnSeasonProfileCard" in progress and "openOwnSeasonProfileCard(this)" in student_html,
             "stable own mini-profile trigger missing")
 
-    require('id="season-v2-modal"' in teacher_html, "teacher editor modal missing")
+    require('id="season-v2-modal"' in teacher_html, "teacher goods preview modal missing")
     require("admin_list_season_v2_self" in teacher, "teacher read-model not wired")
     require("admin_update_scheduled_season_meta_self" in teacher,
             "safe teacher metadata gateway not wired")
+    require("season-v2-inline-editor" in teacher,
+            "scheduled-season metadata editor must stay inside its season card")
+    require("text: 'Запланирован'" in teacher,
+            "scheduled season status is not translated")
+    require('id="season-v2-save-meta"' not in teacher_html,
+            "full-screen season metadata save action returned")
+    require("closeSeasonV2Preview" in teacher_core,
+            "season preview can leak into another teacher tab")
     require("admin_save_season_v2_self" not in teacher,
             "teacher client still exposes full season mutation")
     require("structuredClone(" not in teacher,
