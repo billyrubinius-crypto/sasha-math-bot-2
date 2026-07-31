@@ -15,8 +15,8 @@
         <p class="v4-kicker">Season V4 · реальный интерфейс</p>
         <h1>Профиль как<br><span>личная витрина</span></h1>
         <p class="v4-lead">
-          В списках всё спокойно и читаемо в 32–48 px. Полный характер, фон и анимация
-          раскрываются только после осознанного нажатия на аватар.
+          В топах надетый фон становится подложкой результата, а ник, статус, корона
+          и титул остаются читаемыми в отдельных окнах. Полная визитка открывается по аватару.
         </p>
         <a class="v4-catalog-jump" href="#catalog">Смотреть все 92 предмета <span>↓</span></a>
       </div>
@@ -39,7 +39,7 @@
         <div class="v4-checklist">
           <div>
             <span class="v4-check-index">01</span>
-            <p><strong>Списки не мельтешат</strong><small>Сложная анимация выключена в компактном режиме.</small></p>
+            <p><strong>Фон виден прямо в топе</strong><small>У каждого результата показана публично надетая сцена без анимации.</small></p>
           </div>
           <div>
             <span class="v4-check-index">02</span>
@@ -427,6 +427,7 @@
         {
           id: "me",
           name: "Саша",
+          statusEmoji: "⚡",
           place: 7,
           score: 4280,
           league: "Алмаз",
@@ -439,6 +440,7 @@
         {
           id: "signal",
           name: "Артём К.",
+          statusEmoji: "🛰️",
           place: 2,
           score: 6710,
           league: "Алмаз",
@@ -452,6 +454,8 @@
         {
           id: "nika",
           name: "Ника",
+          statusEmoji: "🧊",
+          hasCrown: true,
           place: 1,
           score: 6840,
           league: "Алмаз",
@@ -464,6 +468,7 @@
         {
           id: "liza",
           name: "Лиза М.",
+          statusEmoji: "🌙",
           place: 3,
           score: 6520,
           league: "Алмаз",
@@ -476,6 +481,7 @@
         {
           id: "max",
           name: "Макс",
+          statusEmoji: "🪲",
           place: 4,
           score: 6190,
           league: "Алмаз",
@@ -488,6 +494,7 @@
         {
           id: "dasha",
           name: "Даша Р.",
+          statusEmoji: "☔",
           place: 5,
           score: 5890,
           league: "Алмаз",
@@ -500,6 +507,7 @@
         {
           id: "tim",
           name: "Тим",
+          statusEmoji: "🚀",
           place: 6,
           score: 5440,
           league: "Алмаз",
@@ -512,6 +520,7 @@
         {
           id: "sonya",
           name: "Соня",
+          statusEmoji: "☁️",
           place: 8,
           score: 4010,
           league: "Алмаз",
@@ -629,13 +638,21 @@
       function leaderboardRow(user) {
         return `
           <li class="v4-leader-row${user.id === "me" ? " is-me" : ""}">
+            <span class="v4-leader-scene scene-${escapeHtml(user.background.visual)} background-rarity-${user.background.rarity}" aria-hidden="true">
+              <span class="v4-scene-layer v4-scene-layer-a"></span>
+              <span class="v4-scene-layer v4-scene-layer-b"></span>
+            </span>
             <span class="v4-rank">${medal(user.place)}</span>
             <button type="button" class="v4-avatar-button v4-avatar-button--leader" data-user-id="${escapeHtml(user.id)}" aria-label="Открыть визитку ${escapeHtml(user.name)}">
               ${avatarMarkup(user, 32, "compact")}
             </button>
             <span class="v4-leader-copy">
-              <strong>${escapeHtml(user.name)}${user.id === "me" ? " · вы" : ""}</strong>
-              <small class="rarity-title-${user.title.rarity}">${escapeHtml(user.title.name)}</small>
+              <span class="v4-leader-nameplate">
+                <strong>${escapeHtml(user.name)}${user.id === "me" ? " · вы" : ""}</strong>
+                <span class="v4-leader-status" title="Эмодзи-статус">${escapeHtml(user.statusEmoji)}</span>
+                ${user.hasCrown ? '<span class="v4-leader-crown" title="Корона ника">♛</span>' : ""}
+              </span>
+              <small class="v4-leader-titleplate rarity-title-${user.title.rarity}">${escapeHtml(user.title.name)}</small>
             </span>
             <span class="v4-score">${user.score.toLocaleString("ru-RU")}<small>XP</small></span>
           </li>

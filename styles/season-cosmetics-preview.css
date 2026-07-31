@@ -485,22 +485,105 @@ body.v4-card-open { overflow: hidden; }
 }
 
 .v4-leader-row {
+  position: relative;
   display: grid;
   grid-template-columns: 24px 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
-  min-height: 58px;
+  min-height: 66px;
   padding: 9px 10px;
   border-bottom: 1px solid #253049;
+  isolation: isolate;
+  overflow: hidden;
 }
 .v4-leader-row:last-child { border-bottom: 0; }
-.v4-leader-row.is-me { background: linear-gradient(90deg, rgba(94, 231, 244, 0.08), transparent); }
-.v4-rank { color: #77859f; font-size: 0.62rem; font-weight: 950; font-variant-numeric: tabular-nums; }
+.v4-leader-row.is-me { box-shadow: inset 3px 0 var(--v4-cyan); }
+.v4-leader-scene {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.v4-leader-scene::after {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(7, 13, 24, .74), rgba(7, 13, 24, .28) 55%, rgba(7, 13, 24, .68)),
+    rgba(7, 13, 24, .18);
+  content: "";
+}
+.v4-leader-scene > * { z-index: 2; }
+.v4-leader-scene .v4-scene-layer { animation: none !important; }
+.v4-leader-row > :not(.v4-leader-scene) {
+  position: relative;
+  z-index: 1;
+}
+.v4-rank {
+  color: #edf4ff;
+  font-size: 0.62rem;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, .9);
+}
 .v4-leader-copy { display: grid; min-width: 0; gap: 2px; }
-.v4-leader-copy strong { overflow: hidden; font-size: 0.71rem; text-overflow: ellipsis; white-space: nowrap; }
-.v4-leader-copy small { overflow: hidden; font-size: 0.56rem; text-overflow: ellipsis; white-space: nowrap; }
-.v4-score { display: grid; justify-items: end; color: #d9e4fb; font-size: 0.65rem; font-weight: 900; font-variant-numeric: tabular-nums; }
-.v4-score small { color: #66748d; font-size: 0.47rem; }
+.v4-leader-nameplate,
+.v4-leader-titleplate,
+.v4-score {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid rgba(201, 220, 255, .16);
+  background: rgba(8, 15, 28, .74);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(7px);
+}
+.v4-leader-nameplate {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 7px 7px 5px 5px;
+}
+.v4-leader-nameplate strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.69rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v4-leader-status,
+.v4-leader-crown {
+  flex: 0 0 auto;
+  line-height: 1;
+}
+.v4-leader-status { font-size: .68rem; }
+.v4-leader-crown {
+  color: #ffd56a;
+  font-size: .7rem;
+  filter: drop-shadow(0 0 5px rgba(255, 190, 64, .52));
+}
+.v4-leader-titleplate {
+  display: block;
+  overflow: hidden;
+  padding: 2px 6px 3px;
+  border-radius: 5px 5px 7px 7px;
+  font-size: 0.54rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v4-score {
+  display: grid;
+  justify-items: end;
+  padding: 5px 6px 4px;
+  border-radius: 8px;
+  color: #f1f6ff;
+  font-size: 0.63rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.v4-score small { color: #9aa9c1; font-size: 0.47rem; }
 
 /* Real compact avatar sizes. The portrait keeps its exact size; the frame grows outward. */
 .v4-avatar {
