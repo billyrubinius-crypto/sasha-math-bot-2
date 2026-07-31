@@ -1,111 +1,581 @@
 <!doctype html>
-<html lang="ru" data-ca-theme="light">
+<html lang="ru" data-v3-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <title>Cosmic Academy — календарный каталог сезонов V2</title>
+  <title>Cosmic Academy — Season V4: профиль как витрина</title>
   <link rel="stylesheet" href="../styles/student.css">
-  <link rel="stylesheet" href="../styles/season-cosmetics-preview.css">
+  <link rel="stylesheet" href="../styles/season-v3-preview.css">
+  <link rel="stylesheet" href="../styles/season-cosmetics-preview.css?v=8">
 </head>
-<body class="season-catalog-preview">
-  <main class="season-preview-shell">
-    <header class="season-preview-header">
-      <p class="season-preview-kicker">Локальный preview · 28.07.2026–24.06.2027</p>
-      <h1>Учебный год в 23 календарных коллекциях</h1>
-      <p class="season-preview-lead">
-        Реальные сезоны, школьный ритм и знакомые события дополнены математикой и лёгким языком Cosmic Academy.
-        Данные загружаются из JSON; стенд работает без Telegram, Supabase и внешних ресурсов.
-      </p>
-      <div class="season-preview-stats" aria-label="Сводка каталога">
-        <span class="season-preview-stat" id="presetStat">23 периода</span>
-        <span class="season-preview-stat" id="itemStat">92 предмета</span>
-        <span class="season-preview-stat">21 × 14 дней</span>
-        <span class="season-preview-stat">2 межсезонья</span>
-        <span class="season-preview-stat">Москва · 00:00</span>
+<body class="v3-page v4-page">
+  <main class="v4-shell">
+    <header class="v4-hero">
+      <div>
+        <p class="v4-kicker">Season V4 · реальный интерфейс</p>
+        <h1>Профиль как<br><span>личная витрина</span></h1>
+        <p class="v4-lead">
+          В списках всё спокойно и читаемо в 32–48 px. Полный характер, фон и анимация
+          раскрываются только после осознанного нажатия на аватар.
+        </p>
+        <a class="v4-catalog-jump" href="#catalog">Смотреть все 92 предмета <span>↓</span></a>
+      </div>
+      <div class="v4-hero-contract" aria-label="Контракт версии четыре">
+        <div><strong>48</strong><span>профиль</span></div>
+        <div><strong>32</strong><span>оба топа</span></div>
+        <div><strong>160</strong><span>раскрытие</span></div>
       </div>
     </header>
 
-    <section class="season-preview-toolbar" aria-label="Управление каталогом">
-      <label class="season-preview-control season-preview-search">
-        Поиск
-        <input id="searchInput" type="search" placeholder="Сезон, предмет или технический ID" autocomplete="off">
-      </label>
-      <label class="season-preview-control">
-        Период
-        <select id="seasonFilter">
-          <option value="all">Все 23 периода</option>
-        </select>
-      </label>
-      <label class="season-preview-control">
-        Редкость
-        <select id="rarityFilter">
-          <option value="all">Все редкости</option>
-          <option value="common">Common</option>
-          <option value="rare">Rare</option>
-          <option value="epic">Epic</option>
-          <option value="legendary">Legendary</option>
-        </select>
-      </label>
-      <label class="season-preview-control">
-        Ширина примерки
-        <select id="viewportFilter">
-          <option value="360">360 px</option>
-          <option value="390">390 px</option>
-          <option value="430">430 px</option>
-          <option value="768" selected>768 px</option>
-        </select>
-      </label>
-      <button class="season-control-button" id="nextPeriodButton" type="button">Следующий период</button>
-      <button class="season-control-button" id="themeToggle" type="button" aria-pressed="false">Тёмная тема</button>
+    <section class="v4-workbench" aria-labelledby="previewTitle">
+      <div class="v4-copy-column">
+        <p class="v4-kicker">Живой прототип</p>
+        <h2 id="previewTitle">Нажмите на любой аватар</h2>
+        <p>
+          Свой профиль, лига и общий топ используют одну и ту же визитку. Она не занимает
+          весь экран, закрывается крестиком, повторным нажатием, кликом снаружи или кнопкой «Назад».
+        </p>
+
+        <div class="v4-checklist">
+          <div>
+            <span class="v4-check-index">01</span>
+            <p><strong>Списки не мельтешат</strong><small>Сложная анимация выключена в компактном режиме.</small></p>
+          </div>
+          <div>
+            <span class="v4-check-index">02</span>
+            <p><strong>Редкость видна без бейджа</strong><small>Материал, контур и поведение предмета различаются.</small></p>
+          </div>
+          <div>
+            <span class="v4-check-index">03</span>
+            <p><strong>Другие ученики доступны</strong><small>В топах раскрывается только публично надетая косметика.</small></p>
+          </div>
+        </div>
+
+        <button type="button" class="v4-secret-shortcut" id="secretShortcut">
+          <span>Проверить скрытую связку</span>
+          <small>Откроет аватар #2 в лиге</small>
+        </button>
+      </div>
+
+      <div class="v4-phone" aria-label="Интерактивный мобильный интерфейс">
+        <div class="v4-phone-speaker" aria-hidden="true"></div>
+        <div class="v4-app">
+          <header class="v4-appbar">
+            <div>
+              <small>Cosmic Academy</small>
+              <strong id="screenHeading">Профиль</strong>
+            </div>
+            <span class="v4-balance">520 ⚙</span>
+          </header>
+
+          <nav class="v4-tabs" aria-label="Разделы демонстрации">
+            <button type="button" class="is-active" data-v4-tab="profile" aria-pressed="true">Профиль</button>
+            <button type="button" data-v4-tab="league" aria-pressed="false">Лига</button>
+            <button type="button" data-v4-tab="global" aria-pressed="false">Общий топ</button>
+          </nav>
+
+          <div class="v4-screen-stack">
+            <section class="v4-screen is-active" data-v4-screen="profile" aria-label="Профиль ученика">
+              <div class="v4-profile-head">
+                <button type="button" class="v4-avatar-button v4-avatar-button--profile" data-user-id="me" aria-label="Открыть визитку Саши">
+                  <span data-avatar-slot="me"></span>
+                  <span class="v4-tap-mark" aria-hidden="true">↗</span>
+                </button>
+                <div class="v4-profile-copy">
+                  <p class="v4-online">в сети</p>
+                  <h3>Саша</h3>
+                  <p class="v4-compact-title rarity-title-common">План был</p>
+                  <div><span>10 класс</span><span>Лига «Алмаз»</span></div>
+                </div>
+              </div>
+
+              <div class="v4-status-card">
+                <p>Текущий ритм</p>
+                <strong>7 дней подряд</strong>
+                <div class="v4-progress"><span></span></div>
+                <small>До следующей контрольной точки — 180 XP</small>
+              </div>
+
+              <div class="v4-profile-grid">
+                <article><span>⭐</span><strong>4 280</strong><small>рейтинг</small></article>
+                <article><span>◈</span><strong>17</strong><small>предметов</small></article>
+                <article><span>↗</span><strong>+6</strong><small>за неделю</small></article>
+              </div>
+
+              <div class="v4-profile-note">
+                <span>Подсказка</span>
+                <p>48 px — настоящий размер. Нажмите на аватар, чтобы увидеть весь надетый набор.</p>
+              </div>
+            </section>
+
+            <section class="v4-screen" data-v4-screen="league" aria-label="Топ лиги">
+              <div class="v4-league-heading">
+                <div><small>Лига</small><strong>Алмаз</strong></div>
+                <span>до финиша 4 дня</span>
+              </div>
+              <div class="v4-promotion-line"><span></span><p>Топ-3 переходят в «Мастер»</p></div>
+              <ol class="v4-leaderboard" id="leagueList"></ol>
+            </section>
+
+            <section class="v4-screen" data-v4-screen="global" aria-label="Общий топ">
+              <div class="v4-global-heading">
+                <div><small>За все сезоны</small><strong>Общий топ</strong></div>
+                <span>2 418 учеников</span>
+              </div>
+              <ol class="v4-leaderboard" id="globalList"></ol>
+            </section>
+          </div>
+
+          <nav class="v4-bottom-nav" aria-label="Основная навигация">
+            <span>⌂<small>Главная</small></span>
+            <span>✓<small>Задания</small></span>
+            <span class="is-active">◇<small>Лидеры</small></span>
+            <span>□<small>Магазин</small></span>
+          </nav>
+        </div>
+      </div>
     </section>
 
-    <p id="catalogStatus" class="season-preview-status" role="status" aria-live="polite">Загрузка каталога…</p>
-    <section id="seasonGrid" class="season-grid" aria-label="Сезонные коллекции"></section>
-    <div id="emptyState" class="season-preview-empty" hidden>По выбранным условиям ничего не найдено.</div>
+    <section class="v4-rarity-section" aria-labelledby="rarityTitle">
+      <div class="v4-section-head">
+        <div>
+          <p class="v4-kicker">Никакой случайности</p>
+          <h2 id="rarityTitle">Редкость идёт строгим циклом</h2>
+        </div>
+        <p>
+          Каждый сезон содержит ровно один предмет каждой редкости. Легендарный слот
+          последовательно проходит через аватар, фон, титул и рамку.
+        </p>
+      </div>
+      <div class="v4-cycle" id="rarityCycle"></div>
+      <div class="v4-year-strip" id="yearStrip" aria-label="Все 23 периода"></div>
+    </section>
+
+    <section class="v4-catalog-section" id="catalog" aria-labelledby="catalogTitle">
+      <div class="v4-section-head">
+        <div>
+          <p class="v4-kicker">23 периода · 4 слота · 92 предмета</p>
+          <h2 id="catalogTitle">Полный каталог V4</h2>
+        </div>
+        <p>
+          Здесь показан каждый предмет отдельно. Редкость вычисляется только по номеру периода
+          и никогда не переставляется вручную.
+        </p>
+      </div>
+
+      <div class="v4-catalog-toolbar">
+        <div class="v4-catalog-tabs" aria-label="Тип предмета">
+          <button type="button" class="is-active" data-catalog-slot="avatar" aria-pressed="true">Аватары <span>23</span></button>
+          <button type="button" data-catalog-slot="frame" aria-pressed="false">Рамки <span>23</span></button>
+          <button type="button" data-catalog-slot="title" aria-pressed="false">Титулы <span>23</span></button>
+          <button type="button" data-catalog-slot="background" aria-pressed="false">Фоны <span>23</span></button>
+        </div>
+        <div class="v4-rarity-filters" aria-label="Фильтр редкости">
+          <button type="button" class="is-active" data-catalog-rarity="all" aria-pressed="true">Все</button>
+          <button type="button" data-catalog-rarity="common" aria-pressed="false">Обычные</button>
+          <button type="button" data-catalog-rarity="rare" aria-pressed="false">Редкие</button>
+          <button type="button" data-catalog-rarity="epic" aria-pressed="false">Эпические</button>
+          <button type="button" data-catalog-rarity="legendary" aria-pressed="false">Легендарные</button>
+        </div>
+      </div>
+
+      <div class="v4-catalog-summary">
+        <p id="catalogSummary">Аватары · 23 предмета</p>
+        <span>Редкость читается без движения: сцена, материал и число слоёв</span>
+      </div>
+      <div class="v4-catalog-grid" id="catalogGrid"></div>
+    </section>
+
+    <section class="v4-background-section" aria-labelledby="backgroundTitle">
+      <div class="v4-section-head">
+        <div>
+          <p class="v4-kicker">16–18 лет · разные визуальные языки</p>
+          <h2 id="backgroundTitle">Фон — это место, а не градиент</h2>
+        </div>
+        <p>
+          Восемь направлений не повторяют одну композицию: меняются камера, свет,
+          глубина и само ощущение пространства.
+        </p>
+      </div>
+      <div class="v4-background-grid" id="backgroundGrid"></div>
+    </section>
+
+    <section class="v4-secret-section" aria-labelledby="secretTitle">
+      <div class="v4-secret-copy">
+        <p class="v4-kicker">Секрет через полгода</p>
+        <h2 id="secretTitle">Четыре вещи.<br>Ни одной очевидной связи.</h2>
+        <p>
+          Титул сентября, рамка ноября, аватар января и фон апреля выглядят самостоятельными.
+          Только вместе они запускают скрытый сигнал «03:17».
+        </p>
+      </div>
+      <div class="v4-secret-items" id="secretItems"></div>
+    </section>
   </main>
 
-  <div class="season-modal" id="previewModal" role="dialog" aria-modal="true" aria-labelledby="previewModalTitle" hidden>
-    <section class="season-modal-panel">
-      <header class="season-modal-head">
-        <h2 id="previewModalTitle">Примерка предмета</h2>
-        <button class="season-modal-close" id="previewModalClose" type="button" aria-label="Закрыть примерку">×</button>
-      </header>
-      <div id="previewModalBody"></div>
-    </section>
+  <div class="v4-overlay" id="profileOverlay" hidden>
+    <article class="v4-profile-card" id="profileCard" role="dialog" aria-modal="true" aria-labelledby="cardName" tabindex="-1">
+      <button type="button" class="v4-card-close" id="cardClose" aria-label="Закрыть визитку">×</button>
+      <div class="v4-card-scene scene-night-bus" id="cardScene">
+        <span class="v4-scene-layer v4-scene-layer-a" aria-hidden="true"></span>
+        <span class="v4-scene-layer v4-scene-layer-b" aria-hidden="true"></span>
+        <span class="v4-combo-frequency" aria-hidden="true">03:17</span>
+        <div class="v4-card-avatar" id="cardAvatar"></div>
+        <span class="v4-card-rarity" id="cardRarity"></span>
+      </div>
+      <div class="v4-card-copy">
+        <p class="v4-card-eyebrow" id="cardEyebrow">Публичная визитка</p>
+        <h3 id="cardName"></h3>
+        <p class="v4-card-title" id="cardTitle"></p>
+        <p class="v4-card-meta" id="cardMeta"></p>
+        <div class="v4-equipped-grid" id="cardEquipment"></div>
+        <p class="v4-combo-message" id="comboMessage" aria-live="polite"></p>
+      </div>
+    </article>
+  </div>
+
+  <div class="v4-toast" id="comboToast" role="status" aria-live="polite" hidden>
+    <span>Скрытая связка обнаружена</span>
+    <strong>СИГНАЛ 03:17</strong>
   </div>
 
   <script>
     (() => {
       "use strict";
 
-      const catalogUrl = "../data/season_presets_2026_2027.json";
-      const avatarRoot = "../assets/season-avatars/";
-      const root = document.documentElement;
-      const grid = document.getElementById("seasonGrid");
-      const status = document.getElementById("catalogStatus");
-      const emptyState = document.getElementById("emptyState");
-      const searchInput = document.getElementById("searchInput");
-      const seasonFilter = document.getElementById("seasonFilter");
-      const rarityFilter = document.getElementById("rarityFilter");
-      const viewportFilter = document.getElementById("viewportFilter");
-      const nextPeriodButton = document.getElementById("nextPeriodButton");
-      const themeToggle = document.getElementById("themeToggle");
-      const modal = document.getElementById("previewModal");
-      const modalTitle = document.getElementById("previewModalTitle");
-      const modalBody = document.getElementById("previewModalBody");
-      const modalClose = document.getElementById("previewModalClose");
+      const rarityNames = {
+        common: "Обычный",
+        rare: "Редкий",
+        epic: "Эпический",
+        legendary: "Легендарный"
+      };
 
-      const slotIcons = { avatar: "◉", frame: "◇", title: "✦", background: "▧" };
-      const slotLabels = { avatar: "Аватар", frame: "Рамка", title: "Титул", background: "Фон" };
-      const rarityLabels = { common: "Common", rare: "Rare", epic: "Epic", legendary: "Legendary" };
-      const monthNames = [
-        "января", "февраля", "марта", "апреля", "мая", "июня",
-        "июля", "августа", "сентября", "октября", "ноября", "декабря"
+      const slotNames = {
+        avatar: "Аватар",
+        frame: "Рамка",
+        title: "Титул",
+        background: "Фон"
+      };
+
+      const rotation = {
+        1: { avatar: "legendary", frame: "rare", title: "common", background: "epic" },
+        2: { avatar: "rare", frame: "common", title: "epic", background: "legendary" },
+        3: { avatar: "common", frame: "epic", title: "legendary", background: "rare" },
+        0: { avatar: "epic", frame: "legendary", title: "rare", background: "common" }
+      };
+
+      const periodLabels = [
+        "28.07", "01.08", "03.09", "17.09", "01.10", "15.10", "29.10", "12.11",
+        "26.11", "10.12", "24.12", "07.01", "21.01", "04.02", "18.02", "04.03",
+        "18.03", "01.04", "15.04", "29.04", "13.05", "27.05", "10.06"
       ];
 
-      let catalog = null;
-      let lastFocused = null;
+      const backgrounds = [
+        { visual: "night-bus", name: "Последний автобус", line: "Отражения, скорость, город за стеклом" },
+        { visual: "liminal-hall", name: "Коридор Б-0", line: "Пустое пространство и неправильная перспектива" },
+        { visual: "terminal", name: "Окно системы", line: "Старый монитор и живые строки команд" },
+        { visual: "rooftop", name: "Крыша после уроков", line: "Горизонт, ветер и тяжёлое небо" },
+        { visual: "rain-city", name: "Город после дождя", line: "Неон, мокрый асфальт и длинные отражения" },
+        { visual: "paper-collage", name: "Архив на скотче", line: "Бумага, фотографии и ручные пометки" },
+        { visual: "orbital", name: "Альфа-7", line: "Орбита, холодный свет и чужая геометрия" },
+        { visual: "darkroom", name: "Красная комната", line: "Фотолаборатория и проявляющиеся следы" }
+      ];
+
+      const periodDateRanges = [
+        "28 июля — 1 августа", "1 августа — 3 сентября", "3–17 сентября",
+        "17 сентября — 1 октября", "1–15 октября", "15–29 октября",
+        "29 октября — 12 ноября", "12–26 ноября", "26 ноября — 10 декабря",
+        "10–24 декабря", "24 декабря — 7 января", "7–21 января",
+        "21 января — 4 февраля", "4–18 февраля", "18 февраля — 4 марта",
+        "4–18 марта", "18 марта — 1 апреля", "1–15 апреля",
+        "15–29 апреля", "29 апреля — 13 мая", "13–27 мая",
+        "27 мая — 10 июня", "10–24 июня"
+      ];
+
+      const avatarCatalog = [
+        ["Режим энергосбережения", "capybara", "Капибара сохраняет спокойствие, даже когда календарь уже нет."],
+        ["Нулевой заряд", "hamster", "Собрал всё необходимое и потратил заряд ещё до старта."],
+        ["Неверный корпус", "alien", "Бип снова вошёл не в ту дверь, но делает вид, что так и надо."],
+        ["Вне расписания", "schedule-cat", "Кот использует расписание исключительно как поверхность для сна."],
+        ["Протокол симметрии", "raccoon", "Енот проверяет мир линейкой и находит подозрительно ровные совпадения."],
+        ["Дедлайн 23:59", "frog", "Ква сохраняет невозмутимость за минуту до отправки."],
+        ["Сообщение доставлено", "pigeon", "Шифр доставил записку. Адрес выбирался интуитивно."],
+        ["Ночная смена", "moth", "Люмен включается только после того, как остальные выключили свет."],
+        ["Не тает", "snow-blob", "Шурх пережил контрольную, оттепель и чужой прогноз."],
+        ["Ещё пять минут", "clock", "Тик переносит будильник с профессиональной точностью."],
+        ["Архив.zip", "gift", "Упаковывает незакрытые задачи в папку, которую никто не откроет."],
+        ["Слабый сигнал", "frozen-alien", "Одна антенна ловит связь, вторая всё ещё загружается."],
+        ["Ошибка на полях", "ink-blob", "Клякса появилась случайно и быстро стала главным элементом страницы."],
+        ["Восемь вкладок", "octopus", "Семь дел открыты. Восьмое уверенно воспроизводит музыку."],
+        ["Ещё попытка", "beetle", "Тягач снова идёт вверх, не обсуждая прошлый результат."],
+        ["Новый рост", "sprout", "Пиксель вышел за границы рисунка и отказался возвращаться."],
+        ["Держится", "balance-cat", "Полка уже накренилась, но Баланс сохраняет выражение лица."],
+        ["Турист с Альфы-7", "space-tourist", "Перепутал школьный двор с космодромом и решил остаться."],
+        ["Метод тыка", "duck", "Крякс исследует лужу способом, который сложно оспорить."],
+        ["Локальный дождь", "cloud", "Миро отвечает за погоду в радиусе одного рабочего стола."],
+        ["Вышел первым", "bell", "Урок закончился, и Дзынь покинул помещение раньше остальных."],
+        ["Загрузка 2%", "brain", "Процессор показывает прогресс, не раскрывая оставшееся время."],
+        ["Уже в отпуске", "backpack", "Рюкзак мысленно уехал к морю за неделю до расписания."]
+      ];
+
+      const frameCatalog = [
+        ["Солнечный маршрут", "v4-sun-route", "Тёплый плетёный шнур, сквозь который проходит холодная бирюзовая жила."],
+        ["Бумажный след", "v4-paper-trace", "Мягкий рваный край бумаги удерживает непрерывная графитовая нить."],
+        ["Неверный поворот", "v4-wrong-turn", "Три гибких неоновых кабеля пересекаются и собираются в один узел."],
+        ["Осенний импульс", "v4-autumn-orbit", "Живой венок из крупных янтарных, красных и зелёных листьев."],
+        ["Четыре оси", "v4-axis", "Цельный безель из потемневшей латуни с холодным внутренним кантом."],
+        ["Дождевая линия", "v4-rainline", "Прозрачная водяная трубка, на которой держатся крупные капли."],
+        ["Потерянное письмо", "v4-dead-letter", "Почтовая окантовка из красных, молочных и синих бумажных полос."],
+        ["Последний свет", "v4-last-light", "Широкий витражный обод собирает фиолетовый сумрак и янтарный свет."],
+        ["Холодный статик", "v4-cold-static", "Кристаллическая корона с острыми ледяными помехами."],
+        ["Обратный отсчёт", "v4-countdown", "Мягкий красный безель таймера стянут тонкой жёлтой разметкой."],
+        ["Гирлянда 00:00", "v4-new-year-lights", "Хвойное плетение с небольшими разноцветными лампочками и мягким праздничным свечением."],
+        ["Слабая частота", "v4-weak-signal", "Спутанный пучок проводов: две жилы светятся, две остаются холодными."],
+        ["Поля документа", "v4-margin-error", "Рваное бумажное волокно перехвачено синей строчкой и красной нитью."],
+        ["Многооконный режим", "v4-multitask", "Три полупрозрачных окна наложились друг на друга и потеряли правильную форму."],
+        ["Повтор", "v4-retry", "Плотно переплетённый шнур возвращает узор к началу."],
+        ["Хлорофилл", "v4-chlorophyll", "Плетёная лоза с крупными цветами, листьями и мягким зелёным свечением."],
+        ["Точка равновесия", "v4-balance", "Цельный обод разделён между холодной керамикой и тёплым деревом."],
+        ["Маршрут Альфы", "v4-alpha-route", "Три тонких эластичных шнура оборачиваются вокруг аватара по разным траекториям."],
+        ["Круги на воде", "v4-ripple", "Полупрозрачные водяные кольца расходятся с разной амплитудой."],
+        ["Погодный цикл", "v4-weather-loop", "Широкий обод постепенно меняется от тёплого солнечного стекла к холодному дождевому."],
+        ["После звонка", "v4-afterbell", "Мягкая нашивка из синей ткани прошита заметной янтарной строчкой."],
+        ["Полоса загрузки", "v4-loading", "Полупрозрачный гелевый индикатор оставляет один намеренный разрыв."],
+        ["Летний выход", "v4-summer-exit", "Морской браслет собран из коралловых бусин, бирюзы и зелёных листьев."]
+      ];
+
+      const titleCatalog = [
+        ["Почти занимаюсь", "plain", "Спокойный титул без эффектов."],
+        ["План был", "pulse", "Мягкий градиент для хорошего, но изменившегося плана."],
+        ["Не туда, но вовремя", "signal", "Легендарный титул иногда сбивается на координаты."],
+        ["Вне расписания", "mono", "Сдержанный моноширинный статус."],
+        ["Сходится по осям", "plain", "Короткий спокойный титул."],
+        ["Сейчас всё решу", "pulse", "Эпический текст едва заметно набирает яркость."],
+        ["Доставлено без адреса", "signal", "Легендарный статус оставляет короткий след отправки."],
+        ["Последний свет", "mono", "Холодная подпись без движения."],
+        ["Не растаял", "plain", "Статичный зимний титул."],
+        ["Ещё пять минут", "pulse", "Индикатор времени проходит по буквам."],
+        ["Архив закрыт", "glitch", "Легендарный титул на мгновение показывает системный код."],
+        ["Сигнал нестабилен", "mono", "Редкая подпись с техническим ритмом."],
+        ["Начну с точки", "plain", "Минимальный титул без анимации."],
+        ["Восемь вкладок", "pulse", "Эпическая смена оттенка между активными задачами."],
+        ["Ещё один шаг", "signal", "Легендарная строка продвигает световой маркер вперёд."],
+        ["Есть идея", "mono", "Короткий редкий титул."],
+        ["Держу баланс", "plain", "Статичный статус без декоративного шума."],
+        ["Первый пошёл", "pulse", "Эпический стартовый импульс."],
+        ["Методом тыка", "glitch", "Легендарный титул иногда выбирает случайный символ."],
+        ["Локальный дождь", "mono", "Редкий холодный текст."],
+        ["Сдал и вышел", "plain", "Прямой титул без эффектов."],
+        ["Ответ почти готов", "pulse", "Эпическая строка загружается до двух процентов."],
+        ["Официально свободен", "signal", "Легендарный финальный титул открывает летний канал."]
+      ];
+
+      const backgroundCatalog = [
+        ["Полевые заметки", "field-notes", "Солнечный стол у воды, снятый сверху."],
+        ["Пол комнаты", "packing-floor", "Рюкзак, кабели и вещи перед стартом года."],
+        ["Коридор Б-0", "wrong-corridor", "Школьный коридор с невозможной точкой схода."],
+        ["Стол вне расписания", "schedule-desk", "Календарь, тени жалюзи и смятый лист."],
+        ["Осенний переход", "autumn-crosswalk", "Мокрая улица, разметка и листья под ногами."],
+        ["Остановка под дождём", "rain-shelter", "Стекло павильона и отражения позднего автобуса."],
+        ["Двор на частоте", "courtyard-radio", "Школьный двор, провода и самодельная антенна."],
+        ["Окно после полуночи", "night-window", "Тёмная комната и единственная включённая лампа."],
+        ["Белый двор", "snow-yard-v4", "Знакомый двор, почти исчезнувший под снегом."],
+        ["Комната 00:05", "countdown-room", "Красные цифры и тени перед дедлайном."],
+        ["Закрытый архив", "archive-room", "Полки, коробки и свет дежурной лампы."],
+        ["Замёрзшее стекло", "frosted-stop", "Остановка видна только через очищенный участок."],
+        ["Бумажное пространство", "paper-space", "Листы, скотч и чернильные следы без горизонта."],
+        ["Перегрузка вкладок", "tab-overload", "Рабочий стол, окна и уведомления поверх друг друга."],
+        ["Наклонная страница", "notebook-slope", "Тетрадный лист превращается в крутой подъём."],
+        ["Весенняя мастерская", "spring-workshop", "Растения, банки с водой и холодный дневной свет."],
+        ["Наклонная библиотека", "leaning-library-v4", "Стеллажи уходят в сторону, сохраняя порядок."],
+        ["Альфа-7", "orbital", "Орбита, холодный свет и чужая геометрия."],
+        ["Город в луже", "puddle-city", "Перевёрнутые дома и неон в отражении воды."],
+        ["Погодная комната", "weather-room", "Карты давления, радар и локальное облако."],
+        ["Пустой класс", "empty-class-v4", "Стулья, пыль и длинный свет после последнего звонка."],
+        ["Экзаменационный терминал", "exam-terminal", "Стол под камерой и мигающий индикатор готовности."],
+        ["Поезд к морю", "summer-train", "Окно вагона, быстрое поле и первая полоска воды."]
+      ];
+
+      function rarityFor(season, slot) {
+        return rotation[season % 4][slot];
+      }
+
+      function item(slot, season, name, visual) {
+        return { slot, season, name, visual, rarity: rarityFor(season, slot) };
+      }
+
+      const catalogSources = {
+        avatar: avatarCatalog,
+        frame: frameCatalog,
+        title: titleCatalog,
+        background: backgroundCatalog
+      };
+
+      const catalogItems = Object.entries(catalogSources).flatMap(([slot, source]) =>
+        source.map(([name, visual, description], index) => ({
+          slot,
+          season: index + 1,
+          dates: periodDateRanges[index],
+          name,
+          visual,
+          description,
+          rarity: rarityFor(index + 1, slot)
+        }))
+      );
+
+      const users = [
+        {
+          id: "me",
+          name: "Саша",
+          place: 7,
+          score: 4280,
+          league: "Алмаз",
+          className: "10 класс",
+          avatar: item("avatar", 6, "Люмен", "moth"),
+          frame: item("frame", 4, "Осенний импульс", "v4-autumn-orbit"),
+          title: item("title", 5, "План был", "plain"),
+          background: item("background", 7, "Последний автобус", "night-bus")
+        },
+        {
+          id: "signal",
+          name: "Артём К.",
+          place: 2,
+          score: 6710,
+          league: "Алмаз",
+          className: "11 класс",
+          secretCombo: true,
+          avatar: item("avatar", 13, "Ошибка на полях", "ink-blob"),
+          frame: item("frame", 8, "Последний свет", "v4-last-light"),
+          title: item("title", 3, "Не туда, но вовремя", "signal"),
+          background: item("background", 18, "Альфа-7", "orbital")
+        },
+        {
+          id: "nika",
+          name: "Ника",
+          place: 1,
+          score: 6840,
+          league: "Алмаз",
+          className: "10 класс",
+          avatar: item("avatar", 12, "Фриз", "frozen-alien"),
+          frame: item("frame", 9, "Холодный статик", "v4-cold-static"),
+          title: item("title", 10, "Ещё пять минут", "pulse"),
+          background: item("background", 14, "Красная комната", "darkroom")
+        },
+        {
+          id: "liza",
+          name: "Лиза М.",
+          place: 3,
+          score: 6520,
+          league: "Алмаз",
+          className: "11 класс",
+          avatar: item("avatar", 4, "Ночной кот", "schedule-cat"),
+          frame: item("frame", 15, "Повтор", "v4-retry"),
+          title: item("title", 11, "Не беспокоить", "glitch"),
+          background: item("background", 10, "Окно системы", "terminal")
+        },
+        {
+          id: "max",
+          name: "Макс",
+          place: 4,
+          score: 6190,
+          league: "Алмаз",
+          className: "10 класс",
+          avatar: item("avatar", 15, "Тягач", "beetle"),
+          frame: item("frame", 16, "Хлорофилл", "v4-chlorophyll"),
+          title: item("title", 14, "Почти синхронно", "plain"),
+          background: item("background", 9, "Город после дождя", "rain-city")
+        },
+        {
+          id: "dasha",
+          name: "Даша Р.",
+          place: 5,
+          score: 5890,
+          league: "Алмаз",
+          className: "11 класс",
+          avatar: item("avatar", 7, "Шифр", "pigeon"),
+          frame: item("frame", 6, "Дождевая линия", "v4-rainline"),
+          title: item("title", 8, "Свет не выключен", "afterglow"),
+          background: item("background", 12, "Коридор Б-0", "liminal-hall")
+        },
+        {
+          id: "tim",
+          name: "Тим",
+          place: 6,
+          score: 5440,
+          league: "Алмаз",
+          className: "10 класс",
+          avatar: item("avatar", 18, "Альф", "space-tourist"),
+          frame: item("frame", 20, "Погодный цикл", "v4-weather-loop"),
+          title: item("title", 19, "Методом тыка", "plain"),
+          background: item("background", 15, "Крыша после уроков", "rooftop")
+        },
+        {
+          id: "sonya",
+          name: "Соня",
+          place: 8,
+          score: 4010,
+          league: "Алмаз",
+          className: "11 класс",
+          avatar: item("avatar", 20, "Миро", "cloud"),
+          frame: item("frame", 21, "После звонка", "v4-afterbell"),
+          title: item("title", 16, "Есть идея", "pulse"),
+          background: item("background", 19, "Архив на скотче", "paper-collage")
+        }
+      ];
+
+      const globalUsers = [
+        { ...users[2], place: 1, score: 48720 },
+        { ...users[1], place: 2, score: 47310 },
+        { ...users[6], place: 3, score: 45980 },
+        { ...users[3], place: 4, score: 44120 },
+        { ...users[4], place: 5, score: 42940 },
+        { ...users[0], place: 18, score: 31860 }
+      ];
+
+      const userById = new Map(users.map((user) => [user.id, user]));
+      globalUsers.forEach((user) => userById.set(user.id, user));
+
+      const avatarFrameNames = {
+        bare: "frame-bare",
+        afterglow: "frame-afterglow",
+        signal: "frame-signal",
+        ice: "frame-ice",
+        steps: "frame-steps-v4",
+        vine: "frame-vine",
+        rain: "frame-rain-v4",
+        orbit: "frame-orbit-v4"
+      };
+
+      function frameClassFor(visual) {
+        if (avatarFrameNames[visual]) return avatarFrameNames[visual];
+        if (visual.startsWith("v4-")) return `frame-${visual}`;
+        return "frame-afterglow";
+      }
+
+      const overlay = document.getElementById("profileOverlay");
+      const card = document.getElementById("profileCard");
+      const cardClose = document.getElementById("cardClose");
+      const cardScene = document.getElementById("cardScene");
+      const cardAvatar = document.getElementById("cardAvatar");
+      const cardRarity = document.getElementById("cardRarity");
+      const cardName = document.getElementById("cardName");
+      const cardTitle = document.getElementById("cardTitle");
+      const cardMeta = document.getElementById("cardMeta");
+      const cardEyebrow = document.getElementById("cardEyebrow");
+      const cardEquipment = document.getElementById("cardEquipment");
+      const comboMessage = document.getElementById("comboMessage");
+      const comboToast = document.getElementById("comboToast");
+      const secretShortcut = document.getElementById("secretShortcut");
+      const catalogGrid = document.getElementById("catalogGrid");
+      const catalogSummary = document.getElementById("catalogSummary");
+
+      let activeUserId = null;
+      let activeTrigger = null;
+      let revealTimer = null;
+      let toastTimer = null;
+      let overlayHideTimer = null;
+      let activeCatalogSlot = "avatar";
+      let activeCatalogRarity = "all";
 
       function escapeHtml(value) {
         return String(value)
@@ -116,336 +586,411 @@
           .replaceAll("'", "&#039;");
       }
 
-      function cssClassFromPayload(payload) {
-        if (payload.startsWith("season_frame_")) {
-          return "season-frame-" + payload.slice("season_frame_".length).replaceAll("_", "-");
-        }
-        if (payload.startsWith("season_bg_")) {
-          return "season-bg-" + payload.slice("season_bg_".length).replaceAll("_", "-");
-        }
-        return "";
-      }
-
-      function getItem(preset, slot) {
-        return preset.items.find((item) => item.slot === slot);
-      }
-
-      function parseDate(value) {
-        const [year, month, day] = value.split("-").map(Number);
-        return new Date(year, month - 1, day, 12);
-      }
-
-      function formatDate(value, includeYear = false) {
-        const parsed = parseDate(value);
-        const year = includeYear ? ` ${parsed.getFullYear()}` : "";
-        return `${parsed.getDate()} ${monthNames[parsed.getMonth()]}${year}`;
-      }
-
-      function formatRange(preset) {
-        const start = parseDate(preset.start_date);
-        const end = parseDate(preset.end_date);
-        const crossesYear = start.getFullYear() !== end.getFullYear();
-        return `${formatDate(preset.start_date, crossesYear)} — ${formatDate(preset.end_date, true)}`;
-      }
-
-      function periodLabel(preset) {
-        if (preset.season_type === "interseason") {
-          return `межсезонье · ${preset.duration_days} дн. · provisional`;
-        }
-        return `соревнование ${preset.competition_season_no} · 14 дней`;
-      }
-
-      function titleTierClass(titleItem) {
-        return `title-tier-${titleItem.title_visual_tier}`;
-      }
-
-      function itemButton(preset, item) {
-        const isFlagship = preset.flagship_item_code === item.item_code;
+      function avatarMarkup(user, displaySize, mode) {
+        const frameClass = frameClassFor(user.frame.visual);
         return `
-          <button
-            class="season-item-button rarity-${escapeHtml(item.rarity)}"
-            type="button"
-            data-sequence="${preset.sequence_no}"
-            data-item-code="${escapeHtml(item.item_code)}"
-            data-flagship="${isFlagship}"
-            aria-label="Примерить ${escapeHtml(item.name)}, ${escapeHtml(rarityLabels[item.rarity])}, ${item.price} шестерёнок"
-          >
-            <span class="season-item-icon" aria-hidden="true">${slotIcons[item.slot]}</span>
-            <span class="season-item-label">
-              <strong>${escapeHtml(item.name)}</strong>
-              <small>${escapeHtml(slotLabels[item.slot])} · ${escapeHtml(rarityLabels[item.rarity])}${isFlagship ? " · флагман" : ""}</small>
-            </span>
-            <span class="season-price-pill">${item.price}</span>
-          </button>
-        `;
-      }
-
-      function technicalDetails(preset) {
-        return `
-          <details class="season-technical">
-            <summary>Технические ID и мотивы</summary>
-            <div class="season-technical-row">
-              <span class="season-tech-pill">${escapeHtml(preset.preset_code)}</span>
-              <span class="season-tech-pill">${escapeHtml(preset.bundle_code)}</span>
-              <span class="season-tech-pill">${escapeHtml(preset.collection_code)}</span>
-              <span class="season-tech-pill">${escapeHtml(preset.theme_key)}</span>
-              <span class="season-tech-pill">${escapeHtml(preset.primary_motif)}</span>
-              <span class="season-tech-pill">${escapeHtml(preset.secondary_motif)}</span>
-            </div>
-          </details>
-        `;
-      }
-
-      function seasonCard(preset) {
-        const avatar = getItem(preset, "avatar");
-        const frame = getItem(preset, "frame");
-        const title = getItem(preset, "title");
-        const background = getItem(preset, "background");
-        const visibleItems = rarityFilter.value === "all"
-          ? preset.items
-          : preset.items.filter((item) => item.rarity === rarityFilter.value);
-
-        return `
-          <article class="season-card" data-preset-code="${escapeHtml(preset.preset_code)}">
-            <div class="season-bg-canvas ${cssClassFromPayload(background.render_payload)}">
-              <div class="season-card-topline">
-                <span class="season-card-number">${String(preset.sequence_no).padStart(2, "0")}</span>
-                <div class="season-card-meta">
-                  <span class="season-period-pill" data-kind="${escapeHtml(preset.season_type)}">${escapeHtml(periodLabel(preset))}</span>
-                </div>
-              </div>
-              <div class="season-card-hero">
-                <div class="season-card-copy">
-                  <p class="season-card-kicker">${escapeHtml(preset.theme_key.replaceAll("_", " "))}</p>
-                  <h2>${escapeHtml(preset.suggested_name)}</h2>
-                  <p class="season-card-dates">${escapeHtml(formatRange(preset))} <small>· конец не включается</small></p>
-                  <p class="season-card-description">${escapeHtml(preset.short_description)}</p>
-                  <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
-                    ${escapeHtml(title.name)}
+          <span class="v4-avatar v4-avatar--${mode} avatar-rarity-${user.avatar.rarity} frame-rarity-${user.frame.rarity}${user.secretCombo ? " has-secret-combo" : ""}" style="--display-size:${displaySize}px">
+            <span class="v3-avatar-stack" style="--avatar-size:calc(var(--display-size) - var(--ring-space))">
+              <span class="v3-avatar-clip avatar-visual-${escapeHtml(user.avatar.visual)}">
+                <span class="v4-avatar-backdrop" aria-hidden="true"></span>
+                <span class="v3-character char-${escapeHtml(user.avatar.visual)}" aria-hidden="true">
+                  <span class="char-antenna char-antenna-left"></span>
+                  <span class="char-antenna char-antenna-right"></span>
+                  <span class="char-ear char-ear-left"></span>
+                  <span class="char-ear char-ear-right"></span>
+                  <span class="char-body">
+                    <span class="char-mask"></span>
+                    <span class="char-eyes"></span>
+                    <span class="char-cheek char-cheek-left"></span>
+                    <span class="char-cheek char-cheek-right"></span>
+                    <span class="char-mouth"></span>
                   </span>
-                </div>
-                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}">
-                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}" loading="lazy">
-                </div>
+                  <span class="char-prop"></span>
+                  <span class="char-extra"></span>
+                </span>
+                <span class="v4-avatar-foreground" aria-hidden="true"></span>
+              </span>
+              <span class="v3-frame ${frameClass}" aria-hidden="true">
+                <i class="v4-frame-strand v4-frame-strand-a"></i>
+                <i class="v4-frame-strand v4-frame-strand-b"></i>
+              </span>
+            </span>
+          </span>
+        `;
+      }
+
+      function medal(place) {
+        if (place === 1) return "01";
+        if (place === 2) return "02";
+        if (place === 3) return "03";
+        return String(place).padStart(2, "0");
+      }
+
+      function leaderboardRow(user) {
+        return `
+          <li class="v4-leader-row${user.id === "me" ? " is-me" : ""}">
+            <span class="v4-rank">${medal(user.place)}</span>
+            <button type="button" class="v4-avatar-button v4-avatar-button--leader" data-user-id="${escapeHtml(user.id)}" aria-label="Открыть визитку ${escapeHtml(user.name)}">
+              ${avatarMarkup(user, 32, "compact")}
+            </button>
+            <span class="v4-leader-copy">
+              <strong>${escapeHtml(user.name)}${user.id === "me" ? " · вы" : ""}</strong>
+              <small class="rarity-title-${user.title.rarity}">${escapeHtml(user.title.name)}</small>
+            </span>
+            <span class="v4-score">${user.score.toLocaleString("ru-RU")}<small>XP</small></span>
+          </li>
+        `;
+      }
+
+      function renderLeaderboards() {
+        const leagueUsers = [users[2], users[1], users[3], users[4], users[5], users[6], users[0], users[7]];
+        document.getElementById("leagueList").innerHTML = leagueUsers.map(leaderboardRow).join("");
+        document.getElementById("globalList").innerHTML = globalUsers.map(leaderboardRow).join("");
+        document.querySelector("[data-avatar-slot='me']").innerHTML = avatarMarkup(users[0], 48, "profile");
+      }
+
+      function renderCycle() {
+        const order = [1, 2, 3, 0];
+        document.getElementById("rarityCycle").innerHTML = order.map((mod, index) => {
+          const values = rotation[mod];
+          return `
+            <article class="v4-cycle-card">
+              <span class="v4-cycle-number">${String(index + 1).padStart(2, "0")}</span>
+              <div>
+                ${Object.keys(slotNames).map((slot) => `
+                  <p><span>${slotNames[slot]}</span><strong class="rarity-${values[slot]}">${rarityNames[values[slot]]}</strong></p>
+                `).join("")}
               </div>
+            </article>
+          `;
+        }).join("");
+
+        document.getElementById("yearStrip").innerHTML = periodLabels.map((label, index) => {
+          const season = index + 1;
+          const legendarySlot = Object.keys(slotNames).find((slot) => rarityFor(season, slot) === "legendary");
+          const secret = [3, 8, 13, 18].includes(season);
+          return `
+            <span class="${secret ? "is-secret-piece" : ""}" title="Период ${season}: легендарный ${slotNames[legendarySlot].toLowerCase()}">
+              <b>${String(season).padStart(2, "0")}</b>
+              <small>${label}</small>
+              <i>${slotNames[legendarySlot][0]}</i>
+            </span>
+          `;
+        }).join("");
+      }
+
+      function renderBackgrounds() {
+        document.getElementById("backgroundGrid").innerHTML = backgrounds.map((background, index) => `
+          <article class="v4-background-card">
+            <div class="v4-bg-preview scene-${background.visual}">
+              <span class="v4-scene-layer v4-scene-layer-a"></span>
+              <span class="v4-scene-layer v4-scene-layer-b"></span>
+              <b>${String(index + 1).padStart(2, "0")}</b>
             </div>
-            <div class="season-card-body">
-              <ul class="season-palette" aria-label="Палитра сезона">
-                ${preset.palette.map((color) => `<li style="background:${escapeHtml(color)}" title="${escapeHtml(color)}"></li>`).join("")}
-              </ul>
-              <div class="season-items">
-                ${visibleItems.map((item) => itemButton(preset, item)).join("")}
-              </div>
-              ${technicalDetails(preset)}
+            <h3>${escapeHtml(background.name)}</h3>
+            <p>${escapeHtml(background.line)}</p>
+          </article>
+        `).join("");
+      }
+
+      function catalogPreview(entry) {
+        if (entry.slot === "avatar") {
+          const previewUser = {
+            avatar: entry,
+            frame: { visual: "bare", rarity: "common" }
+          };
+          return `<div class="v4-catalog-avatar-preview">${avatarMarkup(previewUser, 112, "expanded")}</div>`;
+        }
+
+        if (entry.slot === "frame") {
+          const previewUser = {
+            avatar: { visual: "alien", rarity: "common" },
+            frame: entry
+          };
+          return `<div class="v4-catalog-avatar-preview">${avatarMarkup(previewUser, 112, "expanded")}</div>`;
+        }
+
+        if (entry.slot === "title") {
+          return `
+            <div class="v4-catalog-title-preview title-visual-${escapeHtml(entry.visual)}">
+              <span><b>Артём К.</b><small>так выглядит в топе · 11 px</small></span>
+              <strong class="rarity-title-${entry.rarity}">${escapeHtml(entry.name)}</strong>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="v4-catalog-background-preview scene-${escapeHtml(entry.visual)} background-rarity-${entry.rarity}">
+            <span class="v4-scene-layer v4-scene-layer-a"></span>
+            <span class="v4-scene-layer v4-scene-layer-b"></span>
+          </div>
+        `;
+      }
+
+      function catalogCard(entry) {
+        const isSecretPiece =
+          (entry.slot === "title" && entry.season === 3) ||
+          (entry.slot === "frame" && entry.season === 8) ||
+          (entry.slot === "avatar" && entry.season === 13) ||
+          (entry.slot === "background" && entry.season === 18);
+
+        return `
+          <article class="v4-catalog-card catalog-slot-${entry.slot}${isSecretPiece ? " is-secret-piece" : ""}">
+            <div class="v4-catalog-visual">
+              <span class="v4-catalog-season">S${String(entry.season).padStart(2, "0")}</span>
+              <span class="v4-catalog-rarity rarity-${entry.rarity}">${rarityNames[entry.rarity]}</span>
+              ${catalogPreview(entry)}
+            </div>
+            <div class="v4-catalog-copy">
+              <small>${escapeHtml(entry.dates)} · ${slotNames[entry.slot]}</small>
+              <h3>${escapeHtml(entry.name)}</h3>
+              <p>${escapeHtml(entry.description)}</p>
+              ${isSecretPiece ? `<span class="v4-secret-trace">неизвестная частота</span>` : ""}
             </div>
           </article>
         `;
       }
 
-      function filteredPresets() {
-        const query = searchInput.value.trim().toLocaleLowerCase("ru");
-        return catalog.presets.filter((preset) => {
-          if (seasonFilter.value !== "all" && String(preset.sequence_no) !== seasonFilter.value) {
-            return false;
-          }
-          if (!query) {
-            return true;
-          }
-          const haystack = [
-            preset.preset_code,
-            preset.bundle_code,
-            preset.collection_code,
-            preset.suggested_name,
-            preset.short_description,
-            preset.theme_key,
-            preset.primary_motif,
-            preset.secondary_motif,
-            ...preset.items.flatMap((item) => [item.name, item.description, item.item_code, item.asset_key])
-          ].join(" ").toLocaleLowerCase("ru");
-          return haystack.includes(query);
+      function renderCatalog() {
+        const visible = catalogItems.filter((entry) =>
+          entry.slot === activeCatalogSlot &&
+          (activeCatalogRarity === "all" || entry.rarity === activeCatalogRarity)
+        );
+        catalogGrid.innerHTML = visible.map(catalogCard).join("");
+        const slotLabel = {
+          avatar: "Аватары",
+          frame: "Рамки",
+          title: "Титулы",
+          background: "Фоны"
+        }[activeCatalogSlot];
+        const raritySummary = {
+          common: "обычная редкость",
+          rare: "редкая редкость",
+          epic: "эпическая редкость",
+          legendary: "легендарная редкость"
+        };
+        const rarityLabel = activeCatalogRarity === "all" ? "" : ` · ${raritySummary[activeCatalogRarity]}`;
+        const mod100 = visible.length % 100;
+        const mod10 = visible.length % 10;
+        const itemWord = mod100 >= 11 && mod100 <= 14
+          ? "предметов"
+          : mod10 === 1
+            ? "предмет"
+            : mod10 >= 2 && mod10 <= 4
+              ? "предмета"
+              : "предметов";
+        catalogSummary.textContent = `${slotLabel} · ${visible.length} ${itemWord}${rarityLabel}`;
+      }
+
+      function renderSecretItems() {
+        const signal = users[1];
+        const items = [signal.title, signal.frame, signal.avatar, signal.background];
+        document.getElementById("secretItems").innerHTML = items.map((entry) => `
+          <article>
+            <span>S${String(entry.season).padStart(2, "0")}</span>
+            <small>${slotNames[entry.slot]}</small>
+            <strong>${escapeHtml(entry.name)}</strong>
+            <i>легендарный</i>
+          </article>
+        `).join("") + `<div class="v4-secret-result"><span>?</span><strong>03:17</strong></div>`;
+      }
+
+      function equipmentMarkup(user) {
+        return ["avatar", "frame", "title", "background"].map((slot) => {
+          const entry = user[slot];
+          return `
+            <span>
+              <small>${slotNames[slot]} · S${String(entry.season).padStart(2, "0")}</small>
+              <strong>${escapeHtml(entry.name)}</strong>
+              <i class="rarity-${entry.rarity}">${rarityNames[entry.rarity]}</i>
+            </span>
+          `;
+        }).join("");
+      }
+
+      function setOriginFromTrigger(trigger) {
+        if (!trigger) return;
+        const triggerRect = trigger.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+        const x = triggerRect.left + triggerRect.width / 2 - cardRect.left;
+        const y = triggerRect.top + triggerRect.height / 2 - cardRect.top;
+        card.style.setProperty("--origin-x", `${Math.max(0, Math.min(cardRect.width, x))}px`);
+        card.style.setProperty("--origin-y", `${Math.max(0, Math.min(cardRect.height, y))}px`);
+      }
+
+      function openProfileCard(userId, trigger, options = {}) {
+        const user = userById.get(userId);
+        if (!user) return;
+
+        if (!overlay.hidden && activeUserId === userId) {
+          requestClose();
+          return;
+        }
+
+        window.clearTimeout(revealTimer);
+        window.clearTimeout(toastTimer);
+        window.clearTimeout(overlayHideTimer);
+        activeUserId = userId;
+        activeTrigger = trigger || activeTrigger;
+
+        card.className = "v4-profile-card";
+        cardScene.className = `v4-card-scene scene-${user.background.visual}`;
+        cardAvatar.innerHTML = avatarMarkup(user, 160, "expanded");
+        cardRarity.textContent = user.secretCombo ? "4 × ЛЕГЕНДАРНЫХ" : rarityNames[user.avatar.rarity].toUpperCase();
+        cardName.textContent = user.name;
+        cardTitle.textContent = user.title.name;
+        cardTitle.className = `v4-card-title rarity-title-${user.title.rarity}`;
+        cardMeta.textContent = `${user.className} · Лига «${user.league}»`;
+        cardEyebrow.textContent = user.secretCombo ? "Публичная визитка · связь нестабильна" : "Публичная визитка";
+        cardEquipment.innerHTML = equipmentMarkup(user);
+        comboMessage.textContent = "";
+        comboToast.hidden = true;
+        overlay.hidden = false;
+        document.body.classList.add("v4-card-open");
+
+        requestAnimationFrame(() => {
+          setOriginFromTrigger(trigger);
+          overlay.classList.add("is-open");
+          cardClose.focus({ preventScroll: true });
         });
+
+        if (!options.fromHistory) {
+          history.pushState({ v4Card: userId }, "", `#profile-${userId}`);
+        }
+
+        if (user.secretCombo) {
+          revealTimer = window.setTimeout(() => {
+            card.classList.add("combo-awake");
+            cardScene.classList.add("combo-awake");
+            cardEyebrow.textContent = "Скрытая связка обнаружена";
+            cardTitle.textContent = "СИГНАЛ ПРИНЯТ · 03:17";
+            comboMessage.textContent = "Четыре легендарных предмета из разных периодов собрали пятую, невидимую коллекцию.";
+            comboToast.hidden = false;
+            requestAnimationFrame(() => comboToast.classList.add("is-visible"));
+            toastTimer = window.setTimeout(() => comboToast.classList.remove("is-visible"), 3200);
+          }, 1050);
+        }
       }
 
-      function renderCards() {
-        if (!catalog) {
+      function hideOverlay() {
+        if (overlay.hidden) return;
+        window.clearTimeout(revealTimer);
+        window.clearTimeout(toastTimer);
+        overlay.classList.remove("is-open");
+        comboToast.classList.remove("is-visible");
+        document.body.classList.remove("v4-card-open");
+        overlayHideTimer = window.setTimeout(() => {
+          overlay.hidden = true;
+          comboToast.hidden = true;
+          card.classList.remove("combo-awake");
+          cardScene.classList.remove("combo-awake");
+          const trigger = activeTrigger;
+          activeUserId = null;
+          activeTrigger = null;
+          if (trigger && document.contains(trigger)) trigger.focus({ preventScroll: true });
+        }, 230);
+      }
+
+      function requestClose() {
+        if (history.state && history.state.v4Card) {
+          history.back();
+        } else {
+          hideOverlay();
+        }
+      }
+
+      function switchTab(tabName) {
+        document.querySelectorAll("[data-v4-tab]").forEach((button) => {
+          const active = button.dataset.v4Tab === tabName;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        document.querySelectorAll("[data-v4-screen]").forEach((screen) => {
+          screen.classList.toggle("is-active", screen.dataset.v4Screen === tabName);
+        });
+        document.getElementById("screenHeading").textContent =
+          tabName === "profile" ? "Профиль" : tabName === "league" ? "Моя лига" : "Общий топ";
+      }
+
+      renderLeaderboards();
+      renderCycle();
+      renderBackgrounds();
+      renderCatalog();
+      renderSecretItems();
+
+      document.addEventListener("click", (event) => {
+        const catalogSlotButton = event.target.closest("[data-catalog-slot]");
+        if (catalogSlotButton) {
+          activeCatalogSlot = catalogSlotButton.dataset.catalogSlot;
+          document.querySelectorAll("[data-catalog-slot]").forEach((button) => {
+            const active = button === catalogSlotButton;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-pressed", String(active));
+          });
+          renderCatalog();
           return;
         }
-        const presets = filteredPresets();
-        grid.innerHTML = presets.map(seasonCard).join("");
-        emptyState.hidden = presets.length > 0;
-        const itemPhrase = rarityFilter.value === "all"
-          ? "по четыре предмета"
-          : `только предметы ${rarityLabels[rarityFilter.value]}`;
-        status.textContent = `Показано периодов: ${presets.length}; ${itemPhrase}. Порядок хронологический.`;
-      }
 
-      function modalProduct(preset, selectedItem) {
-        const selectedIsAvatar = selectedItem.slot === "avatar";
-        const avatar = selectedIsAvatar ? selectedItem : getItem(preset, "avatar");
-        const frame = selectedItem.slot === "frame" ? selectedItem : getItem(preset, "frame");
-        const title = selectedItem.slot === "title" ? selectedItem : getItem(preset, "title");
-        const background = getItem(preset, "background");
-        return `
-          <div class="season-mini-app ${cssClassFromPayload(background.render_payload)}">
-            <div class="season-mini-topbar">
-              <strong>Cosmic Academy</strong>
-              <span class="season-mini-balance">⚙ 520</span>
-            </div>
-            <div class="season-mini-content">
-              <section class="season-mini-shop">
-                <p class="season-card-kicker">${escapeHtml(formatRange(preset))}</p>
-                <h3>${escapeHtml(preset.suggested_name)}</h3>
-                <div class="season-mini-product">
-                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="">
-                  <div>
-                    <h4>${escapeHtml(selectedItem.name)}</h4>
-                    <p>${escapeHtml(selectedItem.description)}</p>
-                    <div class="season-modal-meta">
-                      <span class="season-rarity-pill rarity-${escapeHtml(selectedItem.rarity)}">${escapeHtml(rarityLabels[selectedItem.rarity])}</span>
-                      <span class="season-price-pill">⚙ ${selectedItem.price}</span>
-                      <span class="season-price-pill">${escapeHtml(slotLabels[selectedItem.slot])}</span>
-                      ${preset.flagship_item_code === selectedItem.item_code ? '<span class="season-price-pill">Флагман</span>' : ""}
-                    </div>
-                    <p class="season-mini-code">${escapeHtml(selectedItem.item_code)}<br>${escapeHtml(selectedItem.render_payload)}</p>
-                  </div>
-                </div>
-              </section>
-              <aside class="season-mini-profile">
-                <p class="season-card-kicker">Профиль после примерки</p>
-                <div class="season-avatar-shell season-frame rarity-${escapeHtml(frame.rarity)} ${cssClassFromPayload(frame.render_payload)}">
-                  <img src="${avatarRoot}${escapeHtml(avatar.asset_key)}.svg" alt="${escapeHtml(avatar.name)}">
-                </div>
-                <h3>Ученик Академии</h3>
-                <span class="season-title-sample ${titleTierClass(title)}" style="--season-title-color:${escapeHtml(preset.palette[0])}">
-                  ${escapeHtml(title.name)}
-                </span>
-                <p>Локальная компоновка для проверки фона, рамки, титула и SVG. Production-интеграции здесь нет.</p>
-              </aside>
-            </div>
-          </div>
-        `;
-      }
-
-      function openPreview(preset, selectedItem, trigger) {
-        lastFocused = trigger;
-        modalTitle.textContent = `${preset.suggested_name} · ${selectedItem.name} · ${viewportFilter.value}px`;
-        modalBody.innerHTML = modalProduct(preset, selectedItem);
-        modal.hidden = false;
-        document.body.style.overflow = "hidden";
-        modalClose.focus();
-      }
-
-      function closePreview() {
-        modal.hidden = true;
-        document.body.style.overflow = "";
-        modalBody.replaceChildren();
-        if (lastFocused) {
-          lastFocused.focus();
-        }
-      }
-
-      function setTheme(theme) {
-        root.dataset.caTheme = theme;
-        const isDark = theme === "dark";
-        themeToggle.setAttribute("aria-pressed", String(isDark));
-        themeToggle.textContent = isDark ? "Светлая тема" : "Тёмная тема";
-        try {
-          localStorage.setItem("season-catalog-theme", theme);
-        } catch (_) {
-          // Storage is optional for this local preview.
-        }
-      }
-
-      function setModalWidth(width) {
-        root.style.setProperty("--modal-preview-width", `${width}px`);
-        if (!modal.hidden && catalog && lastFocused) {
-          const preset = catalog.presets.find((entry) => entry.sequence_no === Number(lastFocused.dataset.sequence));
-          const item = preset?.items.find((entry) => entry.item_code === lastFocused.dataset.itemCode);
-          if (preset && item) {
-            modalTitle.textContent = `${preset.suggested_name} · ${item.name} · ${width}px`;
-            modalBody.innerHTML = modalProduct(preset, item);
-          }
-        }
-      }
-
-      async function loadCatalog() {
-        try {
-          const response = await fetch(catalogUrl, { cache: "no-store" });
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          catalog = await response.json();
-          catalog.presets.sort((a, b) => a.sequence_no - b.sequence_no);
-          document.getElementById("presetStat").textContent = `${catalog.presets.length} периода`;
-          document.getElementById("itemStat").textContent =
-            `${catalog.presets.reduce((sum, preset) => sum + preset.items.length, 0)} предмета`;
-          for (const preset of catalog.presets) {
-            const option = document.createElement("option");
-            option.value = String(preset.sequence_no);
-            const competition = preset.competition_season_no === null
-              ? "межсезонье"
-              : `соревнование ${preset.competition_season_no}`;
-            option.textContent = `${String(preset.sequence_no).padStart(2, "0")} · ${preset.suggested_name} · ${competition}`;
-            seasonFilter.append(option);
-          }
-          renderCards();
-        } catch (error) {
-          status.textContent =
-            `Не удалось загрузить JSON: ${error.message}. Откройте preview через локальный HTTP-сервер.`;
-          status.style.color = "#dc2626";
-        }
-      }
-
-      searchInput.addEventListener("input", renderCards);
-      seasonFilter.addEventListener("change", renderCards);
-      rarityFilter.addEventListener("change", renderCards);
-      viewportFilter.addEventListener("change", () => setModalWidth(viewportFilter.value));
-      themeToggle.addEventListener("click", () => {
-        setTheme(root.dataset.caTheme === "dark" ? "light" : "dark");
-      });
-      nextPeriodButton.addEventListener("click", () => {
-        if (!catalog) {
+        const catalogRarityButton = event.target.closest("[data-catalog-rarity]");
+        if (catalogRarityButton) {
+          activeCatalogRarity = catalogRarityButton.dataset.catalogRarity;
+          document.querySelectorAll("[data-catalog-rarity]").forEach((button) => {
+            const active = button === catalogRarityButton;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-pressed", String(active));
+          });
+          renderCatalog();
           return;
         }
-        const current = seasonFilter.value === "all" ? 0 : Number(seasonFilter.value);
-        seasonFilter.value = String((current % catalog.presets.length) + 1);
-        renderCards();
-        grid.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
 
-      grid.addEventListener("click", (event) => {
-        const trigger = event.target.closest("[data-item-code]");
-        if (!trigger || !catalog) {
+        const tab = event.target.closest("[data-v4-tab]");
+        if (tab) {
+          switchTab(tab.dataset.v4Tab);
           return;
         }
-        const preset = catalog.presets.find((entry) => entry.sequence_no === Number(trigger.dataset.sequence));
-        const item = preset?.items.find((entry) => entry.item_code === trigger.dataset.itemCode);
-        if (preset && item) {
-          openPreview(preset, item, trigger);
+
+        const avatarButton = event.target.closest("[data-user-id]");
+        if (avatarButton) {
+          openProfileCard(avatarButton.dataset.userId, avatarButton);
         }
       });
 
-      modalClose.addEventListener("click", closePreview);
-      modal.addEventListener("click", (event) => {
-        if (event.target === modal) {
-          closePreview();
-        }
+      secretShortcut.addEventListener("click", () => {
+        switchTab("league");
+        const trigger = document.querySelector("[data-v4-screen='league'] [data-user-id='signal']");
+        if (trigger) openProfileCard("signal", trigger);
       });
+
+      cardClose.addEventListener("click", requestClose);
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) requestClose();
+      });
+
       document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && !modal.hidden) {
-          closePreview();
+        if (event.key === "Escape" && !overlay.hidden) {
+          event.preventDefault();
+          requestClose();
+          return;
+        }
+        if (event.key === "Tab" && !overlay.hidden) {
+          const focusable = [...card.querySelectorAll("button, [href], [tabindex]:not([tabindex='-1'])")]
+            .filter((element) => !element.disabled);
+          if (!focusable.length) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
         }
       });
 
-      let initialTheme = "light";
-      try {
-        initialTheme = localStorage.getItem("season-catalog-theme") || "light";
-      } catch (_) {
-        initialTheme = "light";
-      }
-      setTheme(initialTheme === "dark" ? "dark" : "light");
-      setModalWidth(viewportFilter.value);
-      loadCatalog();
+      window.addEventListener("popstate", () => {
+        if (!overlay.hidden) hideOverlay();
+      });
     })();
   </script>
 </body>

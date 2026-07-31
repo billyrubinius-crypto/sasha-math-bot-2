@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "data" / "season_presets_2026_2027.json"
 AVATAR_DIR = ROOT / "assets" / "season-avatars"
 CSS_PATH = ROOT / "styles" / "season-cosmetics-preview.css"
+BASE_CSS_PATH = ROOT / "styles" / "season-v3-preview.css"
 PREVIEW_PATH = ROOT / "dev" / "season-catalog-preview.html"
 CONTENT_DOC_PATH = ROOT / "docs" / "SEASON_V2_CONTENT_CATALOG.md"
 VISUAL_DOC_PATH = ROOT / "docs" / "SEASON_V2_VISUAL_GUIDE.md"
@@ -192,12 +193,26 @@ def load_catalog(check: Validation) -> dict[str, Any]:
     return parsed
 
 
-def css_class_from_payload(payload: str) -> str:
-    if payload.startswith("season_frame_"):
-        return "season-frame-" + payload.removeprefix("season_frame_").replace("_", "-")
-    if payload.startswith("season_bg_"):
-        return "season-bg-" + payload.removeprefix("season_bg_").replace("_", "-")
-    return ""
+def approved_visual_token(item: dict[str, Any]) -> str:
+    visual = str(item.get("visual_key", "")).replace("_", "-")
+    slot = item.get("slot")
+    if slot == "frame":
+        return f"v4-{visual}"
+    if slot == "background" and visual in {"snow-yard", "leaning-library", "empty-class"}:
+        return f"{visual}-v4"
+    return visual
+
+
+def approved_css_class(item: dict[str, Any]) -> str:
+    token = approved_visual_token(item)
+    if item.get("slot") == "title" and token in {"plain", "pulse"}:
+        return "v4-catalog-title-preview"
+    return {
+        "avatar": f"char-{token}",
+        "frame": f"frame-{token}",
+        "title": f"title-visual-{token}",
+        "background": f"scene-{token}",
+    }.get(str(item.get("slot")), "")
 
 
 def validate_root(catalog: dict[str, Any], check: Validation) -> None:
@@ -563,29 +578,17 @@ def validate_assets_and_preview(items: list[dict[str, Any]], check: Validation) 
         check.require("<script" not in lowered, f"{path}: scripts are forbidden")
         check.require(not EXTERNAL_URL_RE.search(svg), f"{path}: external href/src is forbidden")
 
-    try:
-        css = CSS_PATH.read_text(encoding="utf-8")
-    except OSError as exc:
-        check.errors.append(f"styles: cannot read {CSS_PATH}: {exc}")
-        css = ""
+    css_parts: list[str] = []
+    for path in (BASE_CSS_PATH, CSS_PATH):
+        try:
+            css_parts.append(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            check.errors.append(f"styles: cannot read {path}: {exc}")
+    css = "\n".join(css_parts)
     check.require(not re.search(r"url\(\s*['\"]?https?://", css, re.IGNORECASE), "styles: external CSS URLs are forbidden")
     for item in items:
-        if item.get("slot") not in {"frame", "background"}:
-            continue
-        payload = item.get("render_payload")
-        if not isinstance(payload, str):
-            continue
-        class_name = css_class_from_payload(payload)
-        check.require(bool(class_name) and f".{class_name}" in css, f"styles: missing .{class_name}")
-        if item.get("slot") == "background":
-            check.require(
-                f'html[data-ca-theme="light"] .{class_name}' in css,
-                f"styles: missing light selector for .{class_name}",
-            )
-            check.require(
-                f'html[data-ca-theme="dark"] .{class_name}' in css,
-                f"styles: missing dark selector for .{class_name}",
-            )
+        class_name = approved_css_class(item)
+        check.require(bool(class_name) and f".{class_name}" in css, f"styles: missing approved .{class_name}")
 
     try:
         preview = PREVIEW_PATH.read_text(encoding="utf-8")
@@ -594,16 +597,25 @@ def validate_assets_and_preview(items: list[dict[str, Any]], check: Validation) 
         preview = ""
     for marker in (
         "../styles/student.css",
+        "../styles/season-v3-preview.css",
         "../styles/season-cosmetics-preview.css",
-        "../data/season_presets_2026_2027.json",
-        "themeToggle",
-        "seasonFilter",
-        "rarityFilter",
-        "viewportFilter",
-        "nextPeriodButton",
-        "previewModal",
+        'data-v3-theme="dark"',
+        "avatarCatalog",
+        "frameCatalog",
+        "titleCatalog",
+        "backgroundCatalog",
+        "catalogGrid",
+        "profileOverlay",
+        "avatarMarkup(user, 32",
+        "avatarMarkup(users[0], 48",
+        "avatarMarkup(user, 160",
+        'avatarMarkup(previewUser, 112',
     ):
         check.require(marker in preview, f"preview: missing required marker {marker}")
+    for item in items:
+        token = approved_visual_token(item)
+        check.require(f'"{token}"' in preview, f"preview: missing approved {item.get('slot')} visual {token}")
+        check.require(f'"{item.get("name")}"' in preview, f"preview: missing approved item name {item.get('name')}")
 
     try:
         content_doc = CONTENT_DOC_PATH.read_text(encoding="utf-8")

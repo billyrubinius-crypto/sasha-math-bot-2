@@ -148,7 +148,7 @@ const avatarCatalog = [
   ["Ночная смена", "moth", "Люмен включается только после того, как остальные выключили свет."],
   ["Не тает", "snow_blob", "Шурх пережил контрольную, оттепель и чужой прогноз."],
   ["Ещё пять минут", "clock", "Тик переносит будильник с профессиональной точностью."],
-  ["Архив.zip", "archive_cube", "Упаковывает незакрытые задачи в папку, которую никто не откроет."],
+  ["Архив.zip", "gift", "Упаковывает незакрытые задачи в папку, которую никто не откроет."],
   ["Слабый сигнал", "frozen_alien", "Одна антенна ловит связь, вторая всё ещё загружается."],
   ["Ошибка на полях", "ink_blob", "Клякса появилась случайно и быстро стала главным элементом страницы."],
   ["Восемь вкладок", "octopus", "Семь дел открыты. Восьмое уверенно воспроизводит музыку."],
@@ -263,23 +263,25 @@ for (const [index, preset] of catalog.presets.entries()) {
   avatar.name = avatarCatalog[index][0];
   avatar.description = avatarCatalog[index][2];
   avatar.visual_key = avatarCatalog[index][1];
+  avatar.render_payload = `avatar_v4_${avatarCatalog[index][1]}`;
   avatar.motion_policy = motionFor(avatar.rarity);
 
   frame.name = frameCatalog[index][0];
   frame.description = frameCatalog[index][2];
   frame.visual_key = frameCatalog[index][1];
-  frame.render_payload = `season_frame_v4_${frameCatalog[index][1]}`;
+  frame.render_payload = `frame_v4_${frameCatalog[index][1]}`;
   frame.motion_policy = motionFor(frame.rarity);
 
   title.name = titleCatalog[index][0];
   title.description = titleCatalog[index][2];
   title.visual_key = titleCatalog[index][1];
+  title.render_payload = `title_v4_${String(index + 1).padStart(2, "0")}_${titleCatalog[index][1]}`;
   title.motion_policy = motionFor(title.rarity);
 
   background.name = backgroundCatalog[index][0];
   background.description = backgroundCatalog[index][2];
   background.visual_key = backgroundCatalog[index][1];
-  background.render_payload = `season_bg_v4_${backgroundCatalog[index][1]}`;
+  background.render_payload = `scene_v4_${backgroundCatalog[index][1]}`;
   background.motion_policy = motionFor(background.rarity);
 }
 
