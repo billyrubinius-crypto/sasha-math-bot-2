@@ -1976,3 +1976,116 @@
             margin-top: 4px;
             line-height: 1.35;
         }
+
+        /* =====================================================================
+           ПИТОМЕЦ (Stage 5, V3).
+           Плитка живёт третьей колонкой шапки профиля — справа от группы и звания.
+           Колонка появляется только вместе с классом .has-pet, который ставит
+           loadPetBlock: без питомца сетка шапки остаётся прежней двухколоночной
+           и лишнего gap не возникает.
+           Карточка повторяет механику визитки сезонного профиля, поэтому её стили
+           намеренно зеркалят .season-profile-* (та же геометрия, тот же бэкдроп).
+           ===================================================================== */
+        .profile-header.has-pet {
+            grid-template-columns: var(--ca-avatar-size) minmax(0, 1fr) auto;
+        }
+        .pet-tile {
+            display: grid;
+            place-items: center;
+            position: relative;
+            width: 54px; height: 54px;
+            padding: 0;
+            border: 1px solid var(--ca-border-soft);
+            border-radius: var(--ca-radius-lg);
+            background: var(--ca-surface-nested);
+            box-shadow: var(--ca-elev-2);
+            cursor: pointer;
+        }
+        .pet-tile:focus-visible { outline: 2px solid var(--ca-accent-blue); outline-offset: 2px; }
+        .pet-art { font-size: 30px; line-height: 1; }
+        .pet-tile-mood {
+            position: absolute; right: -4px; bottom: -4px;
+            font-size: 14px; line-height: 1;
+            padding: 1px 3px;
+            border-radius: var(--ca-radius-pill);
+            background: var(--ca-surface);
+            box-shadow: var(--ca-elev-2);
+        }
+        /* Настроение — цвет обводки плитки и подписи в карточке. Оно косметическое:
+           голод ничего не отнимает и ни на что в учёбе не влияет. */
+        .pet-mood-happy       { border-color: var(--ca-accent-turquoise); }
+        .pet-mood-fed         { border-color: var(--ca-border); }
+        .pet-mood-hungry_soon { border-color: var(--ca-accent-blue); }
+        .pet-mood-hungry      { border-color: var(--ca-border-soft); opacity: .85; }
+        /* Виды: отдельное пространство визуалов, не пересекающееся с аватарами сезонов. */
+        .pet-art-cat, .pet-art-owl, .pet-art-capybara { filter: none; }
+
+        .pet-card-overlay[hidden] { display: none; }
+        .pet-card-overlay {
+            position: fixed; z-index: 2200; inset: 0;
+            display: grid; place-items: center; padding: 20px;
+        }
+        .pet-card-backdrop {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            border: 0; background: rgba(4, 8, 17, .72); backdrop-filter: blur(8px);
+        }
+        .pet-card {
+            position: relative;
+            display: grid; justify-items: center; gap: var(--ca-space-3);
+            width: min(330px, calc(100vw - 32px));
+            padding: 26px 20px 20px;
+            border: 1px solid var(--ca-border);
+            border-radius: 26px;
+            background: var(--ca-surface-elevated);
+            box-shadow: 0 26px 80px rgba(0, 0, 0, .5);
+        }
+        .pet-card-close {
+            position: absolute; top: 10px; right: 10px;
+            width: 32px; height: 32px;
+            border: 0; border-radius: 50%;
+            background: var(--ca-tint-muted); color: var(--ca-text-secondary);
+            font-size: 15px; line-height: 1; cursor: pointer;
+        }
+        .pet-card-art { font-size: 92px; line-height: 1; }
+        .pet-card-copy { display: grid; justify-items: center; gap: var(--ca-space-2); text-align: center; }
+        .pet-card-copy h3 { margin: 0; font-size: var(--text-screen); font-weight: 800; }
+        .pet-card-mood { margin: 0; font-weight: 700; }
+        .pet-card-mood.pet-mood-happy       { color: var(--ca-accent-turquoise); }
+        .pet-card-mood.pet-mood-fed         { color: var(--ca-text-secondary); }
+        .pet-card-mood.pet-mood-hungry_soon { color: var(--ca-accent-blue); }
+        .pet-card-mood.pet-mood-hungry      { color: var(--ca-text-secondary); }
+        .pet-card-satiety { margin: 0; color: var(--ca-text-secondary); font-size: var(--text-small); }
+        .pet-card-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--ca-space-2); }
+        .pet-feed-btn {
+            padding: 10px 18px;
+            border: 0; border-radius: var(--ca-radius-pill);
+            background: var(--ca-accent-blue); color: #fff;
+            font-size: var(--text-small); font-weight: 700; cursor: pointer;
+        }
+        .pet-feed-btn:disabled { opacity: .55; cursor: default; }
+        .pet-feed-more {
+            display: inline-flex; align-items: center;
+            padding: 10px 14px;
+            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-pill);
+            background: transparent; color: var(--ca-text-secondary);
+            font-size: var(--text-small); font-weight: 600; cursor: pointer;
+        }
+        .pet-feed-more:disabled { opacity: .55; cursor: default; }
+        .pet-card-total { color: var(--ca-text-secondary); }
+        .pet-card-error:empty { display: none; }
+        .pet-card-error {
+            padding: 6px 10px;
+            border-radius: var(--ca-radius-lg);
+            background: var(--ca-tint-error);
+            font-size: var(--text-small);
+        }
+        body.pet-card-open { overflow: hidden; }
+
+        /* Движение — только там, где пользователь его не запретил (контракт Cosmic Academy). */
+        @media (prefers-reduced-motion: no-preference) {
+            .pet-card-art { animation: pet-idle 4s ease-in-out infinite; }
+            @keyframes pet-idle {
+                0%, 100% { transform: translateY(0); }
+                50%      { transform: translateY(-4px); }
+            }
+        }

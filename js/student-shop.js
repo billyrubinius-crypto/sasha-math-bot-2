@@ -382,7 +382,7 @@
         // проверка и списание атомарны в RPC buy_streak_shield (teacher-логика та же таблица
         // student_items). Кнопка блокируется при лимите; сама покупка защищена RPC от гонки.
         // Цена/лимит подняты миграцией 012 (W04) — значения ниже обязаны совпадать с RPC.
-        const SHIELD_MAX = 7, SHIELD_PRICE = 90;
+        const SHIELD_MAX = 7, SHIELD_PRICE = 150;
 
         function pluralShields(n) {
             const mod10 = n % 10, mod100 = n % 100;
@@ -714,7 +714,7 @@
                 if (!btn.disabled) btn.onclick = () => openCustomTitleModal('', false);
                 action.appendChild(btn);
             } else if (item.item_kind === 'service') {
-                // Смена эмодзи-статуса: выбор варианта = покупка (30 🥯 за смену)
+                // Смена эмодзи-статуса: выбор варианта = покупка (цена — из shop_items)
                 const chips = document.createElement('div');
                 chips.className = 'shop-emoji-chips';
                 (item.render_payload || '').split(/\s+/).filter(Boolean).forEach(em => {
@@ -816,10 +816,10 @@
             input.value = value || '';
             document.getElementById('custom-title-help').textContent = customTitleIsRetry
                 ? 'Исправление после отказа бесплатно. Новый текст снова проверит учитель.'
-                : 'После отправки спишется 2000 бубликов. Учитель проверит текст до публикации.';
+                : 'После отправки спишется 4000 бубликов. Учитель проверит текст до публикации.';
             document.getElementById('custom-title-submit').textContent = customTitleIsRetry
                 ? 'Отправить повторно'
-                : 'Отправить — 2000 🥯';
+                : 'Отправить — 4000 🥯';
             document.getElementById('custom-title-error').textContent = '';
             document.getElementById('custom-title-modal').classList.add('active');
             updateCustomTitleForm();

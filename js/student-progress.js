@@ -372,6 +372,7 @@
                 // Косметика (S3): применяем экипировку к нику/аватару/фону/титулу
                 const { data: eqRows } = await equipmentQuery(currentUser.id, false);
                 applyProfileCosmetics(buildEquipMap(eqRows));
+                if (typeof loadPetBlock === 'function') loadPetBlock();   // Stage 5, V3
 
                 currentUser.stats = data;
                 loadBalanceHistory();
@@ -599,6 +600,7 @@
                         'individual_approved': 'Индивидуальное принято ✅',
                         'bonus_return': 'Бонус за возвращённое задание',
                         'weekly_reward': 'Награда за неделю 🥯',
+                        'league_reward': 'Награда за место в лиге 🏆',
                         'mock_exam_weekly': 'Пробник недели',
                         'mock_exam_record': 'Личный рекорд на пробнике',
                         'mock_exam_season': 'Очки сезона за пробник',

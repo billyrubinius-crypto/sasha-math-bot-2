@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stage 5 — питомец в профиле: превью</title>
+  <!-- Настоящий стиль приложения: превью показывает ровно то, что увидит ученик.
+       Подключаются ВСЕ ТРИ таблицы в том же порядке, что в index.html. Это существенно:
+       глобальный `* { box-sizing: border-box }` живёт в season-v3-preview.css (строка 27),
+       и без него стенд считает карточку по content-box и показывает не ту ширину.
+       Свой CSS здесь только для раскладки самой страницы-стенда. -->
+  <link rel="stylesheet" href="../styles/student.css">
+  <link rel="stylesheet" href="../styles/season-v3-preview.css">
+  <link rel="stylesheet" href="../styles/season-cosmetics-preview.css">
+  <style>
+    body { margin: 0; padding: 24px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: #f4f6fb; color: #0f172a; display: block; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .hint { margin: 0 0 24px; color: #64748b; font-size: 13px; line-height: 1.5; }
+    .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; margin-bottom: 28px; }
+    .frame { border: 1px solid #cbd5f5; border-radius: 18px; overflow: hidden; background: #fff;
+             box-shadow: 0 10px 30px rgba(15, 23, 42, .08); }
+    .frame > figcaption { padding: 8px 12px; font-size: 12px; font-weight: 700; color: #475569;
+                          border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .stage { width: 375px; padding: 12px 20px 18px; }
+    .stage.narrow { width: 360px; }
+    .stage.dark { background: #0f172a; color-scheme: dark; }
+    .stage.dark .user-name { color: #f8fafc; }
+    .card-stage { width: 375px; padding: 18px; display: grid; place-items: center; background: #1e293b; }
+    .card-stage.light { background: #e2e8f0; }
+    /* Карточка в стенде показывается без оверлея — сам оверлей затемняет весь экран. */
+    .card-stage .pet-card { position: relative; }
+  </style>
+</head>
+<body>
+  <h1>Питомец в шапке профиля — превью Stage 5</h1>
+  <p class="hint">
+    Реальная разметка и реальный <code>styles/student.css</code>, данные подставлены вручную.
+    Supabase и Telegram не нужны: страницу можно просто открыть двойным щелчком.<br>
+    Слева направо — четыре состояния сытости; ниже те же состояния в тёмной теме и карточка,
+    которая открывается по нажатию на плитку.
+  </p>
+
+  <div class="row" id="light-row"></div>
+  <div class="row" id="dark-row"></div>
+  <div class="row" id="card-row"></div>
+
+<script>
+  const MOODS = [
+    { mood: 'happy',       badge: '😊', days: 5, satiety: 'Сыт до 5 августа — это ещё 5 дней', long: 'Сыт и доволен' },
+    { mood: 'fed',         badge: '🙂', days: 2, satiety: 'Сыт до 2 августа — это ещё 2 дня',  long: 'Накормлен на сегодня' },
+    { mood: 'hungry_soon', badge: '😐', days: 1, satiety: 'Сыт до 1 августа — это ещё 1 день', long: 'Сегодня последний сытый день' },
+    { mood: 'hungry',      badge: '😢', days: 0, satiety: 'Сегодня ещё не кормлен',            long: 'Проголодался и грустит' }
+  ];
+  const PETS = [
+    { glyph: '🐱', cls: 'pet-art-cat',      name: 'Кот' },
+    { glyph: '🦉', cls: 'pet-art-owl',      name: 'Сова' },
+    { glyph: '🦫', cls: 'pet-art-capybara', name: 'Капибара' }
+  ];
+  const PRICE = 5, MAX = 7;
+
+  function header(pet, state, opts) {
+    const nameText = opts.longRank ? 'Александра Иванова' : 'Александра';
+    return `
+      <div class="profile-header has-pet">
+        <div class="avatar-container"><div class="avatar-placeholder">А</div></div>
+        <div class="profile-identity">
+          <h2 class="user-name">${nameText}</h2>
+          <div class="profile-meta-list">
+            <div class="profile-meta-row" style="display:grid;">
+              <span class="profile-meta-label">Группа</span>
+              <span class="group-badge profile-meta-value assigned">Группа А</span>
+            </div>
+            <div class="profile-meta-row" style="display:grid;">
+              <span class="profile-meta-label">Звание</span>
+              <span class="rank-badge profile-meta-value">${opts.longRank ? 'Кандидат в мастера' : 'Кандидат'}</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="pet-tile pet-mood-${state.mood}" aria-label="Открыть карточку питомца">
+          <span class="pet-art ${pet.cls}" aria-hidden="true">${pet.glyph}</span>
+          <span class="pet-tile-mood" aria-hidden="true">${state.badge}</span>
+        </button>
+      </div>`;
+  }
+
+  function card(pet, state) {
+    const fill = Math.max(0, MAX - state.days);
+    const more = fill >= 2
+      ? `<button type="button" class="pet-feed-more">Ещё ${fill} ${fill === 1 ? 'день' : (fill < 5 ? 'дня' : 'дней')} — ${fill * PRICE} 🥯</button>`
+      : '';
+    const feed = state.days >= MAX
+      ? `<button type="button" class="pet-feed-btn" disabled>Сыт на всю неделю</button>`
+      : `<button type="button" class="pet-feed-btn">Покормить — ${PRICE} 🥯</button>`;
+    return `
+      <article class="pet-card">
+        <button type="button" class="pet-card-close" aria-label="Закрыть">✕</button>
+        <div class="pet-card-art pet-art ${pet.cls}" aria-hidden="true">${pet.glyph}</div>
+        <div class="pet-card-copy">
+          <h3>${pet.name}</h3>
+          <p class="pet-card-mood pet-mood-${state.mood}">${state.long}</p>
+          <p class="pet-card-satiety">${state.satiety}</p>
+          <div class="pet-card-actions">${feed}${more}</div>
+          <small class="pet-card-total">Всего дней заботы: 12</small>
+        </div>
+      </article>`;
+  }
+
+  function figure(caption, cls, inner) {
+    return `<figure class="frame"><figcaption>${caption}</figcaption><div class="${cls}">${inner}</div></figure>`;
+  }
+
+  document.getElementById('light-row').innerHTML = MOODS
+    .map((s, i) => figure(`Светлая · ${s.mood} · 375 px`, 'stage', header(PETS[i % PETS.length], s, {})))
+    .join('') + figure('Светлая · длинное звание · 360 px', 'stage narrow',
+                       header(PETS[0], MOODS[0], { longRank: true }));
+
+  document.getElementById('dark-row').innerHTML = MOODS
+    .map((s, i) => figure(`Тёмная · ${s.mood} · 375 px`, 'stage dark', header(PETS[i % PETS.length], s, {})))
+    .join('');
+
+  document.getElementById('card-row').innerHTML =
+      figure('Карточка · сыт · тёмный фон', 'card-stage', card(PETS[0], MOODS[0]))
+    + figure('Карточка · голоден · тёмный фон', 'card-stage', card(PETS[1], MOODS[3]))
+    + figure('Карточка · последний сытый день · светлый фон', 'card-stage light', card(PETS[2], MOODS[2]));
+</script>
+</body>
+</html>

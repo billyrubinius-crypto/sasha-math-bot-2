@@ -661,8 +661,8 @@
                 if (error) throw error;
 
                 let msg = `Результат ${score} за неделю ${weekStart} сохранён.`;
-                if (data.base_awarded) msg += '\n+20 🥯 за пробник';
-                if (data.record_awarded) msg += '\n+30 🥯 личный рекорд!';
+                if (data.base_awarded) msg += '\n+30 🥯 за пробник';
+                if (data.record_awarded) msg += '\n+50 🥯 личный рекорд!';
                 alert(msg);
 
                 // Траектория сразу отражает исправление (U05B) — до сброса выбранного ученика.

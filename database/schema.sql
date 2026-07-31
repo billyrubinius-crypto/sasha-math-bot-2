@@ -625,7 +625,7 @@ CREATE OR REPLACE FUNCTION public.buy_streak_shield(p_student_id bigint)
  LANGUAGE plpgsql
 AS $function$
 declare
-  v_price  integer := 90;
+  v_price  integer := 150;   -- миграция 062 (ECONOMY_V4 §4.9): было 90
   v_max    integer := 7;
   v_qty    integer;
   v_balance integer;
@@ -1512,10 +1512,10 @@ CREATE OR REPLACE FUNCTION public.weekly_reward_amount(p_effective integer)
  IMMUTABLE
 AS $function$
   select case
-    when p_effective >= 7 then 110
-    when p_effective = 6  then 80
-    when p_effective = 5  then 55
-    when p_effective = 4  then 30
+    when p_effective >= 7 then 300
+    when p_effective = 6  then 230
+    when p_effective = 5  then 165
+    when p_effective = 4  then 60
     else 0
   end;
 $function$;
@@ -2351,10 +2351,10 @@ begin
     do update set score = excluded.score, exam_date = excluded.exam_date, updated_at = v_now;
 
   insert into public.mock_exam_reward_log (student_id, week_start, reward_kind, bubliks)
-    values (p_student_id, p_week_start, 'base', 20)
+    values (p_student_id, p_week_start, 'base', 30)              -- 062 (V4): было 20
     on conflict (student_id, week_start, reward_kind) do nothing;
   if found then
-    perform public.add_huikons(p_student_id, 20, 'mock_exam_weekly');
+    perform public.add_huikons(p_student_id, 30, 'mock_exam_weekly');   -- 062 (V4): было 20
     v_base_awarded := true;
   end if;
 
@@ -2369,10 +2369,10 @@ begin
 
     if not v_record_this_month then
       insert into public.mock_exam_reward_log (student_id, week_start, reward_kind, bubliks)
-        values (p_student_id, p_week_start, 'record', 30)
+        values (p_student_id, p_week_start, 'record', 50)         -- 062 (V4): было 30
         on conflict (student_id, week_start, reward_kind) do nothing;
       if found then
-        perform public.add_huikons(p_student_id, 30, 'mock_exam_record');
+        perform public.add_huikons(p_student_id, 50, 'mock_exam_record');  -- 062 (V4): было 30
         v_record_awarded := true;
       end if;
     end if;
@@ -7635,7 +7635,7 @@ begin
   end loop;
   if v_clean_10 then perform public.grant_achievement_server(v_asn.student_id, 'clean_10', 25); end if;
   if v_asn.type in ('weekly', 'individual') then
-    v_bonus := case v_asn.type when 'weekly' then 20 else 15 end;
+    v_bonus := case v_asn.type when 'weekly' then 30 else 25 end;   -- 062 (V4): было 20/15
     insert into public.assignment_reward_log (assignment_id, student_id, reward_amount)
     values (v_asn.id, v_asn.student_id, v_bonus) on conflict (assignment_id) do nothing;
     get diagnostics v_paid = row_count;
@@ -7800,8 +7800,6 @@ declare
   v_today date := (now() at time zone 'Europe/Moscow')::date;
   v_archived integer := 0;
   v_awarded integer := 0;
-  v_reward integer;
-  r record;
 begin
   select status, start_date into v_status, v_start_date
     from public.seasons where id = p_season_id for update;
@@ -7811,7 +7809,10 @@ begin
       'next_season_id', public.current_season_id(), 'already_completed', true);
   end if;
   v_start_ts := (v_start_date::timestamp) at time zone 'Europe/Moscow';
-  update public.seasons set status = 'completed', end_date = v_today where id = p_season_id;
+  -- Season V2 (миграция 057): конечный статус закрытого сезона — 'closed', не 'completed'.
+  update public.seasons
+     set status = 'closed', end_date = v_today, updated_at = now()
+   where id = p_season_id;
   perform 1 from public.students for update;
   insert into public.season_results (season_id, student_id, points, place)
   select p_season_id, s.telegram_id, s.rating,
@@ -7828,16 +7829,18 @@ begin
     ) pts on pts.student_id = s.telegram_id
   on conflict (season_id, student_id) do nothing;
   get diagnostics v_archived = row_count;
-  for r in select student_id, place from public.season_results
-             where season_id = p_season_id and place <= 3 and points > 0 order by place
-  loop
-    v_reward := case r.place when 1 then 100 when 2 then 60 else 30 end;
-    perform public.add_huikons(r.student_id, v_reward, 'season_place_' || r.place);
-    v_awarded := v_awarded + 1;
-  end loop;
+
+  -- Миграция 061 (V4): приз за глобальный топ-3 (100/60/30) удалён — его каждый сезон
+  -- занимали одни и те же ученики. season_results строится полностью: он нужен лиговым
+  -- когортам, общему топу и истории.
+
   -- A nullable next season means a planned pause. close_league_season then skips
   -- temporary awards and cohort creation instead of creating phantom participants.
   perform public.close_league_season(p_season_id, null);
+
+  -- 062 (V4): выплата за место в своей лиге — строго после простановки мест и переходов.
+  v_awarded := public.pay_league_season_rewards(p_season_id);
+
   update public.students set rating = 0 where rating <> 0;
   return json_build_object('season_id', p_season_id, 'archived', v_archived,
     'awarded', v_awarded, 'next_season_id', null, 'already_completed', false);
@@ -7968,3 +7971,328 @@ end;
 $function$;
 
 revoke all on function public.require_current_season_id() from public, anon, authenticated;
+
+-- =============================================================================
+-- Миграция 062 (ECONOMY_V4): лиговая выплата за место в закрытом сезоне.
+-- ВНИМАНИЕ: этот снимок отстаёт от миграций 057-060 (объекты Season V2 в него не внесены);
+-- после применения 061 снимок следует перегенерировать из dev-базы целиком.
+-- =============================================================================
+
+-- league_reward_log — pay-once ledger лиговых выплат, ключ (season_id, student_id).
+-- Тот же приём, что у weekly_reward_log: повтор закрытия сезона не платит второй раз.
+create table if not exists public.league_reward_log (
+  id         uuid        primary key default gen_random_uuid(),
+  season_id  bigint      not null references public.seasons (id),
+  student_id bigint      not null references public.students (telegram_id),
+  tier       integer     not null references public.league_tiers (tier),
+  place      integer,
+  movement   text,
+  amount     integer     not null check (amount > 0),
+  paid_at    timestamptz not null default now(),
+  unique (season_id, student_id)
+);
+create index if not exists idx_league_reward_log_student
+  on public.league_reward_log (student_id, paid_at);
+alter table public.league_reward_log enable row level security;  -- DENY-CLIENT (образец 043)
+revoke all on public.league_reward_log from anon, authenticated;
+
+-- pay_league_season_rewards — выплата за место в СВОЕЙ лиге; вызывается из finish_season
+-- строго после close_league_season (та проставляет points/place/movement).
+-- Суммы: 1 место 150, 2-3 110, 4-10 75, прочие активные 35, +50 за повышение лиги.
+create or replace function public.pay_league_season_rewards(p_season_id bigint)
+ returns integer
+ language plpgsql
+ set search_path = public, pg_temp
+as $function$
+declare
+  r        record;
+  v_amount integer;
+  v_paid   integer;
+  v_count  integer := 0;
+begin
+  for r in
+    select m.student_id, m.tier, m.place, m.movement
+      from public.league_memberships m
+     where m.season_id = p_season_id
+       and m.activated_at is not null
+       and coalesce(m.points, 0) > 0
+     order by m.student_id
+  loop
+    v_amount := case
+      when r.place = 1                then 150
+      when r.place between 2 and 3    then 110
+      when r.place between 4 and 10   then 75
+      else 35
+    end;
+    if r.movement = 'promote' then
+      v_amount := v_amount + 50;
+    end if;
+
+    insert into public.league_reward_log (season_id, student_id, tier, place, movement, amount)
+      values (p_season_id, r.student_id, r.tier, r.place, r.movement, v_amount)
+      on conflict (season_id, student_id) do nothing;
+    get diagnostics v_paid = row_count;
+    if v_paid = 1 then
+      perform public.add_huikons(r.student_id, v_amount, 'league_reward');
+      v_count := v_count + 1;
+    end if;
+  end loop;
+
+  return v_count;
+end;
+$function$;
+
+revoke all on function public.pay_league_season_rewards(bigint) from public, anon, authenticated;
+
+
+-- =============================================================================
+-- Миграция 064 (Stage 5, питомцы): слот pet, конфиг, состояние заботы, кормление.
+-- Питомец — обычная косметика (item_kind='cosmetic') в новом слоте 'pet', поэтому buy_item и
+-- equip_item НЕ переопределялись. Ограничение shop_items_slot_check расширено значением 'pet'
+-- (в этом снимке версия ограничения отстаёт — снимок не содержит объектов 057-061).
+-- =============================================================================
+-- --- 3. Состояние заботы -------------------------------------------------------
+-- Состояние на УЧЕНИКА, а не на строку питомца: иначе появляется эксплойт «покормил одного,
+-- переключился на второго». Смена активного питомца не создаёт и не сбрасывает запас.
+create table if not exists public.student_pet_state (
+  student_id     bigint      primary key references public.students (telegram_id),
+  satiety_until  date        not null,          -- «сыт до» включительно
+  days_fed_total integer     not null default 0 check (days_fed_total >= 0),
+  updated_at     timestamptz not null default now(),
+  created_at     timestamptz not null default now()
+);
+
+-- pet_feed_log — pay-once по КАЛЕНДАРНОЙ ДАТЕ, а не по факту нажатия: один и тот же день
+-- нельзя оплатить дважды ни повтором, ни двойным кликом, ни параллельным вызовом.
+-- Тот же приём, что у daily_quest_reward_log (student_id, quest_date, reward_kind).
+create table if not exists public.pet_feed_log (
+  id           uuid        primary key default gen_random_uuid(),
+  student_id   bigint      not null references public.students (telegram_id),
+  covered_date date        not null,
+  bubliks      integer     not null check (bubliks > 0),
+  paid_at      timestamptz not null default now(),
+  unique (student_id, covered_date)
+);
+create index if not exists idx_pet_feed_log_student
+  on public.pet_feed_log (student_id, covered_date);
+
+-- DENY-CLIENT по образцу миграции 043: ledger и состояние пишут только definer-функции.
+alter table public.pet_feed_log enable row level security;
+revoke all on public.pet_feed_log from anon, authenticated;
+
+-- student_pet_state тоже DENY-CLIENT, а не select-own: клиент читает состояние исключительно
+-- через get_pet_state_self (security definer), прямой select таблицы ему не нужен, а значит
+-- и политики заводить незачем — меньше поверхности.
+alter table public.student_pet_state enable row level security;
+revoke all on public.student_pet_state from anon, authenticated;
+
+-- --- 4. Каталог питомцев (спящий) ----------------------------------------------
+-- item_kind='cosmetic' — сознательно, см. шапку. condition_achievement уже проверяется
+-- существующим buy_item, кода для условия писать не нужно.
+insert into public.shop_items
+  (item_code, name, description, item_kind, slot, price, availability,
+   condition_achievement, render_payload, visual_key, motion_policy, rarity, sort_order, active)
+values
+  ('pet_cat',      'Питомец: кот',      'Живёт в профиле, ест раз в день, грустит без корма.',
+   'cosmetic', 'pet', 1200, 'always', 'rhythm_4', 'pet_v1_cat',      'pet_v1_cat',      'subtle', 'rare', 610, false),
+  ('pet_owl',      'Питомец: сова',     'Живёт в профиле, ест раз в день, грустит без корма.',
+   'cosmetic', 'pet', 1200, 'always', 'rhythm_4', 'pet_v1_owl',      'pet_v1_owl',      'subtle', 'rare', 611, false),
+  ('pet_capybara', 'Питомец: капибара', 'Живёт в профиле, ест раз в день, грустит без корма.',
+   'cosmetic', 'pet', 1200, 'always', 'rhythm_4', 'pet_v1_capybara', 'pet_v1_capybara', 'subtle', 'rare', 612, false)
+on conflict (item_code) do nothing;
+
+-- --- 5. feed_pet ---------------------------------------------------------------
+-- Оплачивает конкретные КАЛЕНДАРНЫЕ ДАТЫ вперёд, начиная с первой неоплаченной.
+-- p_days — сколько дней добавить; потолок запаса — pet_max_prepaid_days, считая сегодня.
+create or replace function public.feed_pet(p_student_id bigint, p_days integer default 1)
+ returns json
+ language plpgsql
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_enabled   boolean;
+  v_price     integer;
+  v_max       integer;
+  v_today     date := (now() at time zone 'Europe/Moscow')::date;
+  v_pet       text;
+  v_satiety   date;
+  v_total     integer;
+  v_limit     date;
+  v_start     date;
+  v_end       date;
+  v_count     integer;
+  v_cost      integer;
+  v_balance   integer;
+  v_new_balance integer;
+begin
+  select stage5_pets_enabled, pet_feed_price, pet_max_prepaid_days
+    into v_enabled, v_price, v_max
+    from public.economy_config where id;
+  if not coalesce(v_enabled, false) then
+    raise exception 'Питомцы пока недоступны';
+  end if;
+
+  if p_days is null or p_days < 1 or p_days > v_max then
+    raise exception 'Кормить можно от 1 до % дней за раз', v_max;
+  end if;
+
+  select item_code into v_pet
+    from public.student_equipment
+   where student_id = p_student_id and slot = 'pet';
+  if v_pet is null then
+    raise exception 'Сначала нужно завести питомца';
+  end if;
+
+  -- Блокировка ученика сериализует параллельные кормления (как в buy_item).
+  select huikons into v_balance from public.students
+   where telegram_id = p_student_id for update;
+  if v_balance is null then
+    raise exception 'Ученик % не найден', p_student_id;
+  end if;
+
+  select satiety_until, days_fed_total into v_satiety, v_total
+    from public.student_pet_state where student_id = p_student_id for update;
+
+  -- Первая неоплаченная дата: либо завтрашняя относительно запаса, либо сегодня, если голоден.
+  v_start := greatest(coalesce(v_satiety, v_today - 1) + 1, v_today);
+  v_limit := v_today + (v_max - 1);
+  if v_start > v_limit then
+    raise exception 'Питомец уже сыт на % дней вперёд', v_max;
+  end if;
+  v_end := least(v_start + (p_days - 1), v_limit);
+
+  v_count := (v_end - v_start) + 1;
+  v_cost  := v_count * v_price;
+  if v_balance < v_cost then
+    raise exception 'Недостаточно бубликов: нужно %, есть %', v_cost, v_balance;
+  end if;
+
+  -- Уникальный индекс — единственная защита от двойной оплаты дня; предварительная проверка
+  -- на неё не заменяется. Реально оплачиваем ровно вставленные строки.
+  with wanted as (
+    select generate_series(v_start, v_end, interval '1 day')::date as covered_date
+  ), inserted as (
+    insert into public.pet_feed_log (student_id, covered_date, bubliks)
+    select p_student_id, w.covered_date, v_price from wanted w
+    on conflict (student_id, covered_date) do nothing
+    returning covered_date
+  )
+  select count(*), max(covered_date) into v_count, v_end from inserted;
+
+  if coalesce(v_count, 0) = 0 then
+    raise exception 'Эти дни уже оплачены';
+  end if;
+
+  v_cost := v_count * v_price;
+  select new_balance into v_new_balance
+    from public.add_huikons(p_student_id, -v_cost, 'pet_feed');
+
+  insert into public.student_pet_state (student_id, satiety_until, days_fed_total)
+    values (p_student_id, v_end, v_count)
+    on conflict (student_id) do update
+      set satiety_until  = greatest(student_pet_state.satiety_until, excluded.satiety_until),
+          days_fed_total = student_pet_state.days_fed_total + excluded.days_fed_total,
+          updated_at     = now();
+
+  return json_build_object(
+    'days_paid',      v_count,
+    'spent',          v_cost,
+    'satiety_until',  v_end,
+    'balance',        v_new_balance);
+end;
+$function$;
+
+-- --- 6. Read-модель ------------------------------------------------------------
+-- Настроение считает сервер: клиент не знает ни правил, ни таймзоны расчёта.
+create or replace function public.get_pet_state(p_student_id bigint)
+ returns json
+ language plpgsql
+ stable
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_enabled boolean;
+  v_price   integer;
+  v_max     integer;
+  v_today   date := (now() at time zone 'Europe/Moscow')::date;
+  v_pet     text;
+  v_payload text;
+  v_name    text;
+  v_satiety date;
+  v_total   integer := 0;
+  v_days    integer;
+  v_mood    text;
+begin
+  select stage5_pets_enabled, pet_feed_price, pet_max_prepaid_days
+    into v_enabled, v_price, v_max
+    from public.economy_config where id;
+
+  select e.item_code, s.render_payload, s.name into v_pet, v_payload, v_name
+    from public.student_equipment e
+    join public.shop_items s on s.item_code = e.item_code
+   where e.student_id = p_student_id and e.slot = 'pet';
+
+  select satiety_until, days_fed_total into v_satiety, v_total
+    from public.student_pet_state where student_id = p_student_id;
+
+  v_days := case when v_satiety is null or v_satiety < v_today
+                 then 0 else (v_satiety - v_today) + 1 end;
+
+  v_mood := case
+    when v_satiety is null or v_satiety < v_today then 'hungry'
+    when v_satiety = v_today                      then 'hungry_soon'
+    when v_satiety = v_today + 1                  then 'fed'
+    else 'happy'
+  end;
+
+  return json_build_object(
+    'enabled',           coalesce(v_enabled, false),
+    'item_code',         v_pet,
+    'name',              v_name,
+    'render_payload',    v_payload,
+    'satiety_until',     v_satiety,
+    'days_left',         v_days,
+    'mood',              case when v_pet is null then null else v_mood end,
+    'days_fed_total',    coalesce(v_total, 0),
+    'feed_price',        v_price,
+    'max_prepaid_days',  v_max);
+end;
+$function$;
+
+-- --- 7. Гейтвеи T10 ------------------------------------------------------------
+-- Тонкие claim-based обёртки по образцу buy_item_self (миграция 035): identity из JWT,
+-- p_student_id наружу не принимается.
+create or replace function public.feed_pet_self(p_days integer default 1)
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.feed_pet(v_tid, p_days);
+end;
+$function$;
+
+create or replace function public.get_pet_state_self()
+ returns json language plpgsql security definer set search_path = public, pg_temp
+as $function$
+declare v_tid bigint;
+begin
+  if private.current_app_role() is distinct from 'student' then
+    raise exception 'forbidden' using errcode = '42501'; end if;
+  v_tid := private.current_telegram_id();
+  if v_tid is null or v_tid <= 0 then
+    raise exception 'no student identity' using errcode = '42501'; end if;
+  return public.get_pet_state(v_tid);
+end;
+$function$;
+
+revoke all on function public.feed_pet(bigint, integer)      from public, anon, authenticated;
+revoke all on function public.get_pet_state(bigint)          from public, anon, authenticated;
+revoke all on function public.feed_pet_self(integer)         from public, anon;
+revoke all on function public.get_pet_state_self()           from public, anon;
+grant execute on function public.feed_pet_self(integer)      to authenticated;
+grant execute on function public.get_pet_state_self()        to authenticated;

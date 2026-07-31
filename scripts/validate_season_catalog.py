@@ -115,8 +115,8 @@ SNAKE_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
 HEX_RE = re.compile(r"^#[0-9A-F]{6}$")
 EXTERNAL_URL_RE = re.compile(r"""(?:href|src)\s*=\s*["'](?:https?:)?//""", re.IGNORECASE)
 
-REGULAR_PRICES = {"common": 100, "rare": 140, "epic": 180, "legendary": 320}
-SUMMER_PRICES = {"common": 90, "rare": 130, "epic": 170, "legendary": 300}
+REGULAR_PRICES = {"common": 60, "rare": 90, "epic": 120, "legendary": 190}
+SUMMER_PRICES = {"common": 55, "rare": 80, "epic": 110, "legendary": 170}
 RARITY_ROTATION = {
     "1": {"avatar": "legendary", "frame": "rare", "title": "common", "background": "epic"},
     "2": {"avatar": "rare", "frame": "common", "title": "epic", "background": "legendary"},
@@ -218,7 +218,7 @@ def approved_css_class(item: dict[str, Any]) -> str:
 def validate_root(catalog: dict[str, Any], check: Validation) -> None:
     check.exact_keys(catalog, ROOT_FIELDS, "catalog")
     check.require(catalog.get("schema_version") == 2, "catalog.schema_version: expected 2")
-    check.require(catalog.get("catalog_revision") == 4, "catalog.catalog_revision: expected approved revision 4")
+    check.require(catalog.get("catalog_revision") == 5, "catalog.catalog_revision: expected approved revision 5")
     check.require(
         catalog.get("catalog_code") == "cosmic_academy_2026_2027_v2",
         "catalog.catalog_code: unexpected value",
@@ -394,7 +394,7 @@ def validate_presets(catalog: dict[str, Any], check: Validation) -> tuple[list[d
             preset.get("pricing_status") == ("provisional" if is_summer else "recommended"),
             f"{path}.pricing_status: does not match season type",
         )
-        expected_total = 690 if is_summer else 740
+        expected_total = 415 if is_summer else 460
         check.require(preset.get("collection_total_target") == expected_total, f"{path}: collection total must be {expected_total}")
         check.require(preset.get("collection_bonus") == 50, f"{path}.collection_bonus: expected 50")
         check.require(preset.get("flagship_slot") in SLOTS, f"{path}.flagship_slot: unexpected value")

@@ -180,6 +180,14 @@
                     </div>
                 </div>
             </div>
+            <!-- Питомец (Stage 5): третья колонка шапки справа от группы и звания.
+                 display управляет loadPetBlock — блока нет, пока питомец не куплен или
+                 механика не включена флагом stage5_pets_enabled. -->
+            <button type="button" class="pet-tile" id="pet-tile" style="display:none;"
+                    onclick="openPetCard(this)" aria-label="Открыть карточку питомца">
+                <span class="pet-art" id="pet-tile-art" aria-hidden="true"></span>
+                <span class="pet-tile-mood" id="pet-tile-mood" aria-hidden="true"></span>
+            </button>
         </div>
         <div class="rank-progress" id="rank-progress" style="display:none;"></div>
         <div class="profile-title-card" id="profile-title-row" style="display:none;">
@@ -257,7 +265,7 @@
                     <span id="shield-count">🛡 0 щитов</span>
                     <span class="shield-hint">Щит недели: +1 к результату недели (запас до 7)</span>
                 </div>
-                <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 90 🥯</button>
+                <button class="shield-buy-btn" id="btn-buy-shield" onclick="buyStreakShield()">Купить — 150 🥯</button>
             </div>
         </div>
 
@@ -480,17 +488,17 @@
 
             <details class="faq-item">
                 <summary>Как начисляются награды за домашку?</summary>
-                <div class="faq-answer">За саму загрузку решения награды нет — работу должен принять учитель. Принятая ежедневка даёт 10 очков сезона и учитывается в результате недели. Принятое еженедельное задание даёт +20 🥯 и 40 очков сезона, индивидуальное — +15 🥯 и 30 очков сезона.</div>
+                <div class="faq-answer">За саму загрузку решения награды нет — работу должен принять учитель. Принятая ежедневка даёт 10 очков сезона и учитывается в результате недели. Принятое еженедельное задание даёт +30 🥯 и 40 очков сезона, индивидуальное — +25 🥯 и 30 очков сезона.</div>
             </details>
 
             <details class="faq-item">
                 <summary>Как считается результат недели?</summary>
-                <div class="faq-answer">Считаются принятые ежедневные задания: 0–3 дают 0 🥯, 4 — 30 🥯, 5 — 55 🥯, 6 — 80 🥯, 7 — 110 🥯. Итог закрывается автоматически после окончания недели. Еженедельное и индивидуальные задания оплачиваются отдельно.</div>
+                <div class="faq-answer">Считаются принятые ежедневные задания: 0–3 дают 0 🥯, 4 — 60 🥯, 5 — 165 🥯, 6 — 230 🥯, 7 — 300 🥯. Итог закрывается автоматически после окончания недели. Еженедельное и индивидуальные задания оплачиваются отдельно.</div>
             </details>
 
             <details class="faq-item">
                 <summary>Что делает щит недели?</summary>
-                <div class="faq-answer">Щит можно поставить на одно реально назначенное, но пропущенное ежедневное задание. Он помогает недельному результату, но не считается выполненной работой, не даёт очков сезона и не подходит для достижений «без щитов». Щит стоит 90 🥯, хранить можно до 7.</div>
+                <div class="faq-answer">Щит можно поставить на одно реально назначенное, но пропущенное ежедневное задание. Он помогает недельному результату, но не считается выполненной работой, не даёт очков сезона и не подходит для достижений «без щитов». Щит стоит 150 🥯, хранить можно до 7.</div>
             </details>
 
             <details class="faq-item">
@@ -515,17 +523,22 @@
 
             <details class="faq-item">
                 <summary>Как появляются результаты пробников?</summary>
-                <div class="faq-answer">Результат заносит команда учителя через рабочую Google-таблицу. Новый недельный пробник даёт +20 🥯, новый личный рекорд — ещё +30 🥯. График показывает твою траекторию, но его диапазон не является гарантией балла ЕГЭ.</div>
+                <div class="faq-answer">Результат заносит команда учителя через рабочую Google-таблицу. Новый недельный пробник даёт +30 🥯, новый личный рекорд — ещё +50 🥯. График показывает твою траекторию, но его диапазон не является гарантией балла ЕГЭ.</div>
             </details>
 
             <details class="faq-item">
                 <summary>Как работают сезоны, лиги и звание?</summary>
-                <div class="faq-answer">У сезона есть номер, название и даты: он становится текущим в свой день начала и завершается по дате окончания. В битву лиг ты попадаешь не при регистрации, а сразу после первого начисления очков сезона за принятую домашку — и остаёшься в ней до конца сезона. При малом числе активных участников переходов между лигами может не быть. Звание растёт отдельно — за решённые задачи и дни занятий — и не понижается.</div>
+                <div class="faq-answer">У сезона есть номер, название и даты: он становится текущим в свой день начала и завершается по дате окончания. В битву лиг ты попадаешь не при регистрации, а сразу после первого начисления очков сезона за принятую домашку — и остаёшься в ней до конца сезона. При малом числе активных участников переходов между лигами может не быть. По итогам сезона за место в своей лиге начисляются бублики: за первое 150 🥯, за 2–3 место 110 🥯, за 4–10 место 75 🥯, остальным участникам с результатом 35 🥯; за переход в лигу выше — ещё +50 🥯. Звание растёт отдельно — за решённые задачи и дни занятий — и не понижается.</div>
             </details>
 
             <details class="faq-item">
                 <summary>Что можно делать в магазине?</summary>
                 <div class="faq-answer">За бублики покупаются рамки, фоны, титулы и другие украшения без учебного преимущества. Сезонные товары исчезают из ПРОДАЖИ после смены сезона, но уже купленные остаются у тебя навсегда: они лежат в разделе «Инвентарь» на этой же вкладке, откуда их можно надеть, снять и поставить на витрину профиля. Витрина и надетые предметы — разные вещи и друг друга не отменяют.</div>
+            </details>
+
+            <details class="faq-item">
+                <summary>Как работает питомец?</summary>
+                <div class="faq-answer">Питомец стоит 1200 🥯 и открывается после достижения «четыре успешные недели подряд». Он живёт в шапке профиля: нажми на него, чтобы открыть карточку. Корм стоит 5 🥯 за день сытости, кормить можно раз в день, а можно оплатить несколько дней вперёд — запас до 7 дней. Настроение зависит только от корма: без него питомец грустит, но с ним НИЧЕГО не случится — он не болеет и не пропадает. На оценки, рейтинг, лигу и результат недели питомец не влияет никак.</div>
             </details>
 
             <details class="faq-item">
@@ -593,6 +606,32 @@
         </article>
     </div>
 
+    <!-- Карточка питомца (Stage 5, V3). Механика раскрытия и закрытия та же, что у визитки
+         сезонного профиля: бэкдроп, крестик, Escape, кнопка «Назад», возврат фокуса. -->
+    <div id="pet-card-overlay" class="pet-card-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="pet-card-name" hidden>
+        <button type="button" class="pet-card-backdrop" aria-label="Закрыть карточку питомца"
+                onclick="closePetCard()"></button>
+        <article class="pet-card">
+            <button type="button" class="pet-card-close" aria-label="Закрыть"
+                    onclick="closePetCard()">✕</button>
+            <div class="pet-card-art pet-art" id="pet-card-art" aria-hidden="true"></div>
+            <div class="pet-card-copy">
+                <h3 id="pet-card-name"></h3>
+                <p class="pet-card-mood" id="pet-card-mood"></p>
+                <p class="pet-card-satiety" id="pet-card-satiety"></p>
+                <div class="pet-card-actions">
+                    <button type="button" class="pet-feed-btn" id="pet-feed-btn"
+                            onclick="feedPet(1, this)">Покормить</button>
+                    <button type="button" class="pet-feed-more" id="pet-feed-more"
+                            style="display:none;" onclick="feedPetFill(this)"></button>
+                </div>
+                <small class="pet-card-total" id="pet-card-total"></small>
+                <div class="pet-card-error" id="pet-card-error" role="alert"></div>
+            </div>
+        </article>
+    </div>
+
     <!-- НИЖНЕЕ МЕНЮ.
          Контракт: ровно пять .nav-btn в порядке Профиль → Домашка → Лидеры → Магазин → Ещё
          (switchTab подсвечивает их по индексу 0–4), тот же onclick, тот же .nav-icon внутри.
@@ -643,6 +682,7 @@
     <script src="js/student-progress.js"></script>
     <script src="js/student-shop.js"></script>
     <script src="js/student-quests.js"></script>
+    <script src="js/student-pets.js"></script>
     <script src="js/student-auth.js"></script>
     <script src="js/student-app.js"></script>
 </body>
