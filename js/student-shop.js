@@ -36,10 +36,13 @@
             try {
                 const { data: visibleSeasons, error: seasonsError } = await db
                     .from('seasons')
-                    .select('id,status')
+                    .select('id,status,title,display_number,preset_code')
                     .in('status', ['active', 'closed', 'archived']);
                 if (seasonsError) throw seasonsError;
                 const visibleSeasonIds = (visibleSeasons || []).map((season) => season.id);
+                const visibleSeasonById = new Map(
+                    (visibleSeasons || []).map((season) => [season.id, season])
+                );
                 if (!visibleSeasonIds.length) { section.style.display = 'none'; return; }
 
                 const { data: bundles, error } = await db
@@ -49,11 +52,13 @@
                     .order('season_id', { ascending: false });
                 if (error) throw error;
                 if (!bundles || !bundles.length) { section.style.display = 'none'; return; }
+                const visibleBundleIds = bundles.map((row) => row.bundle);
 
                 const [{ data: rotationItems, error: itemsError }, ownership] = await Promise.all([
                     db.from('shop_items')
                         .select('item_code,name,description,rarity,rotation_bundle,slot,item_kind,render_payload,visual_key,motion_policy')
-                        .eq('availability', 'rotation'),
+                        .eq('availability', 'rotation')
+                        .in('rotation_bundle', visibleBundleIds),
                     loadCollectionOwnership()
                 ]);
                 if (itemsError) throw itemsError;
@@ -71,7 +76,12 @@
                     block.className = 'collection-block';
                     const title = document.createElement('div');
                     title.className = 'collection-season-title';
-                    title.textContent = `Сезон №${b.season_id}`;
+                    const season = visibleSeasonById.get(b.season_id);
+                    title.textContent = season?.display_number
+                        ? `Сезон №${season.display_number}${season.title ? ` · ${season.title}` : ''}`
+                        : (season?.preset_code
+                            ? `Межсезонье${season.title ? ` · ${season.title}` : ''}`
+                            : `Сезон №${b.season_id}`);
                     block.appendChild(title);
 
                     const grid = document.createElement('div');

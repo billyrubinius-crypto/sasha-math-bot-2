@@ -113,25 +113,20 @@
                 <button class="btn-primary" id="btn-assign-indiv" onclick="assignIndividual()" style="margin-top:10px;">Назначить индивидуально</button>
             </div>
 
-            <!-- СЕЗОНЫ: планирование + список со статусами.
-                 Форма живёт в том же .week-planner, что и остальное планирование, и пользуется
-                 существующими .btn-primary/.btn-secondary/.btn-danger — отдельной страницы нет.
-                 Время вводится в МСК (проектный часовой пояс, Europe/Moscow) и уходит на сервер
-                 как timestamptz с явным смещением +03:00: локальное время устройства учителя и
-                 UTC не смешиваются. -->
+            <!-- СЕЗОНЫ: безопасный список фиксированного календаря без ручного создания,
+                 изменения дат и досрочного закрытия. -->
             <div class="week-planner">
                 <h3 style="margin-top:0">🗓️ Сезоны V2</h3>
-                <p style="font-size:13px; color:#666; margin-bottom:15px;">Все 23 утверждённых периода уже стоят по календарю. Период 01 доступен только как каталог и никогда не запускается. Первый автоматический запуск — 1 августа в 00:00 МСК. До запуска можно изменить тексты, цены и выбрать другой утверждённый визуал; редкость и тип предмета остаются неизменными.</p>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Первые два периода — межсезонья и не входят в нумерацию соревнований. Период 03 — это Сезон №1, период 04 — Сезон №2 и далее. У запланированного регулярного сезона можно изменить только номер и название. Даты и товары защищены от ручного изменения.</p>
 
                 <div id="season-list"><div style="font-size:13px; color:#999;">Загрузка сезонов…</div></div>
             </div>
 
             <div class="week-planner">
-                <h3 style="margin-top:0">🏁 Закрыть сезон вручную</h3>
-                <p style="font-size:13px; color:#666; margin-bottom:15px;">Досрочное закрытие текущего сезона. Итоги всех учеников уходят в архив, топ-3 получают 100/60/30 бубликов, очки обнуляются. Следующий период включится только в своё опубликованное время; вручную раньше даты он не запускается. Лиговые переходы и Корона считаются сервером в той же операции.</p>
-                <button class="btn-secondary" id="btn-preview-season" onclick="previewSeasonClose()">📊 Превью закрытия (лиги)</button>
+                <h3 style="margin-top:0">📊 Возможные результаты сезона</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">Предпросмотр показывает возможные лиговые переходы на текущих данных. Он ничего не закрывает, не начисляет и не изменяет.</p>
+                <button class="btn-secondary" id="btn-preview-season" onclick="previewSeasonClose()">Посмотреть возможные результаты</button>
                 <div id="season-preview"></div>
-                <button class="btn-danger" id="btn-close-season" onclick="closeSeason()" style="width:100%;">🏁 Закрыть сезон</button>
             </div>
         </div>
 
@@ -177,27 +172,19 @@
             <button class="season-v2-modal-close" type="button" onclick="closeSeasonV2Editor()" aria-label="Закрыть">✕</button>
             <h3 id="season-v2-modal-title">Сезон</h3>
             <div id="season-v2-live-preview"></div>
-            <div id="season-v2-editor-fields">
+            <div id="season-v2-meta-editor">
                 <label>Название
                     <input id="season-v2-title" type="text" maxlength="60">
                 </label>
-                <label>Описание
-                    <textarea id="season-v2-description" maxlength="500"></textarea>
+                <label id="season-v2-number-wrap">Номер сезона
+                    <input id="season-v2-number" type="number" min="1" max="999" step="1">
                 </label>
-                <div class="season-v2-date-grid">
-                    <label>Начало (МСК)
-                        <input id="season-v2-starts-at" type="datetime-local">
-                    </label>
-                    <label>Окончание (МСК)
-                        <input id="season-v2-ends-at" type="datetime-local">
-                    </label>
-                </div>
-                <div id="season-v2-items"></div>
             </div>
+            <h4 class="season-v2-items-heading">Товары периода</h4>
+            <div id="season-v2-items"></div>
             <div id="season-form-error" class="warning-text" style="display:none; text-align:left;"></div>
             <div class="season-v2-modal-actions">
-                <button id="season-v2-save-draft" class="btn-secondary" type="button" onclick="saveSeasonV2(false)">Сохранить черновик</button>
-                <button id="season-v2-schedule" class="btn-primary" type="button" onclick="saveSeasonV2(true)">Опубликовать расписание</button>
+                <button id="season-v2-save-meta" class="btn-primary" type="button" onclick="saveSeasonV2Meta()">Сохранить номер и название</button>
             </div>
         </div>
     </div>

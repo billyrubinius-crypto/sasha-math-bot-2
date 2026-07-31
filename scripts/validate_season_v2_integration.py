@@ -22,6 +22,7 @@ def main() -> int:
 
     foundation = read("database/migrations/057_season_v2_foundation.sql")
     seed = read("database/migrations/058_season_v2_catalog_seed.sql")
+    safe_teacher = read("database/migrations/059_teacher_safe_season_metadata.sql")
     student_html = read("index.html")
     teacher_html = read("teacher.html")
     progress = read("js/student-progress.js")
@@ -34,7 +35,7 @@ def main() -> int:
     require("create or replace function public.ensure_season_rotation()" in foundation,
             "shop must tick the Season V2 schedule")
     require("catalog_only_period" in foundation, "catalog-only period must be server-protected")
-    require("admin_save_season_v2_self" in foundation, "teacher save gateway missing")
+    require("admin_save_season_v2_self" in foundation, "initial teacher save gateway missing")
     require("private.current_app_role() is distinct from 'teacher'" in foundation,
             "teacher gateway role guard missing")
     require("position('<'" in foundation and "markup_not_allowed" in foundation,
@@ -46,6 +47,13 @@ def main() -> int:
     require("where p.sequence_no >= 2" in seed and "'scheduled'" in seed,
             "seed must publish sequences 2–23")
     require("2602" in seed and "2623" in seed, "fixed bundle range missing")
+    require("admin_update_scheduled_season_meta_self" in safe_teacher,
+            "safe scheduled-season metadata gateway missing")
+    require("display_number" in safe_teacher, "editable display number missing")
+    require("revoke all on function public.admin_save_season_v2_self" in safe_teacher,
+            "full teacher season mutation must be disabled")
+    require("revoke all on function public.close_season_self()" in safe_teacher,
+            "manual season closure must be disabled")
 
     for html, label in ((student_html, "student"), (teacher_html, "teacher")):
         require("styles/season-v3-preview.css" in html, f"{label} approved base CSS missing")
@@ -59,10 +67,24 @@ def main() -> int:
             "expanded card browser-back behavior missing")
     require("item.slot === 'avatar'" in shop, "avatar shop preview missing")
     require("shop-rarity--" in shop, "shop rarity label missing")
+    require("display_number" in shop and "display_number" in progress,
+            "student season labels still depend only on internal database ids")
+    require(".in('rotation_bundle', visibleBundleIds)" in shop,
+            "future collection items are still loaded")
+    require("openOwnSeasonProfileCard" in progress and "openOwnSeasonProfileCard(this)" in student_html,
+            "stable own mini-profile trigger missing")
 
     require('id="season-v2-modal"' in teacher_html, "teacher editor modal missing")
     require("admin_list_season_v2_self" in teacher, "teacher read-model not wired")
-    require("admin_save_season_v2_self" in teacher, "teacher save gateway not wired")
+    require("admin_update_scheduled_season_meta_self" in teacher,
+            "safe teacher metadata gateway not wired")
+    require("admin_save_season_v2_self" not in teacher,
+            "teacher client still exposes full season mutation")
+    require("structuredClone(" not in teacher,
+            "teacher preview depends on unsupported WebView structuredClone")
+    require('id="btn-close-season"' not in teacher_html, "manual close button still present")
+    require("closeSeason()" not in teacher_html, "manual close handler still present")
+    require('id="season-v2-items"' in teacher_html, "teacher goods viewer missing")
     require("seasonPreviewCard" in teacher, "teacher live preview missing")
 
     for token in ("AVATARS", "FRAMES", "BACKGROUNDS", "TITLE_VISUALS"):

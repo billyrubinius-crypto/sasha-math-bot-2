@@ -104,7 +104,29 @@
             layer.className = '';
         }
 
+        let currentProfileEquipment = {};
+
+        function ownProfileFallback() {
+            return currentUser.photo_url
+                ? {
+                    imageUrl: normalizeUrl(currentUser.photo_url),
+                    alt: currentUser.first_name ? `Аватар ${currentUser.first_name}` : 'Аватар ученика'
+                }
+                : ((currentUser.first_name || '?')[0].toUpperCase());
+        }
+
+        function openOwnSeasonProfileCard(trigger) {
+            if (!currentUser) return;
+            openSeasonProfileCard({
+                name: currentUser.first_name || '',
+                meta: 'Ваш профиль',
+                eq: currentProfileEquipment,
+                fallback: ownProfileFallback()
+            }, trigger || document.getElementById('user-avatar-container'));
+        }
+
         function applyProfileCosmetics(eq) {
+            currentProfileEquipment = eq || {};
             renderNick(document.getElementById('user-name'), currentUser.first_name || '', eq, '');
             const titleEl = document.getElementById('profile-title');
             const titleRow = document.getElementById('profile-title-row');
@@ -117,29 +139,12 @@
                 titleEl.textContent = '';
             }
             const avatarHost = document.getElementById('user-avatar-container');
-            const fallback = currentUser.photo_url
-                ? {
-                    imageUrl: normalizeUrl(currentUser.photo_url),
-                    alt: currentUser.first_name ? `Аватар ${currentUser.first_name}` : 'Аватар ученика'
-                }
-                : ((currentUser.first_name || '?')[0].toUpperCase());
+            const fallback = ownProfileFallback();
             if (window.SeasonCosmetics) {
                 SeasonCosmetics.replaceAvatar(avatarHost, eq, 48, 'profile', fallback);
                 avatarHost.tabIndex = 0;
                 avatarHost.setAttribute('role', 'button');
-                avatarHost.setAttribute('aria-label', 'Открыть визитку');
-                avatarHost.onclick = () => openSeasonProfileCard({
-                    name: currentUser.first_name || '',
-                    meta: 'Ваш профиль',
-                    eq,
-                    fallback
-                }, avatarHost);
-                avatarHost.onkeydown = (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        avatarHost.click();
-                    }
-                };
+                avatarHost.setAttribute('aria-label', 'Открыть мини-профиль');
             } else {
                 applyAvatarFrame(avatarHost, eq);
             }
@@ -150,30 +155,39 @@
         let seasonProfileHistoryEntry = false;
 
         function openSeasonProfileCard(user, trigger) {
-            if (!window.SeasonCosmetics) return;
             const overlay = document.getElementById('season-profile-overlay');
+            if (!overlay) return;
             const sceneHost = document.getElementById('season-profile-scene');
             const avatarHost = document.getElementById('season-profile-avatar');
             const title = equippedTitleText(user.eq && user.eq.title);
 
-            sceneHost.replaceChildren();
-            const scene = SeasonCosmetics.createScene(user.eq && user.eq.background, 'season-profile-scene-art');
-            if (scene) sceneHost.appendChild(scene);
-            SeasonCosmetics.replaceAvatar(
-                avatarHost,
-                user.eq || {},
-                160,
-                'expanded',
-                user.fallback || (user.name || '?')[0].toUpperCase()
-            );
+            // Сначала открываем оболочку: ошибка отдельного визуального слоя не должна делать
+            // клик полностью нерабочим.
+            seasonProfileTrigger = trigger || null;
+            overlay.hidden = false;
+            document.body.classList.add('season-profile-open');
+            try {
+                sceneHost.replaceChildren();
+                if (!window.SeasonCosmetics) throw new Error('renderer_unavailable');
+                const scene = SeasonCosmetics.createScene(user.eq && user.eq.background, 'season-profile-scene-art');
+                if (scene) sceneHost.appendChild(scene);
+                SeasonCosmetics.replaceAvatar(
+                    avatarHost,
+                    user.eq || {},
+                    160,
+                    'expanded',
+                    user.fallback || (user.name || '?')[0].toUpperCase()
+                );
+            } catch (error) {
+                sceneHost.replaceChildren();
+                avatarHost.textContent = (user.name || '?')[0].toUpperCase();
+                log('⚠️ Мини-профиль: ' + (error.message || error));
+            }
             document.getElementById('season-profile-name').textContent = user.name || '';
             document.getElementById('season-profile-title').textContent = title || 'Без титула';
             document.getElementById('season-profile-title').className =
                 `rarity-title-${(user.eq && user.eq.title && user.eq.title.rarity) || 'common'}`;
             document.getElementById('season-profile-meta').textContent = user.meta || '';
-            seasonProfileTrigger = trigger || null;
-            overlay.hidden = false;
-            document.body.classList.add('season-profile-open');
             avatarHost.tabIndex = 0;
             avatarHost.setAttribute('role', 'button');
             avatarHost.setAttribute('aria-label', 'Закрыть визитку');
@@ -185,8 +199,12 @@
                 }
             };
             if (!seasonProfileHistoryEntry) {
-                history.pushState({ seasonProfileCard: true }, '');
-                seasonProfileHistoryEntry = true;
+                try {
+                    history.pushState({ seasonProfileCard: true }, '');
+                    seasonProfileHistoryEntry = true;
+                } catch (_error) {
+                    seasonProfileHistoryEntry = false;
+                }
             }
             overlay.querySelector('.season-profile-close').focus();
         }
@@ -610,7 +628,7 @@
             try {
                 const { data, error } = await db
                     .from('season_results')
-                    .select('season_id, points, place')
+                    .select('season_id, points, place, seasons(title,display_number,preset_code)')
                     .eq('student_id', currentUser.id)
                     .order('season_id', { ascending: false })
                     .limit(10);
@@ -627,12 +645,22 @@
                     const placeDisplay = item.place === 1 ? '🥇' : item.place === 2 ? '🥈' : item.place === 3 ? '🥉' : `#${item.place}`;
                     const li = document.createElement('li');
                     li.className = 'history-item';
-                    li.innerHTML = `
-                        <div class="hist-info">
-                            <div class="hist-reason">Сезон №${item.season_id} — ${placeDisplay} место</div>
-                        </div>
-                        <div class="hist-amount">${item.points} ⭐</div>
-                    `;
+                    const info = document.createElement('div');
+                    info.className = 'hist-info';
+                    const reason = document.createElement('div');
+                    reason.className = 'hist-reason';
+                    const season = item.seasons;
+                    const seasonLabel = season?.display_number
+                        ? `Сезон №${season.display_number}${season.title ? ` · ${season.title}` : ''}`
+                        : (season?.preset_code
+                            ? `Межсезонье${season.title ? ` · ${season.title}` : ''}`
+                            : `Сезон №${item.season_id}`);
+                    reason.textContent = `${seasonLabel} — ${placeDisplay} место`;
+                    info.appendChild(reason);
+                    const amount = document.createElement('div');
+                    amount.className = 'hist-amount';
+                    amount.textContent = `${item.points} ⭐`;
+                    li.append(info, amount);
                     list.appendChild(li);
                 });
 
@@ -857,11 +885,11 @@
             return li;
         }
 
-        // Подпись сезона в шапке лиги: название из планирования (миграция 051) + номер.
+        // Подпись сезона в шапке лиги: название безопаснее внутреннего id строки seasons.
         function leagueSeasonLabel(snap) {
             if (!snap || !snap.season_id) return '';
             return snap.season_title
-                ? `«${esc(snap.season_title)}» (сезон №${snap.season_id})`
+                ? `«${esc(snap.season_title)}»`
                 : `Сезон №${snap.season_id}`;
         }
 

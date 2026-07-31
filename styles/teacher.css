@@ -312,17 +312,21 @@
     background: #fff;
     cursor: pointer;
 }
-#season-v2-editor-fields > label,
-.season-v2-date-grid label {
+#season-v2-meta-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(120px, 1fr);
+    gap: 10px;
+}
+#season-v2-meta-editor[hidden],
+#season-v2-number-wrap[hidden] { display: none; }
+#season-v2-meta-editor > label {
     display: grid;
     gap: 5px;
     margin: 10px 0;
     font-size: 12px;
     font-weight: 700;
 }
-#season-v2-editor-fields input,
-#season-v2-editor-fields textarea,
-#season-v2-editor-fields select {
+#season-v2-meta-editor input {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #d0d5dd;
@@ -331,12 +335,7 @@
     font: inherit;
     background: #fff;
 }
-#season-v2-editor-fields textarea { min-height: 70px; resize: vertical; }
-.season-v2-date-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
+.season-v2-items-heading { margin: 18px 0 8px; }
 #season-v2-items {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -356,6 +355,35 @@
 .season-v2-item-editor.rarity-rare { border-left-color: #2e90fa; }
 .season-v2-item-editor.rarity-epic { border-left-color: #9b51e0; }
 .season-v2-item-editor.rarity-legendary { border-left-color: #f79009; }
+.season-v2-item-visual {
+    position: relative;
+    display: grid;
+    min-height: 92px;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #151a26;
+}
+.season-v2-item-scene {
+    position: absolute;
+    inset: 0;
+}
+.season-v2-item-visual--title {
+    padding: 10px;
+    min-height: 72px;
+    text-align: center;
+}
+.season-v2-item-description {
+    min-height: 2.7em;
+    color: #667085;
+    font-size: 11px;
+    line-height: 1.35;
+}
+.season-v2-item-price {
+    color: #344054;
+    font-size: 12px;
+    font-weight: 800;
+}
 .season-v2-preview-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -409,7 +437,7 @@
 .season-v2-title { font-size: 12px; }
 
 @media (max-width: 560px) {
-    .season-v2-date-grid,
+    #season-v2-meta-editor,
     #season-v2-items,
     .season-v2-preview-grid { grid-template-columns: 1fr; }
     .season-v2-preview-card { flex-direction: column; }

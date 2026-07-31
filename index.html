@@ -164,7 +164,9 @@
     <!-- ЭКРАН 1: ПРОФИЛЬ -->
     <div id="screen-profile" class="screen active">
         <div class="profile-header">
-            <div class="avatar-container" id="user-avatar-container"></div>
+            <div class="avatar-container" id="user-avatar-container" role="button" tabindex="0"
+                 aria-label="Открыть мини-профиль" onclick="openOwnSeasonProfileCard(this)"
+                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openOwnSeasonProfileCard(this);}"></div>
             <div class="profile-identity">
                 <h2 class="user-name" id="user-name">Загрузка...</h2>
                 <div class="profile-meta-list">
