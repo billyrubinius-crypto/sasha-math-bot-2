@@ -152,7 +152,7 @@
             --ca-space-7: 25px;
 
             --ca-nav-h: 65px;
-            --ca-avatar-size: 48px;
+            --ca-avatar-size: 56px;
             --ca-avatar-sm: 32px;
             --ca-touch: 44px;
             --ca-icon-tile: 30px;
@@ -1993,7 +1993,7 @@
             display: grid;
             place-items: center;
             position: relative;
-            width: 54px; height: 54px;
+            width: 60px; height: 60px;
             padding: 0;
             border: 1px solid var(--ca-border-soft);
             border-radius: var(--ca-radius-lg);

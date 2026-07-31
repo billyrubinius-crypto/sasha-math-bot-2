@@ -1,0 +1,72 @@
+/* =============================================================================
+   Визуалы питомцев (Stage 5).
+
+   Решение: питомец рисуется ЦЕЛИКОМ — голова, туловище, лапы, хвост, — а не бюстом
+   в круге, как сезонные аватары. В окне 38-96 px целая фигура читается однозначно:
+   кот, сова и капибара различимы сразу, тогда как портреты в маленьком размере
+   сливаются в одинаковые мордочки.
+
+   Поэтому портретная система (.v3-character / .char-*) здесь НЕ используется —
+   она устроена под бюст в круглом клипе. Формы питомцев живут в js/student-pets.js
+   как SVG, а этот файл держит палитру и мимику: цвета правятся здесь, рядом с
+   остальной косметикой, и не требуют трогать разметку.
+
+   Пространство классов отдельное: pet-visual-* и pet-figure. Пересекаться с
+   сезонными аватарами нельзя — питомец-капибара и сезонный аватар «капибара»
+   разные сущности в разных слотах (SPEC_STAGE5_PETS §3).
+   ============================================================================= */
+
+.pet-figure {
+    display: block;
+    width: var(--pet-size, 40px);
+    height: var(--pet-size, 40px);
+    /* Мягкое окно под фигурой: рисунок сидит в нём, а не парит в пустоте. */
+    border-radius: 28%;
+    background: radial-gradient(circle at 50% 118%, var(--pet-glow, transparent) 0 58%, transparent 59%),
+                linear-gradient(160deg, var(--pet-bg-a, #e2e8f0), var(--pet-bg-b, #cbd5e1));
+    overflow: hidden;
+}
+.pet-svg { display: block; width: 100%; height: 100%; }
+
+/* Слои фигуры. Обводка одна на всех — силуэт держится даже на 38 px. */
+.pet-body  { fill: var(--pet-body); stroke: var(--pet-ink); stroke-width: 1.6; stroke-linejoin: round; }
+.pet-belly { fill: var(--pet-belly); stroke: none; }
+.pet-beak  { fill: var(--pet-accent); stroke: var(--pet-ink); stroke-width: 1.2; stroke-linejoin: round; }
+.pet-ink   { fill: var(--pet-ink); stroke: none; }
+.pet-spark { fill: #fff; stroke: none; }
+.pet-line  { fill: none; stroke: var(--pet-ink); stroke-width: 1.7; stroke-linecap: round; }
+
+/* --- Палитры видов -------------------------------------------------------- */
+.pet-visual-cat {
+    --pet-body: #f0a15c; --pet-belly: #ffdcb4; --pet-accent: #fb7185;
+    --pet-ink: #3b2416; --pet-bg-a: #ffe6c6; --pet-bg-b: #f3a969; --pet-glow: rgba(255,255,255,.45);
+}
+.pet-visual-owl {
+    --pet-body: #8b74d6; --pet-belly: #ded6f7; --pet-accent: #f6a93b;
+    --pet-ink: #241a45; --pet-bg-a: #ded4f9; --pet-bg-b: #7d68c8; --pet-glow: rgba(255,255,255,.4);
+}
+.pet-visual-capybara {
+    --pet-body: #b07d51; --pet-belly: #e3bd93; --pet-accent: #84cc16;
+    --pet-ink: #34210f; --pet-bg-a: #f7ddb9; --pet-bg-b: #a97a4e; --pet-glow: rgba(255,255,255,.42);
+}
+
+/* --- Мимика по состоянию заботы ------------------------------------------- */
+/* Формы глаз и рта подставляет JS по коду настроения; здесь — только общий тон
+   фигуры. Голод и усталость приглушают её, но ничего не отнимают: правило этапа —
+   питомец грустит, а не наказывает. */
+.pet-face-hungry  { filter: saturate(.72); }
+.pet-face-tired   { filter: saturate(.82) brightness(.97); }
+.pet-face-sleeping { filter: saturate(.86) brightness(.94); }
+
+/* Спящий питомец слегка «дышит» — единственное движение, и оно отключаемо. */
+@media (prefers-reduced-motion: no-preference) {
+    .pet-face-sleeping .pet-svg { animation: pet-breath 3.6s ease-in-out infinite; }
+    @keyframes pet-breath {
+        0%, 100% { transform: scale(1); }
+        50%      { transform: scale(1.04); }
+    }
+}
+
+/* --- Контейнеры плитки и карточки ----------------------------------------- */
+.pet-art .pet-figure { margin: 0 auto; }
+.pet-card-art .pet-figure { border-radius: 24%; }

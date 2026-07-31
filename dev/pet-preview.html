@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="../styles/student.css">
   <link rel="stylesheet" href="../styles/season-v3-preview.css">
   <link rel="stylesheet" href="../styles/season-cosmetics-preview.css?v=9">
+  <link rel="stylesheet" href="../styles/pets.css?v=2">
+  <script src="../js/student-pets.js?v=2"></script>
   <style>
     body { margin: 0; padding: 24px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
            background: #f4f6fb; color: #0f172a; display: block; }
@@ -45,6 +47,11 @@
   <div class="row" id="dark-row"></div>
   <div class="row" id="card-row"></div>
 
+  <h1 style="margin-top:8px">Виды и мимика</h1>
+  <p class="hint">Три вида в пяти состояниях заботы. Мимику задаёт сервер кодом, здесь она
+     только отражается: голод опускает уголки рта, усталость приспускает веки, сон закрывает глаза.</p>
+  <div class="row" id="matrix-row"></div>
+
 <script>
   const MOODS = [
     { mood: 'happy',       badge: '😊', days: 5, satiety: 'Сыт до 5 августа — это ещё 5 дней', long: 'Сыт и доволен' },
@@ -53,10 +60,17 @@
     { mood: 'hungry',      badge: '😢', days: 0, satiety: 'Сегодня ещё не кормлен',            long: 'Проголодался и грустит' }
   ];
   const PETS = [
-    { glyph: '🐱', cls: 'pet-art-cat',      name: 'Кот' },
-    { glyph: '🦉', cls: 'pet-art-owl',      name: 'Сова' },
-    { glyph: '🦫', cls: 'pet-art-capybara', name: 'Капибара' }
+    { key: 'cat',      cls: 'pet-art-cat',      name: 'Кот' },
+    { key: 'owl',      cls: 'pet-art-owl',      name: 'Сова' },
+    { key: 'capybara', cls: 'pet-art-capybara', name: 'Капибара' }
   ];
+
+  // Стенд рисует боевой функцией petArtNode из js/student-pets.js — никакой копии
+  // разметки, поэтому расхождение между превью и приложением невозможно.
+  function art(pet, mood, size) {
+    return petArtNode({ key: pet.key, name: pet.name }, size, mood).outerHTML;
+  }
+
   const PRICE = 5, MAX = 7;
 
   function header(pet, state, opts) {
@@ -78,7 +92,7 @@
           </div>
         </div>
         <button type="button" class="pet-tile pet-mood-${state.mood}" aria-label="Открыть карточку питомца">
-          <span class="pet-art ${pet.cls}" aria-hidden="true">${pet.glyph}</span>
+          <span class="pet-art ${pet.cls}" aria-hidden="true">${art(pet, state.mood, 44)}</span>
           <span class="pet-tile-mood" aria-hidden="true">${state.badge}</span>
         </button>
       </div>`;
@@ -95,7 +109,7 @@
     return `
       <article class="pet-card">
         <button type="button" class="pet-card-close" aria-label="Закрыть">✕</button>
-        <div class="pet-card-art pet-art ${pet.cls}" aria-hidden="true">${pet.glyph}</div>
+        <div class="pet-card-art pet-art ${pet.cls}" aria-hidden="true">${art(pet, state.mood, 96)}</div>
         <div class="pet-card-copy">
           <h3>${pet.name}</h3>
           <p class="pet-card-mood pet-mood-${state.mood}">${state.long}</p>
@@ -118,6 +132,14 @@
   document.getElementById('dark-row').innerHTML = MOODS
     .map((s, i) => figure(`Тёмная · ${s.mood} · 375 px`, 'stage dark', header(PETS[i % PETS.length], s, {})))
     .join('');
+
+  const FACES = ['happy', 'fed', 'hungry_soon', 'hungry', 'tired', 'sleeping'];
+  document.getElementById('matrix-row').innerHTML = PETS.map(pet => figure(
+    pet.name, 'stage',
+    `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">` +
+      FACES.map(f => `<div style="text-align:center;font-size:11px;color:#64748b">
+          ${art(pet, f, 64)}<div style="margin-top:4px">${f}</div></div>`).join('') +
+    `</div>`)).join('');
 
   document.getElementById('card-row').innerHTML =
       figure('Карточка · сыт · тёмный фон', 'card-stage', card(PETS[0], MOODS[0]))

@@ -9,10 +9,87 @@
 // Механика раскрытия повторяет визитку сезонного профиля (openSeasonProfileCard): бэкдроп,
 // крестик, Escape, кнопка «Назад» через history и возврат фокуса на плитку.
         const PET_VISUALS = {
-            pet_v1_cat:      { glyph: '🐱', cls: 'pet-art-cat',      name: 'Кот' },
-            pet_v1_owl:      { glyph: '🦉', cls: 'pet-art-owl',      name: 'Сова' },
-            pet_v1_capybara: { glyph: '🦫', cls: 'pet-art-capybara', name: 'Капибара' }
+            pet_v1_cat:      { key: 'cat',      cls: 'pet-art-cat',      name: 'Кот' },
+            pet_v1_owl:      { key: 'owl',      cls: 'pet-art-owl',      name: 'Сова' },
+            pet_v1_capybara: { key: 'capybara', cls: 'pet-art-capybara', name: 'Капибара' }
         };
+
+        // Питомец рисуется ЦЕЛИКОМ, а не портретом: в маленьком окне фигура читается
+        // лучше бюста, поэтому здесь свои SVG-силуэты, а не портретная система сезонных
+        // аватаров. Формы — в JS, цвета — в styles/pets.css (классы pet-visual-*), чтобы
+        // палитра правилась там же, где остальная косметика.
+        const PET_FACES = {
+            // Глаза и рот по состоянию заботы. Настроение приходит с сервера, здесь только
+            // отражается: голод и усталость меняют лицо и ничего не отнимают.
+            happy:       { eyes: 'open',   mouth: 'M27 30 q5 5 10 0' },
+            fed:         { eyes: 'open',   mouth: 'M28 30 q4 3 8 0' },
+            hungry_soon: { eyes: 'open',   mouth: 'M28 31 h8' },
+            hungry:      { eyes: 'open',   mouth: 'M27 32 q5 -5 10 0' },
+            tired:       { eyes: 'half',   mouth: 'M28 31 h8' },
+            sleeping:    { eyes: 'closed', mouth: 'M29 31 h6' }
+        };
+
+        function petFace(mood) {
+            const face = PET_FACES[mood] || PET_FACES.fed;
+            const eyes = face.eyes === 'closed'
+                ? '<path class="pet-line" d="M23 24 q3 3 6 0"/><path class="pet-line" d="M35 24 q3 3 6 0"/>'
+                : face.eyes === 'half'
+                    ? '<path class="pet-line" d="M23 25 q3 -3 6 0"/><path class="pet-line" d="M35 25 q3 -3 6 0"/>'
+                    : '<circle class="pet-ink" cx="26" cy="24" r="2.6"/><circle class="pet-ink" cx="38" cy="24" r="2.6"/>'
+                      + '<circle class="pet-spark" cx="27" cy="23" r="0.9"/><circle class="pet-spark" cx="39" cy="23" r="0.9"/>';
+            return eyes + `<path class="pet-line" d="${face.mouth}"/>`;
+        }
+
+        // Каждый силуэт — целая фигура: голова, туловище, лапы и хвост в одном кадре 64×64.
+        const PET_SHAPES = {
+            cat: (mood) => `
+                <path class="pet-body" d="M46 50 q9 -3 8 -12 q-1 -6 -5 -5 q-4 1 -3 7"/>
+                <ellipse class="pet-body" cx="32" cy="45" rx="15" ry="12"/>
+                <ellipse class="pet-belly" cx="32" cy="48" rx="8" ry="7"/>
+                <path class="pet-body" d="M20 16 L23 5 L30 13 Z"/>
+                <path class="pet-body" d="M44 16 L41 5 L34 13 Z"/>
+                <circle class="pet-body" cx="32" cy="24" r="13"/>
+                <path class="pet-line" d="M14 22 h6 M14 26 h6 M44 22 h6 M44 26 h6"/>
+                ${petFace(mood)}
+                <circle class="pet-body" cx="24" cy="55" r="4"/>
+                <circle class="pet-body" cx="40" cy="55" r="4"/>`,
+            owl: (mood) => `
+                <path class="pet-body" d="M22 14 L24 5 L30 12 Z"/>
+                <path class="pet-body" d="M42 14 L40 5 L34 12 Z"/>
+                <ellipse class="pet-body" cx="32" cy="34" rx="17" ry="21"/>
+                <ellipse class="pet-belly" cx="32" cy="40" rx="10" ry="13"/>
+                <path class="pet-body" d="M15 30 q-3 12 4 18 q3 -9 2 -18 Z"/>
+                <path class="pet-body" d="M49 30 q3 12 -4 18 q-3 -9 -2 -18 Z"/>
+                <circle class="pet-belly" cx="26" cy="24" r="7"/>
+                <circle class="pet-belly" cx="38" cy="24" r="7"/>
+                ${petFace(mood)}
+                <path class="pet-beak" d="M30 29 h4 l-2 4 Z"/>
+                <path class="pet-line" d="M27 57 v-4 M32 57 v-4 M37 57 v-4"/>`,
+            capybara: (mood) => `
+                <ellipse class="pet-body" cx="34" cy="42" rx="19" ry="13"/>
+                <ellipse class="pet-belly" cx="36" cy="46" rx="12" ry="7"/>
+                <circle class="pet-body" cx="24" cy="55" r="4"/>
+                <circle class="pet-body" cx="44" cy="55" r="4"/>
+                <circle class="pet-body" cx="20" cy="12" r="3"/>
+                <circle class="pet-body" cx="44" cy="12" r="3"/>
+                <ellipse class="pet-body" cx="32" cy="24" rx="15" ry="12"/>
+                <ellipse class="pet-belly" cx="32" cy="31" rx="9" ry="6"/>
+                ${petFace(mood)}
+                <ellipse class="pet-ink" cx="32" cy="30" rx="2.2" ry="1.6"/>`
+        };
+
+        // Структура превью: одно окно фиксированного размера, внутри — целая фигура.
+        function petArtNode(visual, size, mood) {
+            const wrap = document.createElement('span');
+            wrap.className = `pet-figure pet-visual-${visual.key} pet-face-${mood || 'fed'}`;
+            wrap.style.setProperty('--pet-size', `${size}px`);
+            const shape = PET_SHAPES[visual.key];
+            if (!shape) return wrap;
+            wrap.innerHTML =
+                `<svg class="pet-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">`
+                + shape(mood || 'fed') + `</svg>`;
+            return wrap;
+        }
 
         // Подписи настроения задаёт сервер кодом; клиент только переводит код в текст.
         // sleeping — общее состояние (overall_mood), остальные приходят и как ось питания.
@@ -100,7 +177,7 @@
             const overall = petState.overall_mood || petState.mood;
             const art = document.getElementById('pet-tile-art');
             const mood = PET_MOODS[overall] || PET_MOODS.hungry;
-            art.textContent = visual.glyph;
+            art.replaceChildren(petArtNode(visual, 44, overall));
             art.className = `pet-art ${visual.cls}`;
             document.getElementById('pet-tile-mood').textContent = mood.badge;
             tile.className = `pet-tile pet-mood-${overall}`;
@@ -130,7 +207,7 @@
             const max = Number(petState.max_prepaid_days) || 0;
 
             const art = document.getElementById('pet-card-art');
-            art.textContent = visual.glyph;
+            art.replaceChildren(petArtNode(visual, 96, overall));
             art.className = `pet-card-art pet-art ${visual.cls}`;
             document.getElementById('pet-card-name').textContent = visual.name;
             document.getElementById('pet-card-mood').textContent = mood.long;
