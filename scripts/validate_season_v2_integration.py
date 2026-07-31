@@ -24,6 +24,7 @@ def main() -> int:
     seed = read("database/migrations/058_season_v2_catalog_seed.sql")
     safe_teacher = read("database/migrations/059_teacher_safe_season_metadata.sql")
     editable_labels = read("database/migrations/060_teacher_edit_all_scheduled_season_labels.sql")
+    public_numbering = read("database/migrations/061_public_season_numbering_from_zero.sql")
     student_html = read("index.html")
     teacher_html = read("teacher.html")
     progress = read("js/student-progress.js")
@@ -59,10 +60,14 @@ def main() -> int:
             "manual season closure must be disabled")
     require("drop index if exists public.idx_seasons_v2_display_number" in editable_labels,
             "public season number is still incorrectly unique")
-    require("'display_number', coalesce(s.display_number, p.sequence_no)" in editable_labels,
-            "all season rows do not receive public display numbers")
     require("interseason_has_no_number" not in editable_labels,
             "technical interseason type still blocks public label editing")
+    require("when p.catalog_only then null" in public_numbering,
+            "catalog-only archive still receives a public season number")
+    require("when p.sequence_no = 2 then 0" in public_numbering,
+            "automatic August season is not numbered zero")
+    require("p_display_number not between 0 and 999" in public_numbering,
+            "teacher cannot save Season №0")
 
     for html, label in ((student_html, "student"), (teacher_html, "teacher")):
         require("styles/season-v3-preview.css" in html, f"{label} approved base CSS missing")
@@ -96,6 +101,10 @@ def main() -> int:
             "safe teacher metadata gateway not wired")
     require("season-v2-inline-editor" in teacher,
             "scheduled-season metadata editor must stay inside its season card")
+    require("if (row.catalog_only) return 'Архив'" in teacher,
+            "catalog-only template is not labelled as an unnumbered archive")
+    require("numberInput.min = '0'" in teacher,
+            "teacher season number editor does not accept zero")
     require("text: 'Запланирован'" in teacher,
             "scheduled season status is not translated")
     require("Межсезонье" not in teacher and "период" not in teacher

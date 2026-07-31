@@ -713,7 +713,8 @@
                     const reason = document.createElement('div');
                     reason.className = 'hist-reason';
                     const season = item.seasons;
-                    const seasonLabel = season?.display_number
+                    const seasonLabel = season?.display_number !== null
+                        && season?.display_number !== undefined
                         ? `Сезон №${season.display_number}${season.title ? ` · ${season.title}` : ''}`
                         : (season?.preset_code
                             ? `Межсезонье${season.title ? ` · ${season.title}` : ''}`

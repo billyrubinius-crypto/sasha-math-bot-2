@@ -77,7 +77,8 @@
                     const title = document.createElement('div');
                     title.className = 'collection-season-title';
                     const season = visibleSeasonById.get(b.season_id);
-                    title.textContent = season?.display_number
+                    title.textContent = season?.display_number !== null
+                        && season?.display_number !== undefined
                         ? `Сезон №${season.display_number}${season.title ? ` · ${season.title}` : ''}`
                         : (season?.preset_code
                             ? `Межсезонье${season.title ? ` · ${season.title}` : ''}`

@@ -14,7 +14,7 @@
         }
 
         const SEASON_STATUS_LABELS = {
-            catalog_only: { text: 'Только каталог', className: 'catalog' },
+            catalog_only: { text: 'Архив', className: 'archived' },
             draft:        { text: 'Черновик', className: 'draft' },
             scheduled:    { text: 'Запланирован', className: 'scheduled' },
             active:       { text: 'Текущий', className: 'active' },
@@ -24,7 +24,7 @@
 
         const SEASON_ERROR_TEXT = {
             title_required: 'Укажите название сезона (до 60 символов).',
-            season_number_required: 'Укажите номер сезона от 1 до 999.',
+            season_number_required: 'Укажите номер сезона от 0 до 999.',
             scheduled_season_not_found: 'Редактировать можно только запланированный сезон.',
             markup_not_allowed: 'HTML-разметка в текстах запрещена.',
             forbidden: 'Недостаточно прав.'
@@ -41,7 +41,11 @@
         let seasonV2EditingCode = null;
 
         function seasonDisplayLabel(row) {
-            return `Сезон №${row.display_number ?? row.sequence_no ?? '—'}`;
+            if (row.catalog_only) return 'Архив';
+            const displayNumber = row.display_number ?? row.competition_season_no;
+            return displayNumber === null || displayNumber === undefined
+                ? 'Сезон'
+                : `Сезон №${displayNumber}`;
         }
 
         function seasonItemMap(row) {
@@ -186,10 +190,11 @@
             numberLabel.textContent = 'Номер';
             const numberInput = document.createElement('input');
             numberInput.type = 'number';
-            numberInput.min = '1';
+            numberInput.min = '0';
             numberInput.max = '999';
             numberInput.step = '1';
-            numberInput.value = row.display_number ?? row.sequence_no ?? '';
+            numberInput.required = true;
+            numberInput.value = row.display_number ?? row.competition_season_no ?? '';
             numberLabel.appendChild(numberInput);
             editor.appendChild(numberLabel);
 
@@ -220,7 +225,7 @@
 
         async function saveSeasonV2InlineMeta(row, titleInput, numberInput, button, errorBox) {
             const title = titleInput.value.trim();
-            const displayNumber = Number(numberInput.value);
+            const displayNumber = numberInput.value === '' ? null : Number(numberInput.value);
             button.disabled = true;
             errorBox.hidden = true;
             try {
