@@ -1,6 +1,7 @@
 -- =============================================================================
 -- database/tests/v2_pets_regression.sql — регрессия питомцев Stage 5
--- (миграции 064 «питомцы» и 065 «сон»; SPEC_STAGE5_PETS.md, карточки V2/V3)
+-- (миграции 064 «питомцы», 065 «сон», 066 «настроение», 068 «оси комнаты»;
+-- SPEC_STAGE5_PETS.md, SPEC_STAGE5_PET_ROOM.md, карточки V2/V3 и PET1)
 --
 -- Каждый БЛОК выполняется в отдельной begin;...rollback; — dev не изменяется, вся синтетика
 -- (telegram_id >= 995000000) откатывается. Прогонять по одному блоку; каждый отдаёт свой грид
@@ -317,6 +318,157 @@ begin
     get stacked diagnostics v_msg = message_text;
     insert into pet_report values (2, 'OFF_SLEEP', 'выключенная механика не укладывает',
       not exists (select 1 from public.student_pet_state where student_id = 995000506), v_msg);
+  end;
+end $$;
+
+select * from pet_report order by seq;
+rollback;
+
+
+-- =========================================================================
+-- БЛОК 6 — PET1: оси внимания и игры, связь (миграция 068)
+--
+-- Отдельно проверяется главное уточнение реализации: связь считает ДНИ С ЗАБОТОЙ, а не
+-- количество действий. Иначе «60 дней заботы» из условия эволюции набирались бы тапами.
+-- =========================================================================
+begin;
+create temp table pet_report(seq int, code text, title text, pass boolean, detail text) on commit drop;
+
+insert into public.students (telegram_id, name, huikons) values (995000507, 'pet_r7', 500);
+update public.economy_config set stage5_pets_enabled = true where id;
+
+do $$
+declare v_msg text; v_bond integer; v_cnt integer; v_room json;
+begin
+  -- 1. действие без питомца отклоняется
+  begin
+    perform public.pet_care(995000507, 'pet');
+    insert into pet_report values (1, 'CARE_NO_PET', 'забота без питомца отклоняется', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    insert into pet_report values (1, 'CARE_NO_PET', 'забота без питомца отклоняется',
+      not exists (select 1 from public.pet_care_log where student_id = 995000507), v_msg);
+  end;
+
+  insert into public.student_items (student_id, item_code, quantity) values (995000507, 'pet_cat', 1);
+  insert into public.student_equipment (student_id, slot, item_code) values (995000507, 'pet', 'pet_cat');
+
+  -- 2. первое «погладить»: одна строка лога, связь 1
+  perform public.pet_care(995000507, 'pet');
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  select count(*) into v_cnt from public.pet_care_log where student_id = 995000507;
+  insert into pet_report values (2, 'CARE_FIRST', 'первое действие: лог 1, связь 1',
+    v_cnt = 1 and v_bond = 1, format('лог %s, связь %s', v_cnt, v_bond));
+
+  -- 3. повтор в том же окне отклоняется и ничего не пишет
+  begin
+    perform public.pet_care(995000507, 'pet');
+    insert into pet_report values (3, 'CARE_SAME_WINDOW', 'повтор в окне отклоняется', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    select count(*) into v_cnt from public.pet_care_log where student_id = 995000507;
+    select bond into v_bond from public.student_pet_state where student_id = 995000507;
+    insert into pet_report values (3, 'CARE_SAME_WINDOW', 'повтор в окне отклоняется',
+      v_cnt = 1 and v_bond = 1, format('лог %s, связь %s', v_cnt, v_bond));
+  end;
+
+  -- 4. «поиграть» — независимая ось: своё окно, своя строка
+  perform public.pet_care(995000507, 'play');
+  select count(*) into v_cnt from public.pet_care_log where student_id = 995000507;
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  insert into pet_report values (4, 'CARE_INDEPENDENT', 'игра не мешает поглаживанию',
+    v_cnt = 2 and v_bond = 1,
+    format('лог %s, связь %s (в тот же день связь не растёт второй раз)', v_cnt, v_bond));
+
+  -- 5. новое окно: действие снова доступно
+  update public.pet_care_log set window_start = window_start - interval '48 hours'
+   where student_id = 995000507 and action = 'pet';
+  perform public.pet_care(995000507, 'pet');
+  select count(*) into v_cnt from public.pet_care_log
+   where student_id = 995000507 and action = 'pet';
+  insert into pet_report values (5, 'CARE_NEW_WINDOW', 'в новом окне действие доступно',
+    v_cnt = 2, format('строк поглаживания %s', v_cnt));
+
+  -- 6. связь считает ДНИ: в пределах одних суток она осталась 1 при четырёх действиях
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  insert into pet_report values (6, 'BOND_IS_DAYS', 'связь считает дни, а не нажатия',
+    v_bond = 1, format('связь %s после трёх засчитанных действий за день', v_bond));
+
+  -- 7. новый день заботы двигает связь на единицу.
+  -- Сдвигаем И день связи, И окно кулдауна: иначе «поиграть» из проверки 4 всё ещё в своём
+  -- 12-часовом окне и функция откажет — как она и должна.
+  update public.student_pet_state set last_bond_date = last_bond_date - 1
+   where student_id = 995000507;
+  update public.pet_care_log set window_start = window_start - interval '48 hours'
+   where student_id = 995000507 and action = 'play';
+  perform public.pet_care(995000507, 'play');
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  insert into pet_report values (7, 'BOND_NEXT_DAY', 'новый день заботы: связь +1',
+    v_bond = 2, format('связь %s', v_bond));
+
+  -- 8. кормление тоже двигает связь и тоже один раз за день
+  update public.student_pet_state set last_bond_date = last_bond_date - 1
+   where student_id = 995000507;
+  perform public.feed_pet(995000507, 1);
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  insert into pet_report values (8, 'BOND_FEED', 'кормление засчитывает день заботы',
+    v_bond = 3, format('связь %s', v_bond));
+
+  -- 9. сон тоже двигает связь
+  update public.student_pet_state set last_bond_date = last_bond_date - 1
+   where student_id = 995000507;
+  perform public.put_pet_to_sleep(995000507);
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  insert into pet_report values (9, 'BOND_SLEEP', 'сон засчитывает день заботы',
+    v_bond = 4, format('связь %s', v_bond));
+
+  -- 10. бесплатные оси не создали ни одной денежной операции
+  insert into pet_report values (10, 'CARE_FREE', 'внимание и игра бесплатны',
+    (select count(*) from public.balance_history
+      where student_id = 995000507 and reason <> 'pet_feed') = 0,
+    'строк истории кроме корма: ' ||
+      (select count(*) from public.balance_history
+        where student_id = 995000507 and reason <> 'pet_feed'));
+
+  -- 11. read-модель отдаёт доступность обеих осей и связь
+  v_room := public.get_pet_room(995000507);
+  insert into pet_report values (11, 'ROOM_MODEL', 'комната отдаёт оси, связь и питомца',
+    (v_room -> 'care' -> 'petting' ->> 'available') is not null
+      and (v_room -> 'care' -> 'play' ->> 'available') is not null
+      and (v_room ->> 'bond')::int = 4
+      and (v_room -> 'pet' ->> 'item_code') = 'pet_cat',
+    format('bond=%s, petting=%s, play=%s', v_room ->> 'bond',
+           v_room -> 'care' -> 'petting' ->> 'available',
+           v_room -> 'care' -> 'play' ->> 'available'));
+
+  -- 12. реакции: плохих событий в контракте нет вовсе
+  insert into pet_report values (12, 'CHEERS_ONLY_GOOD', 'в реакциях только хорошее',
+    (v_room -> 'cheers' ->> 'good_week') is not null
+      and (v_room -> 'cheers') ::text not like '%bad%'
+      and (v_room -> 'cheers') ::text not like '%missed%'
+      and (v_room -> 'cheers') ::text not like '%demote%',
+    (v_room -> 'cheers')::text);
+
+  -- 13. связь не уменьшилась ни в одном сценарии
+  select bond into v_bond from public.student_pet_state where student_id = 995000507;
+  insert into pet_report values (13, 'BOND_NEVER_DROPS', 'связь только росла',
+    v_bond = 4, format('связь %s', v_bond));
+end $$;
+
+-- 14. выключенная механика отвергает обе бесплатные оси
+do $$
+declare v_msg text;
+begin
+  update public.economy_config set stage5_pets_enabled = false where id;
+  begin
+    perform public.pet_care(995000507, 'pet');
+    insert into pet_report values (14, 'CARE_OFF', 'выключенная механика не даёт заботиться', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    -- Проверка обязана доказывать именно флаг, а не кулдаун: в pet_care флаг проверяется
+    -- раньше окна, поэтому сообщение должно быть про недоступность механики.
+    insert into pet_report values (14, 'CARE_OFF', 'выключенная механика не даёт заботиться',
+      v_msg like '%недоступны%', v_msg);
   end;
 end $$;
 
