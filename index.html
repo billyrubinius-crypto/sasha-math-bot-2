@@ -185,7 +185,7 @@
                  display управляет loadPetBlock — блока нет, пока питомец не куплен или
                  механика не включена флагом stage5_pets_enabled. -->
             <button type="button" class="pet-tile" id="pet-tile" style="display:none;"
-                    onclick="openPetCard(this)" aria-label="Открыть карточку питомца">
+                    onclick="openPetRoom(this)" aria-label="Открыть комнату питомца">
                 <span class="pet-art" id="pet-tile-art" aria-hidden="true"></span>
                 <span class="pet-tile-mood" id="pet-tile-mood" aria-hidden="true"></span>
             </button>
@@ -607,33 +607,71 @@
         </article>
     </div>
 
-    <!-- Карточка питомца (Stage 5, V3). Механика раскрытия и закрытия та же, что у визитки
-         сезонного профиля: бэкдроп, крестик, Escape, кнопка «Назад», возврат фокуса. -->
-    <div id="pet-card-overlay" class="pet-card-overlay" role="dialog" aria-modal="true"
-         aria-labelledby="pet-card-name" hidden>
-        <button type="button" class="pet-card-backdrop" aria-label="Закрыть карточку питомца"
-                onclick="closePetCard()"></button>
-        <article class="pet-card">
-            <button type="button" class="pet-card-close" aria-label="Закрыть"
-                    onclick="closePetCard()">✕</button>
-            <div class="pet-card-art pet-art" id="pet-card-art" aria-hidden="true"></div>
-            <div class="pet-card-copy">
-                <h3 id="pet-card-name"></h3>
-                <p class="pet-card-mood" id="pet-card-mood"></p>
-                <p class="pet-card-satiety" id="pet-card-satiety"></p>
-                <p class="pet-card-rest" id="pet-card-rest"></p>
-                <div class="pet-card-actions">
-                    <button type="button" class="pet-feed-btn" id="pet-feed-btn"
-                            onclick="feedPet(1, this)">Покормить</button>
-                    <button type="button" class="pet-feed-more" id="pet-feed-more"
-                            style="display:none;" onclick="feedPetFill(this)"></button>
-                    <button type="button" class="pet-sleep-btn" id="pet-sleep-btn"
-                            style="display:none;" onclick="putPetToSleep(this)">Уложить спать</button>
+    <!-- Комната питомца (Stage 5, PET2). Полноэкранный слой поверх приложения, а не шестая
+         вкладка — контракт «ровно пять .nav-btn» не трогается. Механика раскрытия и закрытия
+         та же, что у визитки сезонного профиля: бэкдроп, крестик, Escape, кнопка «Назад»,
+         возврат фокуса. Правило комнаты: просроченного не существует — индикаторы показывают
+         только «можно сейчас» или «можно снова через N», без счётчиков пропусков и без вины. -->
+    <div id="pet-room-overlay" class="pet-room-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="pet-room-name" hidden>
+        <button type="button" class="pet-room-backdrop" aria-label="Закрыть комнату питомца"
+                onclick="closePetRoom()"></button>
+        <div class="pet-room">
+            <header class="pet-room-header">
+                <div class="pet-room-heading">
+                    <h3 id="pet-room-name"></h3>
+                    <p class="pet-room-bond" id="pet-room-bond"></p>
                 </div>
-                <small class="pet-card-total" id="pet-card-total"></small>
-                <div class="pet-card-error" id="pet-card-error" role="alert"></div>
+                <button type="button" class="pet-room-close" aria-label="Закрыть"
+                        onclick="closePetRoom()">✕</button>
+            </header>
+
+            <div class="pet-room-scene">
+                <button type="button" class="pet-room-art" id="pet-room-art"
+                        aria-label="Погладить взглядом" onclick="petPokeReact(this)"></button>
+                <p class="pet-room-mood" id="pet-room-mood"></p>
             </div>
-        </article>
+
+            <div class="pet-room-cheers" id="pet-room-cheers"></div>
+
+            <div class="pet-room-indicators" id="pet-room-indicators">
+                <div class="pet-room-indicator" id="pet-room-ind-food">
+                    <span class="pet-room-ind-icon" aria-hidden="true">🍽️</span>
+                    <span class="pet-room-ind-label">Сытость</span>
+                    <span class="pet-room-ind-value" id="pet-room-ind-food-value"></span>
+                </div>
+                <div class="pet-room-indicator" id="pet-room-ind-rest">
+                    <span class="pet-room-ind-icon" aria-hidden="true">🌙</span>
+                    <span class="pet-room-ind-label">Отдых</span>
+                    <span class="pet-room-ind-value" id="pet-room-ind-rest-value"></span>
+                </div>
+                <div class="pet-room-indicator" id="pet-room-ind-pet">
+                    <span class="pet-room-ind-icon" aria-hidden="true">✋</span>
+                    <span class="pet-room-ind-label">Внимание</span>
+                    <span class="pet-room-ind-value" id="pet-room-ind-pet-value"></span>
+                </div>
+                <div class="pet-room-indicator" id="pet-room-ind-play">
+                    <span class="pet-room-ind-icon" aria-hidden="true">🧶</span>
+                    <span class="pet-room-ind-label">Игра</span>
+                    <span class="pet-room-ind-value" id="pet-room-ind-play-value"></span>
+                </div>
+            </div>
+
+            <div class="pet-room-actions">
+                <button type="button" class="pet-feed-btn" id="pet-feed-btn"
+                        onclick="feedPet(1, this)">Покормить</button>
+                <button type="button" class="pet-feed-more" id="pet-feed-more"
+                        style="display:none;" onclick="feedPetFill(this)"></button>
+                <button type="button" class="pet-sleep-btn" id="pet-sleep-btn"
+                        style="display:none;" onclick="putPetToSleep(this)">Уложить спать</button>
+                <button type="button" class="pet-care-btn" id="pet-pet-btn"
+                        onclick="careForPet('pet', this)">Погладить</button>
+                <button type="button" class="pet-care-btn" id="pet-play-btn"
+                        onclick="careForPet('play', this)">Поиграть</button>
+            </div>
+
+            <div class="pet-room-error" id="pet-room-error" role="alert"></div>
+        </div>
     </div>
 
     <!-- НИЖНЕЕ МЕНЮ.

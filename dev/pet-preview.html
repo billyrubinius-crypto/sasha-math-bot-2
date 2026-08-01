@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stage 5 — питомец в профиле: превью</title>
+  <title>Stage 5 — питомец в профиле и комната: превью</title>
   <!-- Настоящий стиль приложения: превью показывает ровно то, что увидит ученик.
        Подключаются ВСЕ ТРИ таблицы в том же порядке, что в index.html. Это существенно:
        глобальный `* { box-sizing: border-box }` живёт в season-v3-preview.css (строка 27),
@@ -28,10 +28,11 @@
     .stage.narrow { width: 360px; }
     .stage.dark { background: #0f172a; color-scheme: dark; }
     .stage.dark .user-name { color: #f8fafc; }
-    .card-stage { width: 375px; padding: 18px; display: grid; place-items: center; background: #1e293b; }
-    .card-stage.light { background: #e2e8f0; }
-    /* Карточка в стенде показывается без оверлея — сам оверлей затемняет весь экран. */
-    .card-stage .pet-card { position: relative; }
+    .room-stage { width: 375px; padding: 18px; display: grid; place-items: center; background: #1e293b; }
+    .room-stage.light { background: #e2e8f0; }
+    .room-stage.short { height: 420px; align-items: end; }
+    /* Комната в стенде показывается без оверлея — сам оверлей затемняет весь экран. */
+    .room-stage .pet-room { position: relative; width: min(340px, 100%); }
   </style>
 </head>
 <body>
@@ -45,12 +46,20 @@
 
   <div class="row" id="light-row"></div>
   <div class="row" id="dark-row"></div>
-  <div class="row" id="card-row"></div>
 
   <h1 style="margin-top:8px">Виды и мимика</h1>
   <p class="hint">Три вида в пяти состояниях заботы. Мимику задаёт сервер кодом, здесь она
      только отражается: голод опускает уголки рта, усталость приспускает веки, сон закрывает глаза.</p>
   <div class="row" id="matrix-row"></div>
+
+  <h1 style="margin-top:8px">Комната (PET2)</h1>
+  <p class="hint">
+    Полноэкранный слой, открывается нажатием на плитку в шапке — не шестая вкладка навигации.
+    Четыре индикатора различают только «можно сейчас» (подсвечен) и «можно снова через N»:
+    просроченного состояния не существует. Реакции показывают только хорошее и пропадают
+    совсем, если сервер не прислал ни одной.
+  </p>
+  <div class="row" id="room-row"></div>
 
 <script>
   const MOODS = [
@@ -98,26 +107,52 @@
       </div>`;
   }
 
-  function card(pet, state) {
-    const fill = Math.max(0, MAX - state.days);
-    const more = fill >= 2
+  // Разметка повторяет index.html дословно (#pet-room-overlay .pet-room), только без самого
+  // оверлея — стенд показывает комнату как открытую панель, не поверх затемнённого экрана.
+  function room(pet, r) {
+    const fill = Math.max(0, MAX - r.days);
+    const fillBtn = fill >= 2
       ? `<button type="button" class="pet-feed-more">Ещё ${fill} ${fill === 1 ? 'день' : (fill < 5 ? 'дня' : 'дней')} — ${fill * PRICE} 🥯</button>`
       : '';
-    const feed = state.days >= MAX
+    const feedBtn = r.days >= MAX
       ? `<button type="button" class="pet-feed-btn" disabled>Сыт на всю неделю</button>`
       : `<button type="button" class="pet-feed-btn">Покормить — ${PRICE} 🥯</button>`;
+    const sleepBtn = r.rest === 'sleeping'
+      ? `<button type="button" class="pet-sleep-btn" disabled>Уже спит</button>`
+      : `<button type="button" class="pet-sleep-btn">Уложить спать</button>`;
+    const indicator = (id, icon, label, ready, value) => `
+      <div class="pet-room-indicator${ready ? ' is-ready' : ''}">
+        <span class="pet-room-ind-icon" aria-hidden="true">${icon}</span>
+        <span class="pet-room-ind-label">${label}</span>
+        <span class="pet-room-ind-value">${value}</span>
+      </div>`;
+    const cheerBadges = r.cheers.map((text) => `<span class="pet-room-cheer">${text}</span>`).join('');
     return `
-      <article class="pet-card">
-        <button type="button" class="pet-card-close" aria-label="Закрыть">✕</button>
-        <div class="pet-card-art pet-art ${pet.cls}" aria-hidden="true">${art(pet, state.mood, 96)}</div>
-        <div class="pet-card-copy">
-          <h3>${pet.name}</h3>
-          <p class="pet-card-mood pet-mood-${state.mood}">${state.long}</p>
-          <p class="pet-card-satiety">${state.satiety}</p>
-          <div class="pet-card-actions">${feed}${more}</div>
-          <small class="pet-card-total">Всего дней заботы: 12</small>
+      <div class="pet-room">
+        <header class="pet-room-header">
+          <div class="pet-room-heading">
+            <h3>${pet.name}</h3>
+            <p class="pet-room-bond">${r.bond > 0 ? `Дней заботы: ${r.bond}` : 'Забота только начинается'}</p>
+          </div>
+          <button type="button" class="pet-room-close" aria-label="Закрыть">✕</button>
+        </header>
+        <div class="pet-room-scene">
+          <button type="button" class="pet-room-art pet-art ${pet.cls}" aria-label="Погладить взглядом">${art(pet, r.mood, 120)}</button>
+          <p class="pet-room-mood pet-mood-${r.mood}">${r.long}</p>
         </div>
-      </article>`;
+        <div class="pet-room-cheers">${cheerBadges}</div>
+        <div class="pet-room-indicators">
+          ${indicator('food', '🍽️', 'Сытость', r.days <= 0, r.satiety)}
+          ${indicator('rest', '🌙', 'Отдых', r.rest === 'tired', r.restText)}
+          ${indicator('pet', '✋', 'Внимание', r.pettingReady, r.pettingReady ? 'Можно сейчас' : `Можно снова через ${r.pettingIn}`)}
+          ${indicator('play', '🧶', 'Игра', r.playReady, r.playReady ? 'Можно сейчас' : `Можно снова через ${r.playIn}`)}
+        </div>
+        <div class="pet-room-actions">
+          ${feedBtn}${fillBtn}${sleepBtn}
+          <button type="button" class="pet-care-btn"${r.pettingReady ? '' : ' disabled'}>Погладить</button>
+          <button type="button" class="pet-care-btn"${r.playReady ? '' : ' disabled'}>Поиграть</button>
+        </div>
+      </div>`;
   }
 
   function figure(caption, cls, inner) {
@@ -141,10 +176,27 @@
           ${art(pet, f, 64)}<div style="margin-top:4px">${f}</div></div>`).join('') +
     `</div>`)).join('');
 
-  document.getElementById('card-row').innerHTML =
-      figure('Карточка · сыт · тёмный фон', 'card-stage', card(PETS[0], MOODS[0]))
-    + figure('Карточка · голоден · тёмный фон', 'card-stage', card(PETS[1], MOODS[3]))
-    + figure('Карточка · последний сытый день · светлый фон', 'card-stage light', card(PETS[2], MOODS[2]));
+  // Три характерных состояния комнаты. Тексты индикаторов подставлены руками ровно в том
+  // виде, в каком их формирует renderPetRoom: клиент их не сочиняет, а получает с сервера.
+  const ROOMS = [
+    { caption: 'Комната · всё доступно · тёмный фон', cls: 'room-stage', pet: PETS[0], data: {
+        mood: 'happy', long: 'Сыт и доволен', days: 3, bond: 7,
+        satiety: 'Сыт до 3 августа — ещё 3 дня', rest: 'rested', restText: 'Выспался, бодрый ещё 33 ч',
+        pettingReady: true, playReady: true, pettingIn: '', playIn: '',
+        cheers: ['🎉 Хорошая неделя', '⬆️ Новая лига'] } },
+    { caption: 'Комната · оси на кулдауне · тёмный фон', cls: 'room-stage', pet: PETS[1], data: {
+        mood: 'hungry', long: 'Проголодался и грустит', days: 0, bond: 21,
+        satiety: 'Сегодня ещё не кормлен', rest: 'tired', restText: 'Давно не спал',
+        pettingReady: false, playReady: false, pettingIn: '2 ч 40 мин', playIn: '9 ч 10 мин',
+        cheers: [] } },
+    { caption: 'Комната · спит · светлый фон', cls: 'room-stage light', pet: PETS[2], data: {
+        mood: 'sleeping', long: 'Спит', days: 5, bond: 60,
+        satiety: 'Сыт до 5 августа — ещё 5 дней', rest: 'sleeping', restText: 'Спит, проснётся через 6 ч 15 мин',
+        pettingReady: true, playReady: false, pettingIn: '', playIn: '4 ч',
+        cheers: ['🏆 Новый рекорд'] } }
+  ];
+  document.getElementById('room-row').innerHTML =
+    ROOMS.map(r => figure(r.caption, r.cls, room(r.pet, r.data))).join('');
 </script>
 </body>
 </html>

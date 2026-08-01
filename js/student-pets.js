@@ -1,13 +1,18 @@
-// student-pets.js — питомец в шапке профиля и его раскрывающаяся карточка (Stage 5, V3).
+// student-pets.js — питомец в шапке профиля и его комната (Stage 5, V3 + PET2).
 //
-// Контракт: всё состояние приходит с сервера (get_pet_state_self). Клиент не считает ни
-// настроение, ни цену, ни остаток сытости, ни доступность кормления — он только показывает.
+// Контракт: всё состояние приходит с сервера (get_pet_state_self / get_pet_room_self). Клиент
+// не считает ни настроение, ни цену, ни остаток сытости, ни кулдауны осей заботы, ни связь —
+// он только показывает.
 //
 // Визуалы — явный allowlist по образцу season-cosmetics.js: из БД принимается только
 // pet_v1_cat / pet_v1_owl / pet_v1_capybara. Произвольный render_payload не рендерится вовсе.
 //
-// Механика раскрытия повторяет визитку сезонного профиля (openSeasonProfileCard): бэкдроп,
-// крестик, Escape, кнопка «Назад» через history и возврат фокуса на плитку.
+// Механика раскрытия комнаты повторяет визитку сезонного профиля (openSeasonProfileCard):
+// бэкдроп, крестик, Escape, кнопка «Назад» через history и возврат фокуса на плитку.
+//
+// Правило комнаты (SPEC_STAGE5_PET_ROOM §6): просроченного не существует. Индикаторы осей
+// внимания и игры показывают только «можно сейчас» или «можно снова через N» — никаких
+// счётчиков пропусков и формулировок вины.
         const PET_VISUALS = {
             pet_v1_cat:      { key: 'cat',      cls: 'pet-art-cat',      name: 'Кот' },
             pet_v1_owl:      { key: 'owl',      cls: 'pet-art-owl',      name: 'Сова' },
@@ -109,10 +114,11 @@
             tired:    'Давно не спал'
         };
 
-        let petState = null;
+        let petState = null;            // последнее состояние плитки (get_pet_state_self)
+        let petRoomState = null;        // последнее состояние комнаты (get_pet_room_self)
         let petBusy = false;            // синхронная защита от двойного клика (урок W05/U08A)
-        let petCardTrigger = null;
-        let petCardHistoryEntry = false;
+        let petRoomTrigger = null;
+        let petRoomHistoryEntry = false;
 
         function petVisual(state) {
             if (!state || !state.render_payload) return null;
@@ -151,6 +157,8 @@
             return 'дней';
         }
 
+        // --- Плитка в шапке профиля --------------------------------------------------------
+
         async function loadPetBlock() {
             const tile = document.getElementById('pet-tile');
             const header = document.querySelector('.profile-header');
@@ -169,23 +177,32 @@
                 return;
             }
 
-            if (!petState || !petState.enabled || !petState.item_code) { petHide(); return; }
-            const visual = petVisual(petState);
+            renderPetTile(petState);
+        }
+
+        // Отрисовка плитки по уже полученному состоянию — вызывается и после обычной загрузки
+        // профиля (get_pet_state_self), и после действий в комнате (тем же объектом petState,
+        // который приходит внутри get_pet_room_self, чтобы не делать лишний RPC).
+        function renderPetTile(state) {
+            const tile = document.getElementById('pet-tile');
+            const header = document.querySelector('.profile-header');
+            if (!tile || !header) return;
+
+            if (!state || !state.enabled || !state.item_code) { petHide(); return; }
+            const visual = petVisual(state);
             if (!visual) { petHide(); return; }   // неизвестный визуал — молча не рендерим
 
             // На плитке — общее состояние: худшее из двух осей заботы, сон показывается отдельно.
-            const overall = petState.overall_mood || petState.mood;
+            const overall = state.overall_mood || state.mood;
             const art = document.getElementById('pet-tile-art');
             const mood = PET_MOODS[overall] || PET_MOODS.hungry;
             art.replaceChildren(petArtNode(visual, 44, overall));
             art.className = `pet-art ${visual.cls}`;
             document.getElementById('pet-tile-mood').textContent = mood.badge;
             tile.className = `pet-tile pet-mood-${overall}`;
-            tile.setAttribute('aria-label', `${visual.name}: ${mood.short}. Открыть карточку питомца`);
+            tile.setAttribute('aria-label', `${visual.name}: ${mood.short}. Открыть комнату питомца`);
             tile.style.display = 'grid';
             header.classList.add('has-pet');
-
-            if (!document.getElementById('pet-card-overlay').hidden) renderPetCard();
         }
 
         function petHide() {
@@ -193,50 +210,73 @@
             const header = document.querySelector('.profile-header');
             if (tile) tile.style.display = 'none';
             if (header) header.classList.remove('has-pet');
-            closePetCard();
+            closePetRoom();
         }
 
-        function renderPetCard() {
-            if (!petState) return;
-            const visual = petVisual(petState);
+        // --- Комната -------------------------------------------------------------------
+
+        function petIndicatorRow(prefix, ready, nextAt) {
+            const valueEl = document.getElementById(`pet-room-ind-${prefix}-value`);
+            const rowEl = document.getElementById(`pet-room-ind-${prefix}`);
+            valueEl.textContent = ready ? 'Можно сейчас' : `Можно снова ${petRelative(nextAt)}`;
+            rowEl.classList.toggle('is-ready', !!ready);
+        }
+
+        function renderPetRoom() {
+            const room = petRoomState;
+            if (!room || !room.pet) return;
+            const pet = room.pet;
+            const visual = petVisual(pet);
             if (!visual) return;
-            const overall = petState.overall_mood || petState.mood;
+            const overall = pet.overall_mood || pet.mood;
             const mood = PET_MOODS[overall] || PET_MOODS.hungry;
-            const days = Number(petState.days_left) || 0;
-            const price = Number(petState.feed_price) || 0;
-            const max = Number(petState.max_prepaid_days) || 0;
 
-            const art = document.getElementById('pet-card-art');
-            art.replaceChildren(petArtNode(visual, 96, overall));
-            art.className = `pet-card-art pet-art ${visual.cls}`;
-            document.getElementById('pet-card-name').textContent = visual.name;
-            document.getElementById('pet-card-mood').textContent = mood.long;
-            document.getElementById('pet-card-mood').className = `pet-card-mood pet-mood-${overall}`;
+            document.getElementById('pet-room-art').replaceChildren(petArtNode(visual, 120, overall));
+            document.getElementById('pet-room-art').className = `pet-room-art pet-art ${visual.cls}`;
+            document.getElementById('pet-room-name').textContent = visual.name;
+            document.getElementById('pet-room-mood').textContent = mood.long;
+            document.getElementById('pet-room-mood').className = `pet-room-mood pet-mood-${overall}`;
 
-            // Ось отдыха отдельной строкой: две оси заботы независимы и показываются раздельно.
-            const restEl = document.getElementById('pet-card-rest');
-            const sleepBtn = document.getElementById('pet-sleep-btn');
-            const rest = petState.rest_state;
-            if (rest) {
-                let restText = PET_REST[rest] || '';
-                if (rest === 'sleeping') {
-                    restText = `Спит, проснётся ${petRelative(petState.sleep_ends_at)}`;
-                } else if (rest === 'rested' && petState.rested_until) {
-                    restText = `Выспался, бодрый ещё ${petRelative(petState.rested_until, true)}`;
-                }
-                restEl.textContent = restText;
-                restEl.className = `pet-card-rest pet-rest-${rest}`;
-                sleepBtn.textContent = rest === 'sleeping' ? 'Уже спит' : 'Уложить спать';
-                sleepBtn.disabled = !petState.can_sleep || petBusy;
-                sleepBtn.style.display = 'inline-flex';
-            } else {
-                restEl.textContent = '';
-                sleepBtn.style.display = 'none';
-            }
+            const bond = Number(room.bond) || 0;
+            document.getElementById('pet-room-bond').textContent =
+                bond > 0 ? `Дней заботы: ${bond}` : 'Забота только начинается';
 
-            document.getElementById('pet-card-satiety').textContent = days > 0
-                ? `Сыт до ${petFormatDate(petState.satiety_until)} — это ещё ${days} ${petPluralDays(days)}`
+            // Сытость — тот же текст, что был в карточке V3.
+            const days = Number(pet.days_left) || 0;
+            const price = Number(pet.feed_price) || 0;
+            const max = Number(pet.max_prepaid_days) || 0;
+            document.getElementById('pet-room-ind-food-value').textContent = days > 0
+                ? `Сыт до ${petFormatDate(pet.satiety_until)} — ещё ${days} ${petPluralDays(days)}`
                 : 'Сегодня ещё не кормлен';
+            document.getElementById('pet-room-ind-food').classList.toggle('is-ready', days <= 0);
+
+            // Отдых — тот же текст, что был в карточке V3.
+            const rest = pet.rest_state;
+            let restText = PET_REST[rest] || '';
+            if (rest === 'sleeping') restText = `Спит, проснётся ${petRelative(pet.sleep_ends_at)}`;
+            else if (rest === 'rested' && pet.rested_until) restText = `Выспался, бодрый ещё ${petRelative(pet.rested_until, true)}`;
+            document.getElementById('pet-room-ind-rest-value').textContent = restText;
+            document.getElementById('pet-room-ind-rest').classList.toggle('is-ready', rest === 'tired');
+
+            // Внимание и игра — новые бесплатные оси (PET1): доступна или «снова через N».
+            const care = room.care || {};
+            petIndicatorRow('pet', !!(care.petting && care.petting.available), care.petting && care.petting.next_at);
+            petIndicatorRow('play', !!(care.play && care.play.available), care.play && care.play.next_at);
+
+            // Реакции: только хорошее, и только если сервер что-то прислал. Пустых мест для
+            // отсутствующих плохих событий нет — их нет и в самом контракте read-модели.
+            const cheers = room.cheers || {};
+            const badges = [];
+            if (cheers.good_week) badges.push('🎉 Хорошая неделя');
+            if (cheers.mock_record) badges.push('🏆 Новый рекорд');
+            if (cheers.promoted) badges.push('⬆️ Новая лига');
+            const cheersEl = document.getElementById('pet-room-cheers');
+            cheersEl.replaceChildren(...badges.map((text) => {
+                const span = document.createElement('span');
+                span.className = 'pet-room-cheer';
+                span.textContent = text;
+                return span;
+            }));
 
             const feedBtn = document.getElementById('pet-feed-btn');
             const fillBtn = document.getElementById('pet-feed-more');
@@ -245,9 +285,6 @@
             feedBtn.disabled = full || petBusy;
 
             // Запас вперёд — вторичное действие: одна кнопка добирает сытость до потолка.
-            // Свободная ёмкость = потолок минус уже оплаченные дни (включая сегодняшний), ровно
-            // столько дней и оплатит сервер: v_start..today + max - 1. Показываем кнопку только
-            // когда она делает больше основной, то есть от двух дней.
             const fillDays = Math.max(0, max - days);
             if (fillDays >= 2) {
                 fillBtn.textContent = `Ещё ${fillDays} ${petPluralDays(fillDays)} — ${fillDays * price} 🥯`;
@@ -258,41 +295,72 @@
                 fillBtn.style.display = 'none';
             }
 
-            const total = Number(petState.days_fed_total) || 0;
-            document.getElementById('pet-card-total').textContent =
-                total > 0 ? `Всего дней заботы: ${total}` : 'Забота только начинается';
+            const sleepBtn = document.getElementById('pet-sleep-btn');
+            sleepBtn.textContent = rest === 'sleeping' ? 'Уже спит' : 'Уложить спать';
+            sleepBtn.disabled = !pet.can_sleep || petBusy;
+            sleepBtn.style.display = 'inline-flex';
+
+            document.getElementById('pet-pet-btn').disabled =
+                petBusy || !(care.petting && care.petting.available);
+            document.getElementById('pet-play-btn').disabled =
+                petBusy || !(care.play && care.play.available);
         }
 
-        function openPetCard(trigger) {
-            const overlay = document.getElementById('pet-card-overlay');
+        async function loadPetRoom() {
+            const { data, error } = await db.rpc('get_pet_room_self');
+            if (error) throw error;
+            petRoomState = data || null;
+            if (petRoomState && petRoomState.pet) {
+                petState = petRoomState.pet;
+                renderPetTile(petState);   // держим плитку в согласии с комнатой без лишнего RPC
+            }
+            renderPetRoom();
+        }
+
+        async function openPetRoom(trigger) {
+            const overlay = document.getElementById('pet-room-overlay');
             if (!overlay || !petState || !petState.item_code) return;
-            petCardTrigger = trigger || document.getElementById('pet-tile');
-            document.getElementById('pet-card-error').textContent = '';
-            renderPetCard();
+            petRoomTrigger = trigger || document.getElementById('pet-tile');
+            document.getElementById('pet-room-error').textContent = '';
             overlay.hidden = false;
-            document.body.classList.add('pet-card-open');
-            if (!petCardHistoryEntry) {
+            document.body.classList.add('pet-room-open');
+            if (!petRoomHistoryEntry) {
                 try {
-                    history.pushState({ petCard: true }, '');
-                    petCardHistoryEntry = true;
+                    history.pushState({ petRoom: true }, '');
+                    petRoomHistoryEntry = true;
                 } catch (_error) {
-                    petCardHistoryEntry = false;
+                    petRoomHistoryEntry = false;
                 }
             }
-            overlay.querySelector('.pet-card-close').focus();
+            overlay.querySelector('.pet-room-close').focus();
+
+            try {
+                await loadPetRoom();
+            } catch (error) {
+                document.getElementById('pet-room-error').textContent = error.message || String(error);
+            }
         }
 
-        function closePetCard(fromPopstate) {
-            const overlay = document.getElementById('pet-card-overlay');
+        function closePetRoom(fromPopstate) {
+            const overlay = document.getElementById('pet-room-overlay');
             if (!overlay || overlay.hidden) return;
             overlay.hidden = true;
-            document.body.classList.remove('pet-card-open');
-            if (petCardTrigger) petCardTrigger.focus();
-            petCardTrigger = null;
-            if (petCardHistoryEntry) {
-                petCardHistoryEntry = false;
+            document.body.classList.remove('pet-room-open');
+            if (petRoomTrigger) petRoomTrigger.focus();
+            petRoomTrigger = null;
+            if (petRoomHistoryEntry) {
+                petRoomHistoryEntry = false;
                 if (!fromPopstate) history.back();
             }
+        }
+
+        // Тап по питомцу: короткая реакция без сети, доступна всегда, ничего не расходует.
+        // Под prefers-reduced-motion не анимируем — фигура просто не шевелится.
+        function petPokeReact(el) {
+            if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            el.classList.remove('pet-poked');
+            void el.offsetWidth;   // перезапуск CSS-анимации при повторных тапах подряд
+            el.classList.add('pet-poked');
         }
 
         function feedPetFill(btn) {
@@ -305,7 +373,7 @@
             if (petBusy || (btn && btn.disabled)) return;
             petBusy = true;
             const sleepBtn = document.getElementById('pet-sleep-btn');
-            const errorEl = document.getElementById('pet-card-error');
+            const errorEl = document.getElementById('pet-room-error');
             const restore = sleepBtn.textContent;
             sleepBtn.disabled = true;
             errorEl.textContent = '';
@@ -313,13 +381,13 @@
             try {
                 const { error } = await db.rpc('put_pet_to_sleep_self');
                 if (error) throw error;
-                await loadPetBlock();
+                await loadPetRoom();
             } catch (error) {
                 sleepBtn.textContent = restore;
                 errorEl.textContent = error.message || String(error);
             } finally {
                 petBusy = false;
-                renderPetCard();
+                renderPetRoom();
             }
         }
 
@@ -330,7 +398,7 @@
             petBusy = true;
             const feedBtn = document.getElementById('pet-feed-btn');
             const fillBtn = document.getElementById('pet-feed-more');
-            const errorEl = document.getElementById('pet-card-error');
+            const errorEl = document.getElementById('pet-room-error');
             const restore = feedBtn.textContent;
             feedBtn.disabled = true;
             fillBtn.disabled = true;
@@ -343,20 +411,41 @@
                 if (data && typeof data.balance === 'number') {
                     document.getElementById('val-huikons').innerText = data.balance;
                 }
-                await loadPetBlock();       // состояние и настроение перечитываем с сервера
-                renderPetCard();
+                await loadPetRoom();       // состояние, связь и баланс перечитываем с сервера
             } catch (error) {
                 feedBtn.textContent = restore;
                 errorEl.textContent = error.message || String(error);
             } finally {
                 petBusy = false;
-                renderPetCard();
+                renderPetRoom();
+            }
+        }
+
+        // Погладить / поиграть (PET1): один RPC, свой кулдаун на каждую ось, без денег.
+        async function careForPet(action, btn) {
+            if (petBusy || (btn && btn.disabled)) return;
+            petBusy = true;
+            const errorEl = document.getElementById('pet-room-error');
+            const restore = btn.textContent;
+            btn.disabled = true;
+            errorEl.textContent = '';
+            btn.textContent = action === 'pet' ? 'Гладим...' : 'Играем...';
+            try {
+                const { error } = await db.rpc('pet_care_self', { p_action: action });
+                if (error) throw error;
+                await loadPetRoom();
+            } catch (error) {
+                btn.textContent = restore;
+                errorEl.textContent = error.message || String(error);
+            } finally {
+                petBusy = false;
+                renderPetRoom();
             }
         }
 
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') closePetCard();
+            if (event.key === 'Escape') closePetRoom();
         });
         window.addEventListener('popstate', () => {
-            if (petCardHistoryEntry) closePetCard(true);
+            if (petRoomHistoryEntry) closePetRoom(true);
         });

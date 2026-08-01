@@ -2020,95 +2020,12 @@
         /* Виды: отдельное пространство визуалов, не пересекающееся с аватарами сезонов. */
         .pet-art-cat, .pet-art-owl, .pet-art-capybara { filter: none; }
 
-        .pet-card-overlay[hidden] { display: none; }
-        .pet-card-overlay {
-            position: fixed; z-index: 2200; inset: 0;
-            display: grid; place-items: center; padding: 20px;
-        }
-        .pet-card-backdrop {
-            position: absolute; inset: 0; width: 100%; height: 100%;
-            border: 0; background: rgba(4, 8, 17, .72); backdrop-filter: blur(8px);
-        }
-        .pet-card {
-            position: relative;
-            display: grid; justify-items: center; gap: var(--ca-space-3);
-            width: min(330px, calc(100vw - 32px));
-            padding: 26px 20px 20px;
-            border: 1px solid var(--ca-border);
-            border-radius: 26px;
-            background: var(--ca-surface-elevated);
-            box-shadow: 0 26px 80px rgba(0, 0, 0, .5);
-        }
-        .pet-card-close {
-            position: absolute; top: 10px; right: 10px;
-            width: 32px; height: 32px;
-            border: 0; border-radius: 50%;
-            background: var(--ca-tint-muted); color: var(--ca-text-secondary);
-            font-size: 15px; line-height: 1; cursor: pointer;
-        }
-        .pet-card-art { font-size: 92px; line-height: 1; }
-        .pet-card-copy { display: grid; justify-items: center; gap: var(--ca-space-2); text-align: center; }
-        .pet-card-copy h3 { margin: 0; font-size: var(--text-screen); font-weight: 800; }
-        .pet-card-mood { margin: 0; font-weight: 700; }
-        .pet-card-mood.pet-mood-happy       { color: var(--ca-accent-turquoise); }
-        .pet-card-mood.pet-mood-fed         { color: var(--ca-text-secondary); }
-        .pet-card-mood.pet-mood-hungry_soon { color: var(--ca-accent-blue); }
-        .pet-card-mood.pet-mood-hungry      { color: var(--ca-text-secondary); }
-        .pet-card-satiety { margin: 0; color: var(--ca-text-secondary); font-size: var(--text-small); }
-        .pet-card-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--ca-space-2); }
-        .pet-feed-btn {
-            padding: 10px 18px;
-            border: 0; border-radius: var(--ca-radius-pill);
-            background: var(--ca-accent-blue); color: #fff;
-            font-size: var(--text-small); font-weight: 700; cursor: pointer;
-        }
-        .pet-feed-btn:disabled { opacity: .55; cursor: default; }
-        .pet-feed-more {
-            display: inline-flex; align-items: center;
-            padding: 10px 14px;
-            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-pill);
-            background: transparent; color: var(--ca-text-secondary);
-            font-size: var(--text-small); font-weight: 600; cursor: pointer;
-        }
-        .pet-feed-more:disabled { opacity: .55; cursor: default; }
-        .pet-card-total { color: var(--ca-text-secondary); }
-        .pet-card-error:empty { display: none; }
-        .pet-card-error {
-            padding: 6px 10px;
-            border-radius: var(--ca-radius-lg);
-            background: var(--ca-tint-error);
-            font-size: var(--text-small);
-        }
-        body.pet-card-open { overflow: hidden; }
-
-        /* Движение — только там, где пользователь его не запретил (контракт Cosmic Academy). */
-        @media (prefers-reduced-motion: no-preference) {
-            .pet-card-art { animation: pet-idle 4s ease-in-out infinite; }
-            @keyframes pet-idle {
-                0%, 100% { transform: translateY(0); }
-                50%      { transform: translateY(-4px); }
-            }
-        }
-
-        /* Сон — вторая ось заботы (миграция 065). Бесплатная: платится вниманием, а не
-           бубликами, поэтому кнопка оформлена вторичной, а не акцентной. */
+        /* Настроение как обводка плитки — общие бейджи, используются и в комнате
+           (styles/pets.css) для текста настроения через компаунд .pet-room-mood.pet-mood-*. */
         .pet-mood-sleeping { border-color: var(--ca-accent-magenta); }
-        .pet-card-mood.pet-mood-sleeping { color: var(--ca-accent-magenta); }
-        .pet-card-rest:empty { display: none; }
-        .pet-card-rest { margin: 0; color: var(--ca-text-secondary); font-size: var(--text-small); }
-        .pet-rest-sleeping { color: var(--ca-accent-magenta); }
-        .pet-rest-rested   { color: var(--ca-accent-turquoise); }
-        .pet-rest-tired    { color: var(--ca-text-secondary); }
-        .pet-sleep-btn {
-            display: inline-flex; align-items: center;
-            padding: 10px 14px;
-            border: 1px solid var(--ca-border); border-radius: var(--ca-radius-pill);
-            background: transparent; color: var(--ca-text-secondary);
-            font-size: var(--text-small); font-weight: 600; cursor: pointer;
-        }
-        .pet-sleep-btn:disabled { opacity: .55; cursor: default; }
-        .pet-mood-tired { border-color: var(--ca-border-soft); }
-        .pet-card-mood.pet-mood-tired { color: var(--ca-text-secondary); }
+        .pet-mood-tired    { border-color: var(--ca-border-soft); }
+
+        /* Полноэкранная комната (PET2) — styles/pets.css, рядом с фигурами питомцев. */
 
         /* Размер сезонного визуала в превью привязан к самой коробке превью, а не к константе.
            Дефект: createAvatar вызывался с жёстким 68px, тогда как .shop-preview — 56px, на

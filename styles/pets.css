@@ -67,6 +67,133 @@
     }
 }
 
-/* --- Контейнеры плитки и карточки ----------------------------------------- */
+/* --- Контейнер плитки ------------------------------------------------------ */
 .pet-art .pet-figure { margin: 0 auto; }
-.pet-card-art .pet-figure { border-radius: 24%; }
+
+/* =============================================================================
+   Комната питомца (Stage 5, PET2).
+
+   Полноэкранный слой поверх приложения, а не шестая вкладка: контракт «ровно пять
+   .nav-btn» в index.html не трогается. Механика открытия/закрытия — бэкдроп, крестик,
+   Escape, «Назад» через history — повторяет визитку сезонного профиля.
+
+   Ключевое требование SPEC_STAGE5_PET_ROOM §6: просроченного не существует. Индикаторы
+   различают только «можно сейчас» (.is-ready) и «можно снова через N» — никакого красного
+   цвета, восклицательных знаков и счётчиков пропусков.
+   ============================================================================= */
+.pet-room-overlay[hidden] { display: none; }
+.pet-room-overlay {
+    position: fixed; z-index: 2200; inset: 0;
+    display: grid; place-items: center;
+    padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+}
+.pet-room-backdrop {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border: 0; background: rgba(4, 8, 17, .72); backdrop-filter: blur(8px);
+}
+.pet-room {
+    position: relative;
+    display: grid; gap: var(--ca-space-3);
+    width: min(360px, calc(100vw - 24px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding: 16px 18px 20px;
+    border: 1px solid var(--ca-border);
+    border-radius: 26px;
+    background: var(--ca-surface-elevated);
+    box-shadow: 0 26px 80px rgba(0, 0, 0, .5);
+}
+.pet-room-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--ca-space-3); }
+.pet-room-heading h3 { margin: 0; font-size: var(--text-screen); font-weight: 800; }
+.pet-room-bond { margin: 2px 0 0; color: var(--ca-text-secondary); font-size: var(--text-small); }
+.pet-room-close {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border: 0; border-radius: 50%;
+    background: var(--ca-tint-muted); color: var(--ca-text-secondary);
+    font-size: 15px; line-height: 1; cursor: pointer;
+}
+
+.pet-room-scene {
+    display: grid; justify-items: center; gap: var(--ca-space-2);
+    padding: var(--ca-space-3) 0;
+}
+.pet-room-art {
+    border: 0; padding: 0; background: transparent; cursor: pointer;
+    border-radius: 24%;
+}
+.pet-room-art:focus-visible { outline: 2px solid var(--ca-accent-blue); outline-offset: 4px; }
+.pet-room-mood { margin: 0; font-weight: 700; }
+.pet-room-mood.pet-mood-happy       { color: var(--ca-accent-turquoise); }
+.pet-room-mood.pet-mood-fed         { color: var(--ca-text-secondary); }
+.pet-room-mood.pet-mood-hungry_soon { color: var(--ca-accent-blue); }
+.pet-room-mood.pet-mood-hungry      { color: var(--ca-text-secondary); }
+.pet-room-mood.pet-mood-sleeping    { color: var(--ca-accent-magenta); }
+.pet-room-mood.pet-mood-tired       { color: var(--ca-text-secondary); }
+
+/* Тап по питомцу — короткая реакция без сети, доступна всегда, ничего не расходует. */
+@media (prefers-reduced-motion: no-preference) {
+    .pet-room-art.pet-poked .pet-figure { animation: pet-poke .5s ease-in-out; }
+    @keyframes pet-poke {
+        0%, 100% { transform: scale(1) rotate(0); }
+        35%      { transform: scale(1.08) rotate(-3deg); }
+        70%      { transform: scale(1.04) rotate(2deg); }
+    }
+}
+
+.pet-room-cheers:empty { display: none; }
+.pet-room-cheers { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--ca-space-2); }
+.pet-room-cheer {
+    padding: 4px 10px;
+    border-radius: var(--ca-radius-pill);
+    background: var(--ca-tint-accent);
+    font-size: var(--text-small); font-weight: 700;
+}
+
+.pet-room-indicators { display: grid; gap: var(--ca-space-2); }
+.pet-room-indicator {
+    display: grid; grid-template-columns: auto minmax(0, auto) 1fr;
+    align-items: center; gap: var(--ca-space-2);
+    padding: var(--ca-space-2) var(--ca-space-3);
+    border: 1px solid var(--ca-border-soft); border-radius: var(--ca-radius-lg);
+    background: var(--ca-surface-nested);
+}
+.pet-room-ind-icon { font-size: 18px; line-height: 1; }
+.pet-room-ind-label { font-size: var(--text-small); color: var(--ca-text-secondary); font-weight: 700; }
+.pet-room-ind-value { justify-self: end; font-size: var(--text-small); color: var(--ca-text-secondary); text-align: right; }
+/* .is-ready — «можно сейчас», единый язык для всех четырёх осей. Не цвет тревоги у обратного
+   состояния: «можно снова через N» остаётся нейтральным текстом, не предупреждением. */
+.pet-room-indicator.is-ready { border-color: var(--ca-accent-soft); background: var(--ca-tint-accent); }
+.pet-room-indicator.is-ready .pet-room-ind-value { color: var(--ca-accent); font-weight: 700; }
+
+.pet-room-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--ca-space-2); }
+.pet-feed-btn {
+    padding: 10px 18px;
+    border: 0; border-radius: var(--ca-radius-pill);
+    background: var(--ca-accent-blue); color: #fff;
+    font-size: var(--text-small); font-weight: 700; cursor: pointer;
+}
+.pet-feed-btn:disabled { opacity: .55; cursor: default; }
+.pet-feed-more,
+.pet-sleep-btn,
+.pet-care-btn {
+    display: inline-flex; align-items: center;
+    padding: 10px 14px;
+    border: 1px solid var(--ca-border); border-radius: var(--ca-radius-pill);
+    background: transparent; color: var(--ca-text-secondary);
+    font-size: var(--text-small); font-weight: 600; cursor: pointer;
+}
+.pet-feed-more:disabled,
+.pet-sleep-btn:disabled,
+.pet-care-btn:disabled { opacity: .55; cursor: default; }
+
+.pet-room-error:empty { display: none; }
+.pet-room-error {
+    padding: 6px 10px;
+    border-radius: var(--ca-radius-lg);
+    background: var(--ca-tint-error);
+    font-size: var(--text-small);
+    text-align: center;
+}
+
+body.pet-room-open { overflow: hidden; }
