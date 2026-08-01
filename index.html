@@ -657,6 +657,17 @@
                 </div>
             </div>
 
+            <!-- Эволюция (PET4): прогресс числом и явное действие ученика. Питомец не
+                 «вырастает сам» — момент остаётся событием, которое человек совершает. -->
+            <div class="pet-room-evolution" id="pet-room-evolution" style="display:none;">
+                <div class="pet-evo-copy">
+                    <span class="pet-evo-title" id="pet-evo-title"></span>
+                    <span class="pet-evo-progress" id="pet-evo-progress"></span>
+                </div>
+                <button type="button" class="pet-evo-btn" id="pet-evo-btn"
+                        onclick="evolvePet(this)">Вырастить</button>
+            </div>
+
             <div class="pet-room-actions">
                 <button type="button" class="pet-feed-btn" id="pet-feed-btn"
                         onclick="feedPet(1, this)">Покормить</button>

@@ -45,6 +45,19 @@
             return eyes + `<path class="pet-line" d="${face.mouth}"/>`;
         }
 
+        // Ступень 2 (эволюция, PET4): та же фигура плюс отличительная черта — она добавляется
+        // поверх базового силуэта, чтобы вид оставался узнаваемым. Имя вида не меняется:
+        // «Кот» остаётся котом, иначе ученик решит, что питомца подменили.
+        const PET_GROWN = {
+            cat:      '<path class="pet-mane" d="M32 11 a13 13 0 0 1 13 13 a13 13 0 0 1 -26 0 a13 13 0 0 1 13 -13 Z"/>'
+                    + '<path class="pet-accent" d="M24 37 h16 l-2 5 h-12 Z"/>',
+            owl:      '<path class="pet-accent" d="M20 18 q12 -7 24 0 q-12 -3 -24 0 Z"/>'
+                    + '<path class="pet-mane" d="M14 32 q-5 14 5 22 q4 -11 3 -22 Z"/>'
+                    + '<path class="pet-mane" d="M50 32 q5 14 -5 22 q-4 -11 -3 -22 Z"/>',
+            capybara: '<path class="pet-accent" d="M22 16 q10 -6 20 0 q-10 -2 -20 0 Z"/>'
+                    + '<ellipse class="pet-mane" cx="34" cy="42" rx="19" ry="13"/>'
+        };
+
         // Каждый силуэт — целая фигура: голова, туловище, лапы и хвост в одном кадре 64×64.
         const PET_SHAPES = {
             cat: (mood) => `
@@ -84,15 +97,19 @@
         };
 
         // Структура превью: одно окно фиксированного размера, внутри — целая фигура.
-        function petArtNode(visual, size, mood) {
+        // stage приходит с сервера (get_pet_state.stage); на второй ступени поверх базового
+        // силуэта добавляется отличительная черта.
+        function petArtNode(visual, size, mood, stage) {
+            const grown = Number(stage) === 2;
             const wrap = document.createElement('span');
-            wrap.className = `pet-figure pet-visual-${visual.key} pet-face-${mood || 'fed'}`;
+            wrap.className = `pet-figure pet-visual-${visual.key} pet-face-${mood || 'fed'}`
+                + (grown ? ' pet-stage-2' : '');
             wrap.style.setProperty('--pet-size', `${size}px`);
             const shape = PET_SHAPES[visual.key];
             if (!shape) return wrap;
             wrap.innerHTML =
                 `<svg class="pet-svg" viewBox="0 0 64 64" aria-hidden="true" focusable="false">`
-                + shape(mood || 'fed') + `</svg>`;
+                + shape(mood || 'fed') + (grown ? (PET_GROWN[visual.key] || '') : '') + `</svg>`;
             return wrap;
         }
 
@@ -196,7 +213,7 @@
             const overall = state.overall_mood || state.mood;
             const art = document.getElementById('pet-tile-art');
             const mood = PET_MOODS[overall] || PET_MOODS.hungry;
-            art.replaceChildren(petArtNode(visual, 44, overall));
+            art.replaceChildren(petArtNode(visual, 44, overall, state.stage));
             art.className = `pet-art ${visual.cls}`;
             document.getElementById('pet-tile-mood').textContent = mood.badge;
             tile.className = `pet-tile pet-mood-${overall}`;
@@ -231,7 +248,8 @@
             const overall = pet.overall_mood || pet.mood;
             const mood = PET_MOODS[overall] || PET_MOODS.hungry;
 
-            document.getElementById('pet-room-art').replaceChildren(petArtNode(visual, 120, overall));
+            document.getElementById('pet-room-art').replaceChildren(
+                petArtNode(visual, 120, overall, pet.stage));
             document.getElementById('pet-room-art').className = `pet-room-art pet-art ${visual.cls}`;
             document.getElementById('pet-room-name').textContent = visual.name;
             document.getElementById('pet-room-mood').textContent = mood.long;
@@ -304,6 +322,33 @@
                 petBusy || !(care.petting && care.petting.available);
             document.getElementById('pet-play-btn').disabled =
                 petBusy || !(care.play && care.play.available);
+
+            // Эволюция: прогресс числом, потому что приложение везде показывает конкретику
+            // («сыт до 3 августа», «можно снова через 3 ч»). Полоса без цифр стала бы
+            // единственным местом, где число прячется. Сервер считает и прогресс, и нехватку.
+            const evo = room.evolution;
+            const evoBlock = document.getElementById('pet-room-evolution');
+            if (!evo) {
+                evoBlock.style.display = 'none';
+            } else if (Number(evo.stage) >= 2) {
+                document.getElementById('pet-evo-title').textContent = 'Вырос';
+                document.getElementById('pet-evo-progress').textContent =
+                    `${bond} ${petPluralDays(bond)} заботы`;
+                document.getElementById('pet-evo-btn').style.display = 'none';
+                evoBlock.style.display = 'flex';
+            } else {
+                const need = Number(evo.bond_required) || 0;
+                const have = Number(evo.bond_current) || 0;
+                const price = Number(evo.price) || 0;
+                document.getElementById('pet-evo-title').textContent = 'Может вырасти';
+                document.getElementById('pet-evo-progress').textContent =
+                    `${have} из ${need} ${petPluralDays(need)} заботы · ${price} 🥯`;
+                const evoBtn = document.getElementById('pet-evo-btn');
+                evoBtn.textContent = `Вырастить — ${price} 🥯`;
+                evoBtn.disabled = petBusy || !evo.available;
+                evoBtn.style.display = 'inline-flex';
+                evoBlock.style.display = 'flex';
+            }
         }
 
         async function loadPetRoom() {
@@ -433,6 +478,32 @@
             try {
                 const { error } = await db.rpc('pet_care_self', { p_action: action });
                 if (error) throw error;
+                await loadPetRoom();
+            } catch (error) {
+                btn.textContent = restore;
+                errorEl.textContent = error.message || String(error);
+            } finally {
+                petBusy = false;
+                renderPetRoom();
+            }
+        }
+
+        // Эволюция необратима, поэтому это отдельное явное действие, а не побочный эффект
+        // кормления. Сервер сам проверит обе оси и назовёт, чего не хватает.
+        async function evolvePet(btn) {
+            if (petBusy || (btn && btn.disabled)) return;
+            petBusy = true;
+            const errorEl = document.getElementById('pet-room-error');
+            const restore = btn.textContent;
+            btn.disabled = true;
+            errorEl.textContent = '';
+            btn.textContent = 'Растём...';
+            try {
+                const { data, error } = await db.rpc('evolve_pet_self');
+                if (error) throw error;
+                if (data && typeof data.balance === 'number') {
+                    document.getElementById('val-huikons').innerText = data.balance;
+                }
                 await loadPetRoom();
             } catch (error) {
                 btn.textContent = restore;

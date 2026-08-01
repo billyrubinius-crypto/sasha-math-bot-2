@@ -1,6 +1,6 @@
 -- =============================================================================
 -- database/tests/v2_pets_regression.sql — регрессия питомцев Stage 5
--- (миграции 064 «питомцы», 065 «сон», 066 «настроение», 068 «оси комнаты»;
+-- (миграции 064 «питомцы», 065 «сон», 066 «настроение», 068 «оси комнаты», 069 «эволюция»;
 -- SPEC_STAGE5_PETS.md, SPEC_STAGE5_PET_ROOM.md, карточки V2/V3 и PET1)
 --
 -- Каждый БЛОК выполняется в отдельной begin;...rollback; — dev не изменяется, вся синтетика
@@ -468,6 +468,137 @@ begin
     -- Проверка обязана доказывать именно флаг, а не кулдаун: в pet_care флаг проверяется
     -- раньше окна, поэтому сообщение должно быть про недоступность механики.
     insert into pet_report values (14, 'CARE_OFF', 'выключенная механика не даёт заботиться',
+      v_msg like '%недоступны%', v_msg);
+  end;
+end $$;
+
+select * from pet_report order by seq;
+rollback;
+
+
+-- =========================================================================
+-- БЛОК 7 — PET4: эволюция питомца (миграция 069)
+--
+-- Главное, что проверяется: эволюцию нельзя купить в обход заботы и нельзя получить
+-- заботой в обход денег — нужны обе оси сразу.
+-- =========================================================================
+begin;
+create temp table pet_report(seq int, code text, title text, pass boolean, detail text) on commit drop;
+
+insert into public.students (telegram_id, name, huikons) values (995000508, 'pet_r8', 5000);
+update public.economy_config set stage5_pets_enabled = true where id;
+
+do $$
+declare v_msg text; v_bal integer; v_stage smallint; v_bond integer; v_state json; v_room json;
+begin
+  -- 1. эволюция без питомца отклоняется
+  begin
+    perform public.evolve_pet(995000508);
+    insert into pet_report values (1, 'EVO_NO_PET', 'эволюция без питомца отклоняется', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    insert into pet_report values (1, 'EVO_NO_PET', 'эволюция без питомца отклоняется', true, v_msg);
+  end;
+
+  insert into public.student_items (student_id, item_code, quantity) values (995000508, 'pet_cat', 1);
+  insert into public.student_equipment (student_id, slot, item_code) values (995000508, 'pet', 'pet_cat');
+  insert into public.student_pet_state (student_id, satiety_until, days_fed_total, bond, last_bond_date)
+    values (995000508, null, 0, 10, (now() at time zone 'Europe/Moscow')::date);
+
+  -- 2. денег хватает, заботы нет → отказ, ничего не списано, ступень прежняя
+  begin
+    perform public.evolve_pet(995000508);
+    insert into pet_report values (2, 'EVO_NEED_BOND', 'без 60 дней заботы эволюции нет', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    select huikons into v_bal from public.students where telegram_id = 995000508;
+    select stage into v_stage from public.student_pet_state where student_id = 995000508;
+    insert into pet_report values (2, 'EVO_NEED_BOND', 'без 60 дней заботы эволюции нет',
+      v_bal = 5000 and v_stage = 1, format('%s | баланс %s, ступень %s', v_msg, v_bal, v_stage));
+  end;
+
+  -- 3. заботы хватает, денег нет → отказ, ступень прежняя
+  update public.student_pet_state set bond = 60 where student_id = 995000508;
+  update public.students set huikons = 100 where telegram_id = 995000508;
+  begin
+    perform public.evolve_pet(995000508);
+    insert into pet_report values (3, 'EVO_NEED_MONEY', 'без 1500 бубликов эволюции нет', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    select stage into v_stage from public.student_pet_state where student_id = 995000508;
+    select huikons into v_bal from public.students where telegram_id = 995000508;
+    insert into pet_report values (3, 'EVO_NEED_MONEY', 'без 1500 бубликов эволюции нет',
+      v_stage = 1 and v_bal = 100, format('%s | баланс %s, ступень %s', v_msg, v_bal, v_stage));
+  end;
+
+  -- 4. обе оси сошлись → эволюция проходит, списано ровно 1500
+  update public.students set huikons = 2000 where telegram_id = 995000508;
+  perform public.evolve_pet(995000508);
+  select huikons into v_bal from public.students where telegram_id = 995000508;
+  select stage, bond into v_stage, v_bond from public.student_pet_state where student_id = 995000508;
+  insert into pet_report values (4, 'EVO_OK', 'обе оси сошлись: ступень 2, списано 1500',
+    v_bal = 500 and v_stage = 2 and v_bond = 60,
+    format('баланс %s, ступень %s, связь %s', v_bal, v_stage, v_bond));
+
+  -- 5. повторная эволюция отклоняется и не списывает второй раз
+  begin
+    perform public.evolve_pet(995000508);
+    insert into pet_report values (5, 'EVO_TWICE', 'повторная эволюция отклоняется', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    select huikons into v_bal from public.students where telegram_id = 995000508;
+    insert into pet_report values (5, 'EVO_TWICE', 'повторная эволюция отклоняется',
+      v_bal = 500, format('%s | баланс %s', v_msg, v_bal));
+  end;
+
+  -- 6. связь эволюция не тратит: 60 дней заботы остаются накопленными
+  insert into pet_report values (6, 'EVO_KEEPS_BOND', 'эволюция не сбрасывает связь',
+    v_bond = 60, format('связь %s', v_bond));
+
+  -- 7. get_pet_state отдаёт ступень (её читает задеплоенный клиент)
+  v_state := public.get_pet_state(995000508);
+  insert into pet_report values (7, 'STATE_STAGE', 'get_pet_state отдаёт ступень',
+    (v_state ->> 'stage')::int = 2, format('stage=%s', v_state ->> 'stage'));
+
+  -- 8. комната отдаёт блок эволюции с прогрессом
+  v_room := public.get_pet_room(995000508);
+  insert into pet_report values (8, 'ROOM_EVOLUTION', 'комната отдаёт блок эволюции',
+    (v_room -> 'evolution' ->> 'stage')::int = 2
+      and (v_room -> 'evolution' ->> 'price')::int = 1500
+      and (v_room -> 'evolution' ->> 'bond_required')::int = 60
+      and (v_room -> 'evolution' ->> 'available') = 'false',
+    (v_room -> 'evolution')::text);
+end $$;
+
+-- 9. прогресс до эволюции: сколько не хватает, считает сервер
+do $$
+declare v_room json;
+begin
+  insert into public.students (telegram_id, name, huikons) values (995000509, 'pet_r9', 5000);
+  insert into public.student_items (student_id, item_code, quantity) values (995000509, 'pet_owl', 1);
+  insert into public.student_equipment (student_id, slot, item_code) values (995000509, 'pet', 'pet_owl');
+  insert into public.student_pet_state (student_id, satiety_until, days_fed_total, bond, last_bond_date)
+    values (995000509, null, 0, 38, (now() at time zone 'Europe/Moscow')::date);
+
+  v_room := public.get_pet_room(995000509);
+  insert into pet_report values (9, 'EVO_PROGRESS', 'сервер считает прогресс и нехватку',
+    (v_room -> 'evolution' ->> 'bond_current')::int = 38
+      and (v_room -> 'evolution' ->> 'bond_missing')::int = 22
+      and (v_room -> 'evolution' ->> 'available') = 'false',
+    (v_room -> 'evolution')::text);
+end $$;
+
+-- 10. выключенная механика отвергает эволюцию
+do $$
+declare v_msg text;
+begin
+  update public.economy_config set stage5_pets_enabled = false where id;
+  begin
+    perform public.evolve_pet(995000508);
+    insert into pet_report values (10, 'EVO_OFF', 'выключенная механика не выращивает', false, 'прошло');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    insert into pet_report values (10, 'EVO_OFF', 'выключенная механика не выращивает',
       v_msg like '%недоступны%', v_msg);
   end;
 end $$;

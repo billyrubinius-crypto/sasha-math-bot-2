@@ -12,8 +12,8 @@
   <link rel="stylesheet" href="../styles/student.css">
   <link rel="stylesheet" href="../styles/season-v3-preview.css">
   <link rel="stylesheet" href="../styles/season-cosmetics-preview.css?v=9">
-  <link rel="stylesheet" href="../styles/pets.css?v=2">
-  <script src="../js/student-pets.js?v=2"></script>
+  <link rel="stylesheet" href="../styles/pets.css?v=3">
+  <script src="../js/student-pets.js?v=3"></script>
   <style>
     body { margin: 0; padding: 24px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
            background: #f4f6fb; color: #0f172a; display: block; }
@@ -55,6 +55,8 @@
   <h1 style="margin-top:8px">Комната (PET2)</h1>
   <p class="hint">
     Полноэкранный слой, открывается нажатием на плитку в шапке — не шестая вкладка навигации.
+    Третья комната показывает выросшего питомца (ступень 2): силуэт получает отличительную
+    черту, но вид и имя остаются прежними.
     Четыре индикатора различают только «можно сейчас» (подсвечен) и «можно снова через N»:
     просроченного состояния не существует. Реакции показывают только хорошее и пропадают
     совсем, если сервер не прислал ни одной.
@@ -76,8 +78,8 @@
 
   // Стенд рисует боевой функцией petArtNode из js/student-pets.js — никакой копии
   // разметки, поэтому расхождение между превью и приложением невозможно.
-  function art(pet, mood, size) {
-    return petArtNode({ key: pet.key, name: pet.name }, size, mood).outerHTML;
+  function art(pet, mood, size, stage) {
+    return petArtNode({ key: pet.key, name: pet.name }, size, mood, stage).outerHTML;
   }
 
   const PRICE = 5, MAX = 7;
@@ -137,7 +139,7 @@
           <button type="button" class="pet-room-close" aria-label="Закрыть">✕</button>
         </header>
         <div class="pet-room-scene">
-          <button type="button" class="pet-room-art pet-art ${pet.cls}" aria-label="Погладить взглядом">${art(pet, r.mood, 120)}</button>
+          <button type="button" class="pet-room-art pet-art ${pet.cls}" aria-label="Погладить взглядом">${art(pet, r.mood, 120, r.stage)}</button>
           <p class="pet-room-mood pet-mood-${r.mood}">${r.long}</p>
         </div>
         <div class="pet-room-cheers">${cheerBadges}</div>
@@ -147,6 +149,13 @@
           ${indicator('pet', '✋', 'Внимание', r.pettingReady, r.pettingReady ? 'Можно сейчас' : `Можно снова через ${r.pettingIn}`)}
           ${indicator('play', '🧶', 'Игра', r.playReady, r.playReady ? 'Можно сейчас' : `Можно снова через ${r.playIn}`)}
         </div>
+        ${r.evo ? `<div class="pet-room-evolution">
+          <div class="pet-evo-copy">
+            <span class="pet-evo-title">${r.evo.title}</span>
+            <span class="pet-evo-progress">${r.evo.progress}</span>
+          </div>
+          ${r.evo.button ? `<button type="button" class="pet-evo-btn"${r.evo.ready ? '' : ' disabled'}>${r.evo.button}</button>` : ''}
+        </div>` : ''}
         <div class="pet-room-actions">
           ${feedBtn}${fillBtn}${sleepBtn}
           <button type="button" class="pet-care-btn"${r.pettingReady ? '' : ' disabled'}>Погладить</button>
@@ -183,17 +192,22 @@
         mood: 'happy', long: 'Сыт и доволен', days: 3, bond: 7,
         satiety: 'Сыт до 3 августа — ещё 3 дня', rest: 'rested', restText: 'Выспался, бодрый ещё 33 ч',
         pettingReady: true, playReady: true, pettingIn: '', playIn: '',
-        cheers: ['🎉 Хорошая неделя', '⬆️ Новая лига'] } },
+        cheers: ['🎉 Хорошая неделя', '⬆️ Новая лига'],
+        evo: { title: 'Может вырасти', progress: '38 из 60 дней заботы · 1500 🥯',
+               button: 'Вырастить — 1500 🥯', ready: false } } },
     { caption: 'Комната · оси на кулдауне · тёмный фон', cls: 'room-stage', pet: PETS[1], data: {
         mood: 'hungry', long: 'Проголодался и грустит', days: 0, bond: 21,
         satiety: 'Сегодня ещё не кормлен', rest: 'tired', restText: 'Давно не спал',
         pettingReady: false, playReady: false, pettingIn: '2 ч 40 мин', playIn: '9 ч 10 мин',
-        cheers: [] } },
+        cheers: [],
+        evo: { title: 'Может вырасти', progress: '60 из 60 дней заботы · 1500 🥯',
+               button: 'Вырастить — 1500 🥯', ready: true } } },
     { caption: 'Комната · спит · светлый фон', cls: 'room-stage light', pet: PETS[2], data: {
         mood: 'sleeping', long: 'Спит', days: 5, bond: 60,
         satiety: 'Сыт до 5 августа — ещё 5 дней', rest: 'sleeping', restText: 'Спит, проснётся через 6 ч 15 мин',
         pettingReady: true, playReady: false, pettingIn: '', playIn: '4 ч',
-        cheers: ['🏆 Новый рекорд'] } }
+        cheers: ['🏆 Новый рекорд'], stage: 2,
+        evo: { title: 'Вырос', progress: '73 дня заботы', button: null, ready: false } } }
   ];
   document.getElementById('room-row').innerHTML =
     ROOMS.map(r => figure(r.caption, r.cls, room(r.pet, r.data))).join('');
