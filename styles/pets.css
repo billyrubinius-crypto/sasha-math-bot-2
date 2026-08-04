@@ -225,3 +225,53 @@ body.pet-room-open { overflow: hidden; }
     font-size: var(--text-small); font-weight: 700; cursor: pointer;
 }
 .pet-evo-btn:disabled { opacity: .55; cursor: default; }
+
+/* --- Предметы комнаты (PET3) -----------------------------------------------
+   Лежанка лежит под питомцем, игрушка стоит рядом. Обе — чистая косметика: ни на
+   одну ось заботы и ни на эволюцию они не влияют.
+   Стена берётся из уже купленного сезонного фона, отдельным товаром не является. */
+.pet-room-scene { position: relative; }
+.pet-room-wall {
+    position: absolute; inset: 0;
+    border-radius: var(--ca-radius-lg);
+    overflow: hidden;
+    opacity: .55;
+    pointer-events: none;
+}
+.pet-room-wall-art { position: absolute; inset: 0; }
+/* Пока стены нет, сцена остаётся прежней панелью — без пустой рамки. */
+.pet-room-scene.has-wall { padding: var(--ca-space-4) var(--ca-space-3); }
+
+.pet-room-stage {
+    position: relative; z-index: 1;
+    display: grid; justify-items: center;
+    min-height: 132px;
+}
+/* Лежанка — подложка ровно под фигурой, поэтому обе в одной ячейке грида. */
+.pet-room-bed, .pet-room-art { grid-area: 1 / 1; align-self: end; }
+.pet-room-bed { width: 132px; transform: translateY(10px); }
+.pet-room-toy {
+    grid-area: 1 / 1; justify-self: end; align-self: end;
+    width: 34px; transform: translate(14px, 4px);
+}
+.pet-room-item { display: block; width: 100%; }
+.pet-item-svg { display: block; width: 100%; height: auto; }
+/* У предметов СВОЯ палитра: они мебель, а не часть животного, и переменные питомца
+   (--pet-body и соседние) в их контейнерах не определены. */
+.pet-room-item { --item-fill: #cbd5e1; --item-ink: #334155; }
+.item-bed-v1-pillow { --item-fill: #f2b3c4; --item-ink: #5b2b3a; }
+.item-bed-v1-basket { --item-fill: #d9a066; --item-ink: #4a3018; }
+.item-bed-v1-mat    { --item-fill: #9ec9e8; --item-ink: #24435c; }
+.item-toy-v1-ball   { --item-fill: #f4795b; --item-ink: #4e1f14; }
+.item-toy-v1-yarn   { --item-fill: #b8a6ef; --item-ink: #2f2358; }
+.item-toy-v1-block  { --item-fill: #f6c85c; --item-ink: #4e3a10; }
+
+.item-body { fill: var(--item-fill); stroke: var(--item-ink); stroke-width: 1.6; stroke-linejoin: round; }
+.item-soft { fill: var(--item-fill); stroke: var(--item-ink); stroke-width: 1.6; stroke-linejoin: round; }
+.item-line { fill: none; stroke: var(--item-ink); stroke-width: 1.4; stroke-linecap: round; opacity: .7; }
+
+/* Превью в витрине: предмет вписывается в коробку .shop-preview, не вылезая за неё —
+   тот же урок, что и с сезонными аватарами, которые рисовались жёстким 68 px. */
+.pet-shop-item { display: block; width: 100%; }
+.pet-shop-bed { max-width: 46px; }
+.pet-shop-toy { max-width: 30px; }

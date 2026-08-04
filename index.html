@@ -626,9 +626,16 @@
                         onclick="closePetRoom()">✕</button>
             </header>
 
+            <!-- Сцена: стена — уже купленный сезонный фон (не отдельный товар), под питомцем
+                 лежанка, рядом игрушка. Предметы косметические и ни на что не влияют. -->
             <div class="pet-room-scene">
-                <button type="button" class="pet-room-art" id="pet-room-art"
-                        aria-label="Погладить взглядом" onclick="petPokeReact(this)"></button>
+                <div class="pet-room-wall" id="pet-room-wall" aria-hidden="true"></div>
+                <div class="pet-room-stage">
+                    <div class="pet-room-bed" id="pet-room-bed" aria-hidden="true"></div>
+                    <button type="button" class="pet-room-art" id="pet-room-art"
+                            aria-label="Погладить взглядом" onclick="petPokeReact(this)"></button>
+                    <div class="pet-room-toy" id="pet-room-toy" aria-hidden="true"></div>
+                </div>
                 <p class="pet-room-mood" id="pet-room-mood"></p>
             </div>
 

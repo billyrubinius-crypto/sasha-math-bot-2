@@ -1,6 +1,6 @@
 -- =============================================================================
 -- database/tests/v2_pets_regression.sql — регрессия питомцев Stage 5
--- (миграции 064 «питомцы», 065 «сон», 066 «настроение», 068 «оси комнаты», 069 «эволюция»;
+-- (миграции 064 «питомцы», 065 «сон», 066 «настроение», 068 «оси комнаты», 069 «эволюция», 070 «предметы»;
 -- SPEC_STAGE5_PETS.md, SPEC_STAGE5_PET_ROOM.md, карточки V2/V3 и PET1)
 --
 -- Каждый БЛОК выполняется в отдельной begin;...rollback; — dev не изменяется, вся синтетика
@@ -601,6 +601,98 @@ begin
     insert into pet_report values (10, 'EVO_OFF', 'выключенная механика не выращивает',
       v_msg like '%недоступны%', v_msg);
   end;
+end $$;
+
+select * from pet_report order by seq;
+rollback;
+
+
+-- =========================================================================
+-- БЛОК 8 — PET3: предметы комнаты (миграция 070)
+--
+-- Главное, что проверяется: предметы комнаты НЕ попадают в требование коллекционного
+-- бонуса. Это решение пользователя, и оно держится не на договорённости, а на том, что
+-- предметы постоянные (availability='always'), а бонус считает только rotation.
+-- =========================================================================
+begin;
+create temp table pet_report(seq int, code text, title text, pass boolean, detail text) on commit drop;
+
+insert into public.students (telegram_id, name, huikons) values (995000510, 'pet_r10', 5000);
+update public.economy_config set stage5_pets_enabled = true where id;
+
+do $$
+declare v_msg text; v_bal integer; v_room json; v_before integer; v_after integer; v_season bigint;
+begin
+  -- 1. пока предметы спят, купить их нельзя
+  begin
+    perform public.buy_item(995000510, 'pet_bed_pillow');
+    insert into pet_report values (1, 'ITEM_DORMANT', 'спящий предмет не продаётся', false, 'покупка прошла');
+  exception when others then
+    get stacked diagnostics v_msg = message_text;
+    select huikons into v_bal from public.students where telegram_id = 995000510;
+    insert into pet_report values (1, 'ITEM_DORMANT', 'спящий предмет не продаётся',
+      v_bal = 5000, format('%s | баланс %s', v_msg, v_bal));
+  end;
+
+  -- 2. после включения покупка списывает цену и сразу экипирует в свой слот
+  update public.shop_items set active = true where slot in ('pet_bed', 'pet_toy');
+  perform public.buy_item(995000510, 'pet_bed_pillow');
+  perform public.buy_item(995000510, 'pet_toy_yarn');
+  select huikons into v_bal from public.students where telegram_id = 995000510;
+  insert into pet_report values (2, 'ITEM_BUY', 'покупка списывает 600+300 и экипирует',
+    v_bal = 4100
+      and exists (select 1 from public.student_equipment
+                   where student_id = 995000510 and slot = 'pet_bed' and item_code = 'pet_bed_pillow')
+      and exists (select 1 from public.student_equipment
+                   where student_id = 995000510 and slot = 'pet_toy' and item_code = 'pet_toy_yarn'),
+    format('баланс %s', v_bal));
+
+  -- 3. слоты независимы: вторая лежанка вытесняет первую, игрушку не трогает
+  perform public.buy_item(995000510, 'pet_bed_mat');
+  insert into pet_report values (3, 'ITEM_SLOTS', 'слоты независимы, в каждом один предмет',
+    (select item_code from public.student_equipment
+      where student_id = 995000510 and slot = 'pet_bed') = 'pet_bed_mat'
+      and (select item_code from public.student_equipment
+            where student_id = 995000510 and slot = 'pet_toy') = 'pet_toy_yarn'
+      and (select count(*) from public.student_equipment
+            where student_id = 995000510 and slot like 'pet_%') = 2,
+    'лежанка сменилась, игрушка на месте');
+
+  -- 4. комната отдаёт надетые предметы
+  insert into public.student_items (student_id, item_code, quantity) values (995000510, 'pet_cat', 1);
+  insert into public.student_equipment (student_id, slot, item_code) values (995000510, 'pet', 'pet_cat');
+  v_room := public.get_pet_room(995000510);
+  insert into pet_report values (4, 'ROOM_ITEMS', 'комната отдаёт лежанку и игрушку',
+    (v_room -> 'room_items' ->> 'bed') = 'bed_v1_mat'
+      and (v_room -> 'room_items' ->> 'toy') = 'toy_v1_yarn',
+    (v_room -> 'room_items')::text);
+
+  -- 5. ГЛАВНОЕ: предметы комнаты не меняют требование коллекционного бонуса
+  select season_id into v_season from public.season_bundles order by season_id desc limit 1;
+  if v_season is null then
+    insert into pet_report values (5, 'ITEM_NOT_IN_COLLECTION', 'предметы вне коллекции',
+      true, 'бандлов нет — проверка неприменима, требование считается по rotation');
+  else
+    select count(*) into v_after
+      from public.shop_items s
+      join public.season_bundles b on b.bundle = s.rotation_bundle
+     where s.availability = 'rotation' and b.season_id = v_season;
+    select count(*) into v_before
+      from public.shop_items s
+      join public.season_bundles b on b.bundle = s.rotation_bundle
+     where s.availability = 'rotation' and b.season_id = v_season
+       and s.slot not in ('pet_bed', 'pet_toy');
+    insert into pet_report values (5, 'ITEM_NOT_IN_COLLECTION', 'предметы вне коллекции',
+      v_before = v_after,
+      format('в бандле %s предметов, из них комнатных %s', v_after, v_after - v_before));
+  end if;
+
+  -- 6. предметы не трогают ни связь, ни сытость, ни отдых
+  insert into pet_report values (6, 'ITEM_COSMETIC_ONLY', 'предметы ничего не дают механике',
+    not exists (select 1 from public.pet_care_log where student_id = 995000510)
+      and not exists (select 1 from public.pet_feed_log where student_id = 995000510)
+      and coalesce((select bond from public.student_pet_state where student_id = 995000510), 0) = 0,
+    'ни заботы, ни кормлений, связь 0');
 end $$;
 
 select * from pet_report order by seq;

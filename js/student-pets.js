@@ -113,6 +113,47 @@
             return wrap;
         }
 
+        // Предметы комнаты (PET3). Allowlist такой же явный, как у питомцев: из БД принимается
+        // только перечисленный render_payload, произвольный не рисуется вовсе.
+        const PET_ROOM_ITEMS = {
+            bed_v1_pillow: '<rect class="item-soft" x="6" y="12" width="52" height="18" rx="9"/>'
+                         + '<path class="item-line" d="M16 21 h32"/>',
+            bed_v1_basket: '<path class="item-body" d="M8 12 h48 l-5 18 h-38 Z"/>'
+                         + '<path class="item-line" d="M16 16 v12 M32 16 v12 M48 16 v12 M10 22 h44"/>',
+            bed_v1_mat:    '<rect class="item-soft" x="4" y="16" width="56" height="12" rx="6"/>'
+                         + '<path class="item-line" d="M16 16 v12 M32 16 v12 M48 16 v12"/>',
+            toy_v1_ball:   '<circle class="item-body" cx="16" cy="16" r="12"/>'
+                         + '<path class="item-line" d="M6 12 q10 6 20 0 M6 20 q10 -6 20 0"/>',
+            toy_v1_yarn:   '<circle class="item-soft" cx="16" cy="16" r="12"/>'
+                         + '<path class="item-line" d="M8 12 q8 10 16 8 M8 20 q10 -10 16 -6 M10 24 q6 -12 14 -10"/>',
+            toy_v1_block:  '<rect class="item-body" x="4" y="4" width="24" height="24" rx="5"/>'
+                         + '<path class="item-line" d="M11 22 v-11 h4 a4 4 0 0 1 0 8 h-4 M17 19 l5 3"/>'
+        };
+
+        function petRoomItemNode(payload, cls, viewBox) {
+            const shape = payload ? PET_ROOM_ITEMS[payload] : null;
+            if (!shape) return null;
+            const wrap = document.createElement('span');
+            // Класс по payload несёт палитру предмета: цвета живут в styles/pets.css рядом с
+            // остальной косметикой, а не в разметке.
+            wrap.className = `${cls} item-${payload.replace(/_/g, '-')}`;
+            wrap.innerHTML = `<svg class="pet-item-svg" viewBox="${viewBox}" aria-hidden="true" focusable="false">`
+                + shape + '</svg>';
+            return wrap;
+        }
+
+        // Превью для витрины магазина: тот же код рисует товар, что и комната, поэтому
+        // купленное совпадает с показанным. Вызывается из student-shop.js.
+        function petShopPreviewNode(slot, payload) {
+            if (slot === 'pet') {
+                const visual = PET_VISUALS[payload];
+                return visual ? petArtNode(visual, 44, 'happy') : null;
+            }
+            if (slot === 'pet_bed') return petRoomItemNode(payload, 'pet-shop-item pet-shop-bed', '0 0 64 32');
+            if (slot === 'pet_toy') return petRoomItemNode(payload, 'pet-shop-item pet-shop-toy', '0 0 32 32');
+            return null;
+        }
+
         // Подписи настроения задаёт сервер кодом; клиент только переводит код в текст.
         // sleeping — общее состояние (overall_mood), остальные приходят и как ось питания.
         const PET_MOODS = {
@@ -248,8 +289,31 @@
             const overall = pet.overall_mood || pet.mood;
             const mood = PET_MOODS[overall] || PET_MOODS.hungry;
 
+            // Стена комнаты — уже купленный сезонный фон, а не отдельный товар: у ученика он
+            // часто уже есть, и это добавляет ценность существующей покупке вместо второго
+            // типа фонов. Экипировку профиля держит student-progress.js.
+            const scene = document.querySelector('.pet-room-scene');
+            const wallHost = document.getElementById('pet-room-wall');
+            wallHost.replaceChildren();
+            const wallItem = (typeof currentProfileEquipment === 'object' && currentProfileEquipment)
+                ? currentProfileEquipment.background : null;
+            if (wallItem && window.SeasonCosmetics) {
+                const wall = SeasonCosmetics.createScene(wallItem, 'pet-room-wall-art');
+                if (wall) wallHost.appendChild(wall);
+            }
+            scene.classList.toggle('has-wall', wallHost.childElementCount > 0);
+
             document.getElementById('pet-room-art').replaceChildren(
                 petArtNode(visual, 120, overall, pet.stage));
+
+            // Предметы комнаты: лежанка под питомцем, игрушка рядом.
+            const items = room.room_items || {};
+            const bedHost = document.getElementById('pet-room-bed');
+            const toyHost = document.getElementById('pet-room-toy');
+            const bed = petRoomItemNode(items.bed, 'pet-room-item pet-room-bed-art', '0 0 64 32');
+            const toy = petRoomItemNode(items.toy, 'pet-room-item pet-room-toy-art', '0 0 32 32');
+            bedHost.replaceChildren(...(bed ? [bed] : []));
+            toyHost.replaceChildren(...(toy ? [toy] : []));
             document.getElementById('pet-room-art').className = `pet-room-art pet-art ${visual.cls}`;
             document.getElementById('pet-room-name').textContent = visual.name;
             document.getElementById('pet-room-mood').textContent = mood.long;

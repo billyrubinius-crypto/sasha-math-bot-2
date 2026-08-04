@@ -615,6 +615,22 @@
                     demo.appendChild(bar);
                 }
                 p.appendChild(demo);
+            } else if (item.slot === 'pet') {
+                // Питомец и предметы его комнаты рисуются модулем student-pets.js — тем же
+                // кодом, что и в самой комнате, поэтому витрина показывает ровно покупаемое.
+                if (typeof petShopPreviewNode === 'function') {
+                    const node = petShopPreviewNode(item.slot, item.render_payload);
+                    if (node) p.appendChild(node); else p.textContent = '🐾';
+                } else {
+                    p.textContent = '🐾';
+                }
+            } else if (item.slot === 'pet_bed' || item.slot === 'pet_toy') {
+                if (typeof petShopPreviewNode === 'function') {
+                    const node = petShopPreviewNode(item.slot, item.render_payload);
+                    if (node) p.appendChild(node); else p.textContent = '🧸';
+                } else {
+                    p.textContent = '🧸';
+                }
             } else if (item.slot === 'crown') {
                 p.textContent = '👑';
             } else if (item.slot === 'status_emoji') {

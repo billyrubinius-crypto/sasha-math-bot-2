@@ -9271,3 +9271,137 @@ $function$;
 revoke all on function public.evolve_pet(bigint)   from public, anon, authenticated;
 revoke all on function public.evolve_pet_self()    from public, anon;
 grant execute on function public.evolve_pet_self() to authenticated;
+
+
+-- =============================================================================
+-- Миграция 070 (PET3): предметы комнаты — лежанка и игрушка.
+-- get_pet_room ниже ПЕРЕОПРЕДЕЛЯЕТ версию из 069: добавлено поле room_items.
+-- Предметы постоянные (availability='always') СОЗНАТЕЛЬНО: коллекционный бонус считает
+-- только rotation, поэтому постоянство — единственный способ не тянуть их в коллекцию,
+-- не трогая работающую функцию выплаты.
+-- =============================================================================
+-- --- 1. Новые слоты экипировки --------------------------------------------------
+-- Расширение того же check, что вводило слоты avatar (057) и pet (064).
+alter table public.shop_items drop constraint if exists shop_items_slot_check;
+alter table public.shop_items add constraint shop_items_slot_check
+  check (slot in ('name_color', 'crown', 'status_emoji', 'title', 'frame', 'background',
+                  'avatar', 'pet', 'pet_bed', 'pet_toy'));
+
+-- --- 2. Каталог предметов (спящий) ----------------------------------------------
+-- item_kind='cosmetic' — сознательно, как и у питомца: тогда buy_item, equip_item и инвентарь
+-- работают существующим кодом, а unique(student_id, slot) сам держит один предмет на слот.
+insert into public.shop_items
+  (item_code, name, description, item_kind, slot, price, availability,
+   render_payload, visual_key, motion_policy, rarity, sort_order, active)
+values
+  ('pet_bed_pillow', 'Лежанка: подушка',  'Мягкая подушка, на которой питомец спит.',
+   'cosmetic', 'pet_bed', 600, 'always', 'bed_v1_pillow', 'bed_v1_pillow', 'static', 'rare', 620, false),
+  ('pet_bed_basket', 'Лежанка: корзинка', 'Плетёная корзинка с бортиками.',
+   'cosmetic', 'pet_bed', 600, 'always', 'bed_v1_basket', 'bed_v1_basket', 'static', 'rare', 621, false),
+  ('pet_bed_mat',    'Лежанка: коврик',   'Полосатый коврик — просто и удобно.',
+   'cosmetic', 'pet_bed', 600, 'always', 'bed_v1_mat',    'bed_v1_mat',    'static', 'rare', 622, false),
+  ('pet_toy_ball',   'Игрушка: мячик',    'Мячик, который всегда лежит рядом.',
+   'cosmetic', 'pet_toy', 300, 'always', 'toy_v1_ball',   'toy_v1_ball',   'static', 'common', 630, false),
+  ('pet_toy_yarn',   'Игрушка: клубок',   'Клубок ниток — классика жанра.',
+   'cosmetic', 'pet_toy', 300, 'always', 'toy_v1_yarn',   'toy_v1_yarn',   'static', 'common', 631, false),
+  ('pet_toy_block',  'Игрушка: кубик',    'Кубик с буквой — для умных питомцев.',
+   'cosmetic', 'pet_toy', 300, 'always', 'toy_v1_block',  'toy_v1_block',  'static', 'common', 632, false)
+on conflict (item_code) do nothing;
+
+-- --- 3. Read-модель комнаты отдаёт надетые предметы -------------------------------
+-- Тело перенесено из миграции 069 и пропатчено по якорям: добавлены два поля, остальное
+-- дословно прежнее.
+create or replace function public.get_pet_room(p_student_id bigint)
+ returns json
+ language plpgsql
+ stable
+ set search_path = public, pg_temp
+as $function$
+declare
+  v_state     json := public.get_pet_state(p_student_id);
+  v_petting   integer;
+  v_play      integer;
+  v_now       timestamptz := now();
+  v_pet_win   timestamptz;
+  v_play_win  timestamptz;
+  v_pet_done  boolean;
+  v_play_done boolean;
+  v_bond      integer;
+  v_stage     smallint;
+  v_ev_price  integer;
+  v_ev_bond   integer;
+  v_bed       text;
+  v_toy       text;
+  v_week      boolean;
+  v_record    boolean;
+  v_promote   boolean;
+begin
+  select pet_petting_hours, pet_play_hours, pet_evolution_price, pet_evolution_bond
+    into v_petting, v_play, v_ev_price, v_ev_bond
+    from public.economy_config where id;
+
+  select bond, stage into v_bond, v_stage
+    from public.student_pet_state where student_id = p_student_id;
+
+  -- Предметы комнаты — обычная косметика в своих слотах, поэтому берутся тем же способом,
+  -- что и питомец: из student_equipment с render_payload из каталога.
+  select s.render_payload into v_bed
+    from public.student_equipment e
+    join public.shop_items s on s.item_code = e.item_code
+   where e.student_id = p_student_id and e.slot = 'pet_bed';
+  select s.render_payload into v_toy
+    from public.student_equipment e
+    join public.shop_items s on s.item_code = e.item_code
+   where e.student_id = p_student_id and e.slot = 'pet_toy';
+
+  v_pet_win  := date_bin(make_interval(hours => v_petting), v_now, timestamptz '2026-01-01 00:00:00+03');
+  v_play_win := date_bin(make_interval(hours => v_play),    v_now, timestamptz '2026-01-01 00:00:00+03');
+
+  v_pet_done := exists (select 1 from public.pet_care_log
+                         where student_id = p_student_id and action = 'pet'
+                           and window_start = v_pet_win);
+  v_play_done := exists (select 1 from public.pet_care_log
+                          where student_id = p_student_id and action = 'play'
+                            and window_start = v_play_win);
+
+  -- Реакции: только хорошее и только свежее.
+  v_week := exists (select 1 from public.student_week_results
+                     where student_id = p_student_id and successful
+                       and finalized_at >= v_now - interval '7 days');
+  v_record := exists (select 1 from public.mock_exam_reward_log
+                       where student_id = p_student_id and reward_kind = 'record'
+                         and awarded_at >= v_now - interval '7 days');
+  v_promote := exists (select 1 from public.league_movements
+                        where student_id = p_student_id and kind = 'promote'
+                          and created_at >= v_now - interval '30 days');
+
+  return json_build_object(
+    'pet',  v_state,
+    'bond', coalesce(v_bond, 0),
+    'care', json_build_object(
+      'petting', json_build_object(
+        'available', not v_pet_done,
+        'next_at',   case when v_pet_done then v_pet_win + make_interval(hours => v_petting) end,
+        'hours',     v_petting),
+      'play', json_build_object(
+        'available', not v_play_done,
+        'next_at',   case when v_play_done then v_play_win + make_interval(hours => v_play) end,
+        'hours',     v_play)),
+    'room_items', json_build_object(
+      'bed', v_bed,
+      'toy', v_toy),
+    -- Эволюция: сервер отдаёт и прогресс, и чего именно не хватает. Клиент ничего не
+    -- досчитывает и не решает, доступна ли кнопка.
+    'evolution', json_build_object(
+      'stage',          coalesce(v_stage, 1),
+      'price',          v_ev_price,
+      'bond_required',  v_ev_bond,
+      'bond_current',   least(coalesce(v_bond, 0), v_ev_bond),
+      'bond_missing',   greatest(v_ev_bond - coalesce(v_bond, 0), 0),
+      'available',      coalesce(v_stage, 1) = 1 and coalesce(v_bond, 0) >= v_ev_bond),
+    'cheers', json_build_object(
+      'good_week',   coalesce(v_week, false),
+      'mock_record', coalesce(v_record, false),
+      'promoted',    coalesce(v_promote, false)));
+end;
+$function$;
