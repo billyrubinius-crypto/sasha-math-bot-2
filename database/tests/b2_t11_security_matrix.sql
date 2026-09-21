@@ -171,7 +171,7 @@ with allowed(sig) as (
     ('public.submit_custom_title_self(text)'), ('public.request_weekly_shield_self(uuid)'),
     ('public.cancel_weekly_shield_self(uuid)'), ('public.get_daily_quests_self()'),
     ('public.replace_life_quest_self(smallint)'), ('public.claim_life_quest_self(smallint)'),
-    ('public.review_assignment_self(uuid,text,text)'),
+    ('public.review_assignment_self(uuid,text,text,integer)'),
     ('public.apply_penalty_self(uuid,integer,text)'), ('public.get_review_queue_self(text)'),
     ('public.publish_weekly_plan_self(date,text,text,jsonb)'),
     ('public.cancel_weekly_plan_self(uuid)'),

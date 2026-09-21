@@ -28,6 +28,7 @@ import {
   parentFetchLinkedStudents,
   parentFetchProgress,
   parentFetchStudentName,
+  parentFetchTaskTotals,
   parentFetchTrajectory,
   parentLinkExists,
   rateLimitHit,
@@ -38,6 +39,7 @@ import {
   assertTelegramId,
   pickLinkedStudents,
   pickProgressRows,
+  pickTaskTotals,
   pickTrajectory,
   pickWeek,
 } from "../_shared/parentApi.ts";
@@ -150,9 +152,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const { parentId, studentId } = parentAndStudent(body);
         if (!(await parentLinkExists(parentId, studentId))) throw new AuthError("forbidden", 403);
 
-        const [progress, trajectory] = await Promise.all([
+        const [progress, trajectory, taskTotals] = await Promise.all([
           parentFetchProgress(studentId),
           parentFetchTrajectory(studentId),
+          parentFetchTaskTotals(studentId),
         ]);
 
         // Недельный блок необязателен: его сбой не должен ломать /progress (W07-требование
@@ -168,6 +171,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         data = {
           name: await parentFetchStudentName(studentId),
           progress: pickProgressRows(progress),
+          task_totals: pickTaskTotals(taskTotals),
           trajectory: pickTrajectory(trajectory),
           week,
         };

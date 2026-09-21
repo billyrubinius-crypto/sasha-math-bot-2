@@ -220,12 +220,20 @@ def format_trajectory_summary(trajectory: dict) -> str:
     return " ".join(parts) + "\nДиапазон последних пробников — не гарантия балла ЕГЭ."
 
 
-def format_progress_message(student_name: str, progress_rows: list, trajectory: dict) -> str:
+def format_progress_message(student_name: str, progress_rows: list, trajectory: dict,
+                            task_totals: dict | None = None) -> str:
     progress_by_type = {row['type']: row for row in progress_rows}
     lines = [f"📊 Результаты ученика <b>{student_name}</b>:\n"]
     for key, label in TYPE_LABELS.items():
         row = progress_by_type.get(key, {'issued': 0, 'completed': 0})
         lines.append(f"{label}: {row['completed']} из {row['issued']} выполнено")
+
+    totals = task_totals or {}
+    solved = totals.get('solved_tasks', 0)
+    if isinstance(solved, (int, float)) and solved >= 0:
+        lines.append(f"\n✅ Правильно решено задач: {int(solved)}")
+    if totals.get('has_unknown_approved_assignments'):
+        lines.append("В части старых работ число задач не было указано.")
 
     points = (trajectory or {}).get('points') or []
     if points:
@@ -292,7 +300,8 @@ async def send_student_progress(message: types.Message, parent_id: int, student_
 
     trajectory = report.get('trajectory') or {}
     name = student_name or report.get('name') or 'Ученик'
-    text = format_progress_message(name, report.get('progress') or [], trajectory)
+    text = format_progress_message(name, report.get('progress') or [], trajectory,
+                                   report.get('task_totals') or {})
 
     # Блок текущей недели (W07) — необязательное дополнение: его недоступность не должна
     # ломать старый /progress (карточка требует "старый /progress работает"). Сервер в этом

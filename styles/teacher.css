@@ -213,6 +213,11 @@
         .btn-success { background: var(--success); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; flex: 1; cursor: pointer; }
         .btn-danger { background: var(--danger); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; flex: 1; cursor: pointer; }
         textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; min-height: 80px; font-family: inherit; margin-top: 10px; }
+        .review-correct-count { margin: 0 0 10px; }
+        .review-correct-count > label { display: block; margin-bottom: 5px; color: #344054; font-size: 13px; font-weight: 700; }
+        .review-correct-count-row { display: flex; align-items: center; gap: 8px; }
+        #rev-correct-count { width: 96px; min-height: 38px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; font: inherit; }
+        #rev-correct-total { color: #667085; font-size: 13px; }
 
         /* Штрафы */
         .penalty-options { display: flex; gap: 10px; margin: 15px 0; justify-content: center; }

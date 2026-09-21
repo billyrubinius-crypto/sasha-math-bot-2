@@ -340,6 +340,10 @@ export function parentFetchTrajectory(studentId: number): Promise<unknown> {
   return callRpc<unknown>("get_mock_exam_trajectory", { p_student_id: studentId });
 }
 
+export function parentFetchTaskTotals(studentId: number): Promise<unknown> {
+  return callRpc<unknown>("get_student_task_totals", { p_student_id: studentId });
+}
+
 export function parentFetchCurrentWeek(studentId: number): Promise<unknown> {
   return callRpc<unknown>("get_student_current_week", { p_student_id: studentId });
 }

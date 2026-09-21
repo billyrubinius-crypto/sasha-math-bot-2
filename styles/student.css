@@ -1429,20 +1429,20 @@
            контрастная поверхность к тому же гарантирует читаемость подписей на всех
            четырёх пользовательских фонах.
 
-           Высота панели (box-sizing здесь content-box — глобального border-box нет):
-             height          = --ca-nav-h                  — контентная высота под кнопки;
+           Высота панели задана через border-box:
+             height          = --ca-nav-h + --ca-safe-bottom;
              padding-bottom  = --ca-safe-bottom            — safe-area, ровно один раз;
-             итоговая внешняя высота ≈ --ca-nav-h + --ca-safe-bottom (+1px border-top).
+             контентная высота = --ca-nav-h — целиком остаётся под кнопки.
            Столько же резервирует body в своём padding-bottom, поэтому нижний контент
            не уходит под панель и safe-area не учитывается дважды.
            ===================================================================== */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
-            /* height — ТОЛЬКО контентная высота (--ca-nav-h). safe-area добавляется
-               один раз через padding-bottom; прибавлять её ещё и к height нельзя —
-               при content-box она сложилась бы дважды и панель стала бы выше, чем
-               резервирует body. */
-            height: var(--ca-nav-h);
+            /* На iPhone padding без включения safe-area в высоту может сжать доступную
+               область кнопок. Явный border-box оставляет для навигации ровно --ca-nav-h,
+               а индикатор Home остаётся внутри нижнего padding. */
+            box-sizing: border-box;
+            height: calc(var(--ca-nav-h) + var(--ca-safe-bottom));
             padding-bottom: var(--ca-safe-bottom);
             background: var(--ca-surface); display: flex; border-top: 1px solid var(--ca-border);
             box-shadow: 0 -1px 0 var(--ca-divider);

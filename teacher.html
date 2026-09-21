@@ -225,6 +225,13 @@
                 <div id="photo-counter" style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); color:white; padding:4px 10px; border-radius:12px; font-size:12px; display:none;">1 / 1</div>
             </div>
             
+            <div class="review-correct-count">
+                <label for="rev-correct-count">Правильно решено</label>
+                <div class="review-correct-count-row">
+                    <input type="number" id="rev-correct-count" min="0" step="1" inputmode="numeric" placeholder="0">
+                    <span id="rev-correct-total">задач</span>
+                </div>
+            </div>
             <textarea id="rev-feedback" placeholder="Комментарий при проверке..."></textarea>
             
             <div class="action-buttons">

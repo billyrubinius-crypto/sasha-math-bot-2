@@ -72,6 +72,7 @@ create table public.assignments (
   -- FK plan_item_id -> weekly_plan_items добавляется ниже, после её создания.
   plan_item_id         uuid,
   task_count           integer      check (task_count is null or task_count > 0),
+  correct_task_count   integer      check (correct_task_count is null or (correct_task_count >= 0 and (task_count is null or correct_task_count <= task_count))),
   first_submitted_at   timestamptz,
   revision_deadline_at timestamptz,
   revision_count       integer      check (revision_count is null or revision_count >= 0)
@@ -2022,8 +2023,8 @@ create trigger trg_students_weekly_plans_group_change
 -- get_student_task_totals — серверный lifetime/range счётчик задач и дней занятий поверх
 -- lifecycle-полей W01/W04 (миграция 013, P01A). Read-only производная от assignments: без
 -- отдельного изменяемого counter. Принятая работа = status='checked' и
--- approval_status='approved'; solved_tasks суммирует только task_count > 0 (сложение null
--- бессмысленно), active_days считает ВСЕ принятые работы с известной датой отправки, включая
+-- approval_status='approved'; solved_tasks суммирует только фактически верные correct_task_count.
+-- task_count остаётся объёмом задания; active_days считает все принятые работы с известной датой.
 -- legacy с task_count IS NULL (решение пользователя 2026-07-16: день был реально активным
 -- независимо от того, известно ли число задач) — такие строки одновременно увеличивают
 -- unknown_approved_assignments. p_from/p_to = null → lifetime; иначе диапазон дат МСК
@@ -2043,7 +2044,7 @@ CREATE OR REPLACE FUNCTION public.get_student_task_totals(
 AS $function$
   with accepted as (
     select
-      a.task_count,
+      a.correct_task_count,
       (coalesce(a.first_submitted_at, a.submitted_at) at time zone 'Europe/Moscow')::date as date_msk
     from public.assignments a
     where a.student_id = p_student_id
@@ -2053,9 +2054,9 @@ AS $function$
       and (p_to   is null or (coalesce(a.first_submitted_at, a.submitted_at) at time zone 'Europe/Moscow')::date <= p_to)
   )
   select
-    coalesce(sum(task_count) filter (where task_count > 0), 0)::bigint as solved_tasks,
+    coalesce(sum(correct_task_count) filter (where correct_task_count >= 0), 0)::bigint as solved_tasks,
     count(distinct date_msk)::bigint                                   as active_days,
-    count(*) filter (where task_count is null)::bigint                 as unknown_approved_assignments
+    count(*) filter (where correct_task_count is null)::bigint         as unknown_approved_assignments
   from accepted;
 $function$;
 -- =============================================================================
@@ -4590,7 +4591,8 @@ grant execute on function public.claim_life_quest_self() to authenticated;
 -- reward_path='legacy' (клиент — T10-07). Audit: object id + result, без photo/feedback. UI не
 -- переключён (T10-07), auth_mode=legacy. search_path=public,pg_temp (делегирование в public-функции).
 -- =============================================================================
-create or replace function public.review_assignment_self(p_assignment_id uuid, p_status text, p_feedback text)
+create or replace function public.review_assignment_self(
+  p_assignment_id uuid, p_status text, p_feedback text, p_correct_task_count integer)
  returns json language plpgsql security definer set search_path = public, pg_temp
 as $function$
 declare
@@ -4605,12 +4607,22 @@ begin
   v_princ := private.current_principal();
   select * into v_a from public.assignments where id = p_assignment_id for update;
   if not found then raise exception 'not found' using errcode = 'P0002'; end if;
+  if p_status = 'approved' then
+    if p_correct_task_count is null or p_correct_task_count < 0 then
+      raise exception 'correct_task_count required' using errcode = '22023'; end if;
+    if v_a.task_count is not null and p_correct_task_count > v_a.task_count then
+      raise exception 'correct_task_count exceeds task_count' using errcode = '22023'; end if;
+    if v_a.task_count is null and p_correct_task_count > 200 then
+      raise exception 'invalid correct_task_count' using errcode = '22023'; end if;
+  end if;
   v_was_approved := (v_a.status = 'checked' and v_a.approval_status = 'approved');
   select cutover_at, stage4_started_at into v_cutover_at, v_stage4_at from public.economy_config limit 1;
   v_cutover := v_cutover_at is not null and now() >= v_cutover_at;
   v_stage4  := v_stage4_at  is not null and now() >= v_stage4_at;
   update public.assignments
-     set status = 'checked', approval_status = p_status, teacher_feedback = p_feedback, checked_at = now()
+     set status = 'checked', approval_status = p_status, teacher_feedback = p_feedback,
+         correct_task_count = case when p_status = 'approved' then p_correct_task_count else null end,
+         checked_at = now()
    where id = p_assignment_id;
   if v_a.type = 'daily' and v_a.scheduled_date is not null then
     v_week_start := public.week_start_of(v_a.scheduled_date);
@@ -4626,9 +4638,13 @@ begin
     end if;
   else v_reward_path := 'reject'; end if;
   perform public.security_audit('teacher_review', 'teacher', v_princ, null,
-    json_build_object('assignment_id', p_assignment_id, 'status', p_status, 'reward_path', v_reward_path)::jsonb);
+    json_build_object('assignment_id', p_assignment_id, 'status', p_status,
+      'correct_task_count', case when p_status = 'approved' then p_correct_task_count else null end,
+      'reward_path', v_reward_path)::jsonb);
   return json_build_object('ok', true, 'student_id', v_a.student_id, 'type', v_a.type,
-    'scheduled_date', v_a.scheduled_date, 'was_approved', v_was_approved, 'reward_path', v_reward_path,
+    'scheduled_date', v_a.scheduled_date,
+    'correct_task_count', case when p_status = 'approved' then p_correct_task_count else null end,
+    'was_approved', v_was_approved, 'reward_path', v_reward_path,
     'cutover_active', v_cutover, 'stage4_active', v_stage4);
 end;
 $function$;
@@ -4677,10 +4693,10 @@ begin
 end;
 $function$;
 
-revoke all on function public.review_assignment_self(uuid, text, text) from public, anon;
+revoke all on function public.review_assignment_self(uuid, text, text, integer) from public, anon;
 revoke all on function public.apply_penalty_self(uuid, integer, text) from public, anon;
 revoke all on function public.get_review_queue_self(text) from public, anon;
-grant execute on function public.review_assignment_self(uuid, text, text) to authenticated;
+grant execute on function public.review_assignment_self(uuid, text, text, integer) to authenticated;
 grant execute on function public.apply_penalty_self(uuid, integer, text) to authenticated;
 grant execute on function public.get_review_queue_self(text) to authenticated;
 

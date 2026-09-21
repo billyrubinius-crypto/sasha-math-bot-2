@@ -61,6 +61,17 @@ export function pickTrajectory(t: unknown): Record<string, unknown> | null {
   };
 }
 
+export function pickTaskTotals(value: unknown): Record<string, unknown> {
+  const row = Array.isArray(value) ? value[0] : value;
+  const src = row && typeof row === "object" ? row as Record<string, unknown> : {};
+  const solved = Number(src.solved_tasks ?? 0);
+  const unknown = Number(src.unknown_approved_assignments ?? 0);
+  return {
+    solved_tasks: Number.isSafeInteger(solved) && solved >= 0 ? solved : 0,
+    has_unknown_approved_assignments: Number.isSafeInteger(unknown) && unknown > 0,
+  };
+}
+
 // Недельный блок (W07). Пропускаем только то, что печатает format_week_block, и СОЗНАТЕЛЬНО
 // отбрасываем reward_forecast: это сумма бубликов (денежное поле), родителю она не показывается
 // и в родительский UX не входит. days отдаются с полями дня, включая щиты (weekly shields —

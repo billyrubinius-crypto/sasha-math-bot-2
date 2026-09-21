@@ -8,6 +8,7 @@ import {
   assertTelegramId,
   pickLinkedStudents,
   pickProgressRows,
+  pickTaskTotals,
   pickTrajectory,
   pickWeek,
 } from "../_shared/parentApi.ts";
@@ -79,6 +80,21 @@ Deno.test("pickTrajectory: только утверждённые поля про
   assertEquals(t.points, [{ week_start: "2026-07-13", score: 70 }]);
   assert(!("balance" in t));
   assertEquals(pickTrajectory(null), null);
+});
+
+Deno.test("pickTaskTotals: наружу проходит только итог правильных ответов", () => {
+  assertEquals(pickTaskTotals([{
+    solved_tasks: 42,
+    unknown_approved_assignments: 1,
+    balance: 999,
+  }]), {
+    solved_tasks: 42,
+    has_unknown_approved_assignments: true,
+  });
+  assertEquals(pickTaskTotals(null), {
+    solved_tasks: 0,
+    has_unknown_approved_assignments: false,
+  });
 });
 
 Deno.test("pickWeek: reward_forecast (бублики) НЕ проходит наружу", () => {

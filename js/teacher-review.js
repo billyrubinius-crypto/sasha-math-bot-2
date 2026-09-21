@@ -169,6 +169,20 @@
             document.getElementById('rev-link').style.display = sub.content_url ? 'inline-block' : 'none';
             document.getElementById('rev-feedback').value = sub.teacher_feedback || '';
 
+            const correctInput = document.getElementById('rev-correct-count');
+            const correctTotal = document.getElementById('rev-correct-total');
+            const taskCount = Number.isInteger(Number(sub.task_count)) && Number(sub.task_count) >= 0
+                ? Number(sub.task_count) : null;
+            correctInput.value = Number.isInteger(Number(sub.correct_task_count))
+                ? String(sub.correct_task_count) : '';
+            if (taskCount !== null) {
+                correctInput.max = String(taskCount);
+                correctTotal.innerText = `из ${taskCount}`;
+            } else {
+                correctInput.removeAttribute('max');
+                correctTotal.innerText = 'задач';
+            }
+
             try {
                 reviewPhotos = JSON.parse(sub.photo_url);
                 if (!Array.isArray(reviewPhotos)) reviewPhotos = [reviewPhotos];
@@ -282,6 +296,25 @@
         async function submitReview(status) {
             if (!currentSubmissionId) return;
 
+            let correctTaskCount = null;
+            if (status === 'approved') {
+                const correctInput = document.getElementById('rev-correct-count');
+                const raw = correctInput.value.trim();
+                const max = correctInput.max === '' ? null : Number(correctInput.max);
+                if (!/^\d+$/.test(raw)) {
+                    alert('Укажите, сколько задач решено правильно.');
+                    correctInput.focus();
+                    return;
+                }
+                correctTaskCount = Number(raw);
+                if (!Number.isSafeInteger(correctTaskCount) || correctTaskCount < 0 ||
+                    (max !== null && correctTaskCount > max)) {
+                    alert(max !== null ? `Введите целое число от 0 до ${max}.` : 'Введите неотрицательное целое число.');
+                    correctInput.focus();
+                    return;
+                }
+            }
+
             // Двойной клик/повтор не должен начислить награду дважды (W05): проверка и установка
             // disabled должны быть СИНХРОННЫМИ (до первого await), иначе второй вызов проскочит
             // проверку раньше, чем первый успеет выставить disabled.
@@ -302,7 +335,8 @@
                 const { error } = await db.rpc('review_assignment_self', {
                     p_assignment_id: currentSubmissionId,
                     p_status: status,
-                    p_feedback: feedback
+                    p_feedback: feedback,
+                    p_correct_task_count: correctTaskCount
                 });
                 if (error) throw error;
 
