@@ -172,9 +172,11 @@
             const correctInput = document.getElementById('rev-correct-count');
             const correctTotal = document.getElementById('rev-correct-total');
             const taskCount = Number.isInteger(Number(sub.task_count)) && Number(sub.task_count) >= 0
-                ? Number(sub.task_count) : null;
+                ? Number(sub.task_count)
+                : null;
             correctInput.value = Number.isInteger(Number(sub.correct_task_count))
-                ? String(sub.correct_task_count) : '';
+                ? String(sub.correct_task_count)
+                : '';
             if (taskCount !== null) {
                 correctInput.max = String(taskCount);
                 correctTotal.innerText = `из ${taskCount}`;
@@ -204,6 +206,12 @@
             if (sub.type !== 'daily' || !sub.scheduled_date) { el.style.display = 'none'; return; }
 
             const lines = [`📅 Исходный срок: ${sub.scheduled_date} 23:59 МСК`];
+            if (sub.teacher_excused_at && sub.approval_status === 'approved') {
+                lines.push('✓ Учитель зачёл день как исключение — день сохраняет серию.');
+                el.innerText = lines.join('\n');
+                el.style.display = 'block';
+                return;
+            }
             let overdue = false;
 
             if (sub.revision_deadline_at) {
@@ -252,9 +260,23 @@
             const counter = document.getElementById('photo-counter');
             
             if (!img || !reviewPhotos.length) return;
-            
+
+            // Фото старых работ удаляются из Cloudinary по сроку хранения (071), и тогда ссылка
+            // отдаёт 404. Ловим это через onerror, а не по полю в базе: очередь проверки приходит
+            // из get_review_queue_self с фиксированным набором полей, и так заглушка заодно
+            // покрывает любую другую причину пропажи картинки.
+            const expired = document.getElementById('rev-photo-expired');
+            if (expired) {
+                expired.style.display = 'none';
+                img.style.display = '';
+                img.onerror = () => {
+                    img.style.display = 'none';
+                    expired.style.display = 'block';
+                };
+            }
+
             img.src = reviewPhotos[reviewPhotoIndex];
-            
+
             if (reviewPhotos.length > 1) {
                 prevBtn.style.display = 'block';
                 nextBtn.style.display = 'block';
@@ -309,7 +331,9 @@
                 correctTaskCount = Number(raw);
                 if (!Number.isSafeInteger(correctTaskCount) || correctTaskCount < 0 ||
                     (max !== null && correctTaskCount > max)) {
-                    alert(max !== null ? `Введите целое число от 0 до ${max}.` : 'Введите неотрицательное целое число.');
+                    alert(max !== null
+                        ? `Введите целое число от 0 до ${max}.`
+                        : 'Введите неотрицательное целое число.');
                     correctInput.focus();
                     return;
                 }
@@ -348,6 +372,7 @@
                 alert(status === 'approved' ? 'Работа принята!' : 'Работа возвращена!');
                 closeReview();
                 loadSubmissions();
+                if (document.getElementById('tab-journal').classList.contains('active')) loadJournal();
             } catch(e) { alert('Ошибка: ' + e.message); }
             finally { approveBtn.disabled = false; rejectBtn.disabled = false; }
         }

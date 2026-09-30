@@ -70,6 +70,9 @@
 
             const status = WEEK_DAY_LABELS[day.status] ? day.status : 'not_assigned';
             let note = WEEK_DAY_LABELS[status];
+            if (status === 'approved' && day.teacher_excused_at) {
+                note += ' · зачтено учителем как исключение, день сохраняет серию';
+            }
             if (status === 'revision' && day.revision_deadline_at) {
                 note += ` · до ${new Date(day.revision_deadline_at).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })} МСК`;
             }

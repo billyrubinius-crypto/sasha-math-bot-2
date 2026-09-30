@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="shared.js"></script>
     <link rel="stylesheet" href="styles/teacher.css">
+    <link rel="stylesheet" href="styles/teacher-journal.css">
     <link rel="stylesheet" href="styles/season-v3-preview.css">
     <link rel="stylesheet" href="styles/season-cosmetics-preview.css?v=9">
 </head>
@@ -25,6 +26,7 @@
     <!-- Табы навигации -->
     <div class="top-tabs">
         <div class="tab-btn active" onclick="switchTab('check', this)">✅ Проверка</div>
+        <div class="tab-btn" onclick="switchTab('journal', this)">📒 Журнал</div>
         <div class="tab-btn" onclick="switchTab('plan', this)">📅 Планирование</div>
         <div class="tab-btn" onclick="switchTab('titles', this)">🏷️ Титулы<span id="custom-title-count-badge" class="tab-count-badge" style="display:none;"></span></div>
         <div class="tab-btn" onclick="switchTab('quests', this)">🎲 Квесты</div>
@@ -46,6 +48,23 @@
         <div id="submissions-list">
             <div style="text-align:center; padding:40px; color:#999;">Загрузка работ...</div>
         </div>
+    </div>
+
+    <!-- Электронный журнал -->
+    <div id="tab-journal" class="content-area">
+        <div class="journal-heading"><div><h2>Электронный журнал</h2><p>Успеваемость, домашние работы и исправления отчётов</p></div><button type="button" class="btn-secondary" onclick="loadJournal()">Обновить</button></div>
+        <div class="journal-filters">
+            <label>С даты<input type="date" id="journal-from" onchange="loadJournal()"></label>
+            <label>По дату<input type="date" id="journal-to" onchange="loadJournal()"></label>
+            <label>Группа<select id="journal-group" onchange="renderJournal()"><option value="">Все группы</option></select></label>
+            <label>Найти ученика<input type="search" id="journal-search" placeholder="Имя или username" oninput="renderJournal()"></label>
+            <label class="journal-attention"><input type="checkbox" id="journal-attention" onchange="renderJournal()"> Только с пропусками и возвратами</label>
+        </div>
+        <p class="journal-hint">Выберите период до 93 дней. Нажмите на ученика, чтобы увидеть задания, фотографии и историю исправлений. Даты указаны по Москве.</p>
+        <div id="journal-message" role="status" aria-live="polite"></div>
+        <div id="journal-summary" class="journal-summary"></div>
+        <div id="journal-list"></div>
+        <section id="journal-detail" class="journal-detail" hidden></section>
     </div>
 
     <!-- Вкладка планирования -->
@@ -216,6 +235,12 @@
             <!-- Контейнер фото с навигацией -->
             <div style="position:relative; background:#eee; border-radius:8px; overflow:hidden; min-height:200px; display:flex; align-items:center; justify-content:center; margin: 15px 0;">
                 <img id="rev-photo" class="review-photo" src="" onclick="openLightbox()" style="margin:0; cursor:zoom-in;">
+
+                <!-- Работы старше срока хранения: фото удалены из Cloudinary (071), показываем
+                     это явно вместо битой картинки -->
+                <div id="rev-photo-expired" style="display:none; padding:24px 16px; text-align:center; color:#666; font-size:13px;">
+                     Фото этой работы удалены — они хранятся ограниченное время
+                </div>
                 
                 <!-- Кнопки листания -->
                 <button id="prev-photo-btn" onclick="changeReviewPhoto(-1)" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.5); color:white; border:none; border-radius:50%; width:36px; height:36px; font-size:18px; cursor:pointer; display:none;">‹</button>
@@ -306,6 +331,7 @@
     <script src="js/teacher-review.js"></script>
     <script src="js/teacher-planning.js"></script>
     <script src="js/teacher-students.js"></script>
+    <script src="js/teacher-journal.js"></script>
     <script src="js/teacher-titles.js"></script>
     <script src="js/teacher-quests.js"></script>
     <script src="js/teacher-auth.js"></script>

@@ -97,6 +97,7 @@
         // 12h-семьи, обнаруженный reuse, kill-switch teacher_token_version) — возвращает на экран
         // логина с понятным сообщением вместо тихого зависания на сломанных запросах.
         function teacherSessionExpired() {
+            if (typeof clearTeacherJournal === 'function') clearTeacherJournal();
             document.getElementById('login-screen').style.display = 'flex';
             const err = document.getElementById('err');
             err.innerText = 'Сессия истекла, войдите снова.';
@@ -104,6 +105,7 @@
         }
 
         async function handleTeacherLogout() {
+            if (typeof clearTeacherJournal === 'function') clearTeacherJournal();
             await teacherLogout();
             document.getElementById('login-screen').style.display = 'flex';
             document.getElementById('err').style.display = 'none';
@@ -127,6 +129,7 @@
             document.getElementById('sub-tabs-container').style.display = tab === 'check' ? 'flex' : 'none';
             
             if (tab === 'check') loadSubmissions();
+            if (tab === 'journal') loadJournal();
             if (tab === 'plan') loadSeasons();
             if (tab === 'titles') loadCustomTitleRequests();
             if (tab === 'quests') loadQuestTemplates();
