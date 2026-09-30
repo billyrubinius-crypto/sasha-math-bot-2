@@ -252,7 +252,7 @@ function renderJournalEditor(a, card) {
     const reason = journalNode('textarea'); reason.required = true; reason.minLength = 3; reason.maxLength = 1000;
     reason.placeholder = 'Например: работу решил вовремя, не успел отправить. Проверено на занятии.';
     const reasonLabel = journalNode('label', '', 'Причина исправления (будет видна ученику)'); reasonLabel.append(reason); form.append(reasonLabel);
-    form.append(journalNode('p', 'journal-hint', 'Без исключения поздняя работа остаётся пропуском. Исключение доступно для принятой ежедневной работы за прошедший день. Время загрузки сохраняется. Уже выданные награды не пересчитываются.'));
+    form.append(journalNode('p', 'journal-hint', 'Без исключения поздняя работа остаётся пропуском. Время загрузки сохраняется. Серии и достижения пересчитываются; недостающая награда за достижение выдаётся один раз. Выплаченные награды за работы и недели не переигрываются.'));
     const error = journalNode('p', 'journal-error'); error.setAttribute('role', 'alert'); form.append(error);
     const save = journalNode('button', 'btn-primary', 'Сохранить исправление'); save.type = 'submit';
     const cancel = journalButton('Отмена', () => form.remove()); form.append(save, cancel);
@@ -272,10 +272,12 @@ function renderJournalEditor(a, card) {
             p_excuse: excuse.checked, p_reason: reason.value.trim(), p_expected_version: a.journal_version };
         journalSaving = true; save.disabled = true; cancel.disabled = true; error.textContent = '';
         try {
-            const { error: rpcError } = await db.rpc('correct_journal_assignment_self', params);
+            const { data: correction, error: rpcError } = await db.rpc('correct_journal_assignment_self', params);
             if (rpcError) throw rpcError;
             await loadJournal();
-            document.getElementById('journal-message').textContent = 'Исправление сохранено. Отчёт ученика обновлён.';
+            const awarded = Number(correction?.achievements_awarded) || 0;
+            document.getElementById('journal-message').textContent = 'Исправление сохранено. Отчёт ученика обновлён.' +
+                (awarded > 0 ? ` Выдано новых достижений: ${awarded}.` : '');
             updatePendingCount();
         } catch (e) { error.textContent = journalError(e); }
         finally { journalSaving = false; save.disabled = false; cancel.disabled = false; }

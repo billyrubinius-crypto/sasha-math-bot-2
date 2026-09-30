@@ -47,7 +47,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shubi/.c
                     a.teacher_feedback = params.p_reason;
                     students[0].stats = { total: 3, approved: 2, submitted: 1, late: params.p_excuse ? 0 : 1, excused: params.p_excuse ? 1 : 0, solved: 15, task_total: 24 };
                     changes.unshift({ assignment_id: a.id, created_at: '2026-09-30T09:10:00Z', reason: params.p_reason, before_state: before, after_state: { ...a } });
-                    return { data: { ok: true } };
+                    return { data: { ok: true, achievements_awarded: params.p_excuse ? 2 : 0 } };
                 }
                 return { data: { students: params.p_student_id ? students.filter(s => s.telegram_id === params.p_student_id) : students,
                     assignments: params.p_student_id === '1001' ? tasks : [], changes, exams: [] } };
@@ -86,6 +86,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shubi/.c
         await editor.getByRole('button', { name: 'Сохранить исправление' }).click();
         await past.getByText('✓ Принято', { exact: true }).waitFor();
         assert.match(await past.innerText(), /День сохраняет серию/);
+        await page.locator('#journal-message').getByText(/Выдано новых достижений: 2/).waitFor();
         const calls = await page.evaluate(() => window.journalCalls.filter(c => c.name === 'correct_journal_assignment_self'));
         assert.equal(calls.length, 2);
         assert.equal(calls[0].params.p_excuse, false);

@@ -40,7 +40,8 @@ begin
     raise exception 'ordinary late approval was implicitly forgiven';
   end if;
 
-  select count(*) into v_before from public.balance_history where student_id = 995073001;
+  select count(*) into v_before from public.balance_history where student_id = 995073001
+    and reason not like 'achievement_%';
   perform public.correct_journal_assignment_self(v_id, 'approved', 7, true, 'Checked on lesson; teacher exception', v_version);
   select * into v_a from public.assignments where id = v_id;
   if v_a.photo_url is not null or v_a.submitted_at is not null or v_a.first_submitted_at is not null then
@@ -51,8 +52,11 @@ begin
   if (select current_streak from public.students where telegram_id = 995073001) <> 3 then
     raise exception 'exception failed to restore the three-day series';
   end if;
-  if (select count(*) from public.balance_history where student_id = 995073001) <> v_before
-      or (select huikons from public.students where telegram_id = 995073001) <> 123
+  if (select count(*) from public.balance_history where student_id = 995073001
+        and reason not like 'achievement_%') <> v_before
+      or (select huikons from public.students where telegram_id = 995073001) <> 123 +
+        (select coalesce(sum(change_amount), 0) from public.balance_history where student_id = 995073001
+          and reason like 'achievement_%')
       or (select rating from public.students where telegram_id = 995073001) <> 456 then
     raise exception 'correction unexpectedly replayed rewards';
   end if;
