@@ -43,6 +43,7 @@ function journalPhotos(value) {
 }
 function journalError(error) {
     const raw = String(error?.message || error || '');
+    if (/jwt expired|invalid_token|session_expired/i.test(raw)) return 'Сессия истекла. Войдите снова; затем повторите действие.';
     if (raw.includes('journal_conflict')) return 'Работу уже изменили или ученик отправил решение. Обновите журнал и откройте исправление заново.';
     if (raw.includes('invalid_correct_task_count')) return 'Проверьте число правильно решённых задач.';
     if (raw.includes('reason_required')) return 'Укажите причину длиной от 3 до 1000 символов.';
@@ -52,6 +53,18 @@ function journalError(error) {
         return 'Журнал ещё не подключён к базе. Нужно применить миграции 072 и 073.';
     }
     return 'Не удалось выполнить запрос. Проверьте соединение и попробуйте снова.';
+}
+function setJournalPeriod(preset) {
+    const today = getTodayMSK();
+    const monthStart = today.slice(0, 7) + '-01';
+    let from = monthStart, to = today;
+    if (preset === 'previous') {
+        to = addDaysToDate(monthStart, -1);
+        from = to.slice(0, 7) + '-01';
+    } else if (preset === 'recent') from = addDaysToDate(today, -29);
+    document.getElementById('journal-from').value = from;
+    document.getElementById('journal-to').value = to;
+    return loadJournal();
 }
 function journalPeriod() {
     const fromInput = document.getElementById('journal-from');
@@ -89,7 +102,8 @@ async function loadJournal() {
         const groups = [...new Set(journalStudents.map(s => s.group_name || ''))].sort((a, b) => a.localeCompare(b, 'ru'));
         groups.forEach(name => group.add(new Option(name || 'Без группы', name || '__ungrouped__')));
         if ([...group.options].some(o => o.value === previous)) group.value = previous;
-        message.textContent = '';
+        message.textContent = journalStudents.length && !journalStudents.some(s => journalNumber(s.stats, 'total') > 0)
+            ? 'За выбранные даты заданий нет. Проверьте период и опубликованный план во вкладке «Планирование».' : '';
         renderJournal(true);
         if (journalStudentId && journalStudents.some(s => s.telegram_id === journalStudentId)) {
             await openJournalStudent(journalStudentId, false);

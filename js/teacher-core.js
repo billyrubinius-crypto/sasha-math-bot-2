@@ -24,7 +24,7 @@
         // T10-09: unsigned preset убран. Подпись выдаёт Edge Function sign-upload по учительскому
         // JWT; folder (sasha-math-tasks), public_id и allowed_formats=pdf задаёт сервер.
         async function uploadPdfToCloudinary(file) {
-            return uploadSignedToCloudinary(file, 'teacher_pdf', teacherAccessToken());
+            return uploadSignedToCloudinary(file, 'teacher_pdf', await ensureTeacherAccessToken());
         }
 
         let db, currentSubmissionId = null, selectedPenalty = -20, studentsList = [];
@@ -116,6 +116,7 @@
             await loadStudents();
             loadSubmissions();
             updateCustomTitleCount();
+            if (document.getElementById('tab-journal').classList.contains('active')) loadJournal();
         }
 
         function switchTab(tab, el) {

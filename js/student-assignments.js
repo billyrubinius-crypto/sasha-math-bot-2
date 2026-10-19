@@ -236,7 +236,7 @@
         // T10-09: unsigned preset убран. Подпись выдаёт Edge Function sign-upload по студенческому
         // JWT и только для СВОЕГО задания — folder/public_id/формат/размер задаёт сервер.
         async function uploadToCloudinary(file, assignmentId) {
-            return uploadSignedToCloudinary(file, 'student_photo', studentAccessToken(), assignmentId);
+            return uploadSignedToCloudinary(file, 'student_photo', await ensureStudentAccessToken(), assignmentId);
         }
 
         async function uploadDZ() {

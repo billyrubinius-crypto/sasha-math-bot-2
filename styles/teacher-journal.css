@@ -7,6 +7,8 @@
 .journal-heading button { flex-shrink: 0; }
 .journal-heading .btn-secondary, .journal-task-actions .btn-secondary { width: auto; margin: 0; color: #1c69a8; background: #edf6ff; border: 1px solid #bdd7ed; }
 .journal-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 16px; border-radius: 12px; background: white; }
+.journal-period-buttons { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.journal-period-buttons .btn-secondary { width: auto; margin: 0; }
 .journal-filters label, .journal-editor label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
 .journal-filters input, .journal-filters select, .journal-detail-filters select, .journal-editor input, .journal-editor select, .journal-editor textarea { padding: 10px; border: 1px solid #ccd5df; border-radius: 8px; font: inherit; background: white; min-width: 0; }
 .journal-filters .journal-attention { flex-direction: row; align-items: center; padding: 10px 0; }

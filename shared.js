@@ -17,6 +17,38 @@ const SUPABASE_KEY = 'sb_publishable_LB2cXXcEvYODJMzOa6rJ-A_8dhmGE4b';
 // (cloud_name тоже отдаёт сервер, поэтому отдельная константа больше не нужна).
 const SIGN_UPLOAD_URL = SUPABASE_URL + '/functions/v1/sign-upload';
 
+// Timers can be suspended while a laptop sleeps. Decode only for scheduling;
+// the server still verifies the signature and identity on every request.
+function sessionJwtExpiresAt(token) {
+    try {
+        const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const exp = JSON.parse(atob(part)).exp;
+        return Number.isFinite(exp) ? exp * 1000 : 0;
+    } catch { return 0; }
+}
+
+// Replay only an explicit expired-JWT rejection, before the server executed the
+// request. Network errors, permission denials and business errors are never replayed.
+function createSessionFetch(ensureToken, expireSession) {
+    return async (input, init) => {
+        const request = new Request(input, init);
+        const response = await fetch(request.clone());
+        if (response.status !== 401) return response;
+        const body = await response.clone().json().catch(() => null);
+        if (!/jwt expired/i.test(String(body?.message || body?.msg || ''))) return response;
+        const rejectedToken = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+        const token = await ensureToken(rejectedToken);
+        const headers = new Headers(request.headers);
+        headers.set('Authorization', 'Bearer ' + token);
+        const retried = await fetch(new Request(request, { headers }));
+        if (retried.status === 401) {
+            const error = await retried.clone().json().catch(() => null);
+            if (/jwt expired/i.test(String(error?.message || error?.msg || ''))) expireSession();
+        }
+        return retried;
+    };
+}
+
 // Загружает файл в Cloudinary через серверную подпись и возвращает secure_url.
 //   kind         — 'student_photo' | 'teacher_pdf' (политику сервер проверяет по роли в JWT);
 //   accessToken  — JWT текущего actor, живёт только в памяти адаптера сессии;

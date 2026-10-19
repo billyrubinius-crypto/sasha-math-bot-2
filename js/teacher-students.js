@@ -333,7 +333,8 @@
         }
 
         async function loadStudents() {
-            const { data } = await db.from('students').select('telegram_id, name, group_name');
+            const { data, error } = await db.from('students').select('telegram_id, name, group_name');
+            if (error) return; // A failed refresh must not erase the selected publication audience.
             studentsList = data || [];
             populateGroupFilter();
         }
@@ -341,7 +342,8 @@
         function populateGroupFilter() {
             const container = document.getElementById('week-group-list');
             if (!container) return;
-            const groups = [...new Set(studentsList.map(s => s.group_name).filter(Boolean))].sort();
+            const selected = new Set([...container.querySelectorAll('.week-group-checkbox:checked')].map(cb => cb.value));
+            const groups = [...new Set([...studentsList.map(s => s.group_name).filter(Boolean), ...selected])].sort();
 
             container.querySelectorAll('.week-group-item').forEach(el => el.remove());
             groups.forEach(g => {
@@ -355,6 +357,7 @@
                 checkbox.type = 'checkbox';
                 checkbox.className = 'week-group-checkbox';
                 checkbox.value = g;
+                checkbox.checked = selected.has(g);
                 checkbox.onchange = onWeekGroupPick;
                 label.appendChild(checkbox);
                 label.appendChild(document.createTextNode(' ' + g));

@@ -119,8 +119,9 @@ def main() -> int:
             "teacher season number editor does not accept zero")
     require("text: 'Запланирован'" in teacher,
             "scheduled season status is not translated")
+    # The journal has its own date range; it is unrelated to season type labels.
     require("Межсезонье" not in teacher and "период" not in teacher
-            and "период" not in teacher_html,
+            and "Межсезонье" not in teacher_html,
             "technical season type leaks into teacher labels")
     require('id="season-v2-save-meta"' not in teacher_html,
             "full-screen season metadata save action returned")

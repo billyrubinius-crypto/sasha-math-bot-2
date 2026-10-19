@@ -56,6 +56,34 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shubi/.c
         });
         await page.getByText('📒 Журнал', { exact: true }).click();
         await page.getByRole('button', { name: 'Анна Иванова', exact: true }).waitFor();
+        // Re-login reloads the roster. It must preserve the selected group and filled plan.
+        await page.evaluate(() => {
+            studentsList = [{ group_name: '11А' }, { group_name: '9А' }];
+            populateGroupFilter();
+            const cb = [...document.querySelectorAll('.week-group-checkbox')].find(cb => cb.value === '11А');
+            cb.checked = true; onWeekGroupPick();
+            document.getElementById('day-title-0').value = 'Октябрьское задание';
+            populateGroupFilter();
+        });
+        assert.equal(await page.evaluate(() => getSelectedWeekGroups().join()), '11А');
+        assert.equal(await page.locator('#week-group-all').isChecked(), false);
+        assert.equal(await page.locator('#day-title-0').inputValue(), 'Октябрьское задание');
+        // A new month must query October, even if September was selected earlier.
+        await page.evaluate(() => { getTodayMSK = () => '2026-10-20'; });
+        await page.getByRole('button', { name: 'Текущий месяц', exact: true }).click();
+        await page.getByRole('button', { name: 'Анна Иванова', exact: true }).waitFor();
+        assert.equal(await page.locator('#journal-from').inputValue(), '2026-10-01');
+        assert.equal(await page.locator('#journal-to').inputValue(), '2026-10-20');
+        assert.equal(await page.evaluate(() => window.journalCalls.at(-1).params.p_from), '2026-10-01');
+        await page.getByRole('button', { name: 'Прошлый месяц', exact: true }).click();
+        await page.getByRole('button', { name: 'Анна Иванова', exact: true }).waitFor();
+        assert.equal(await page.locator('#journal-from').inputValue(), '2026-09-01');
+        assert.equal(await page.locator('#journal-to').inputValue(), '2026-09-30');
+        await page.evaluate(() => { getTodayMSK = () => '2026-03-01'; });
+        await page.getByRole('button', { name: 'Прошлый месяц', exact: true }).click();
+        assert.equal(await page.locator('#journal-to').inputValue(), '2026-02-28');
+        await page.evaluate(() => { getTodayMSK = () => '2026-09-30'; });
+        await page.getByRole('button', { name: '30 дней', exact: true }).click();
         assert.equal(await page.locator('.journal-group').count(), 3);
         assert.equal(await page.locator('.journal-student-button img').count(), 0, 'Student names must remain text');
         await page.locator('#journal-search').fill('anna');

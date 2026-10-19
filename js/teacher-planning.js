@@ -69,6 +69,9 @@
             if (!items.length) return alert('Заполните хотя бы одно задание!');
 
             const selectedGroups = getSelectedWeekGroups();
+            if (!selectedGroups.length && !document.getElementById('week-group-all').checked) {
+                return alert('Выберите группу или включите «Все ученики».');
+            }
             const audiences = selectedGroups.length
                 ? selectedGroups.map(g => ({ audience_type: 'group', group_name: g }))
                 : [{ audience_type: 'all', group_name: null }];
