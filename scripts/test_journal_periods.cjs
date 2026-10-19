@@ -19,12 +19,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shubi/.c
             // Browsers can restore old form values when reopening a page.
             document.getElementById('journal-from').value = '2026-09-01';
             document.getElementById('journal-to').value = '2026-09-30';
-            const dates = ['2026-09-30', '2026-10-09', '2026-10-15', '2026-10-19', '2026-11-01'];
+            const dates = ['2025-01-01', '2026-09-30', '2026-10-09', '2026-10-15', '2026-10-19', '2026-11-01'];
             window.periodCalls = [];
             db = { rpc: async (name, params = {}) => {
                 if (name !== 'get_teacher_journal_self') return { data: { pending_count: 0 } };
                 window.periodCalls.push(params);
-                const filtered = dates.filter(date => date >= params.p_from && date <= params.p_to);
+                const filtered = dates.filter(date => params.p_from === null && params.p_to === null
+                    || date >= params.p_from && date <= params.p_to);
                 return { data: { students: [{ telegram_id: '1001', name: 'Проверка периода', group_name: '11А',
                     stats: { total: filtered.length, approved: filtered.length, solved: filtered.length * 7, task_total: filtered.length * 8 } }],
                     assignments: [], changes: [], exams: [] } };
@@ -34,6 +35,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shubi/.c
         await page.getByText('📒 Журнал', { exact: true }).click();
         const row = page.locator('.journal-table tbody tr');
         await row.waitFor();
+        assert.equal(await row.locator('td').nth(1).innerText(), '6 / 6', 'default must include history older than 93 days');
+        assert.equal(await page.locator('#journal-period-label').innerText(), 'За всё время');
+        assert.equal(await page.locator('#journal-from').inputValue(), '');
+        assert.equal(await page.locator('[data-journal-period="all"]').getAttribute('aria-pressed'), 'true');
+        await page.getByRole('button', { name: 'Проверка периода', exact: true }).click();
+        assert.match(await page.locator('#journal-detail').innerText(), /За всё время/);
+        assert.deepEqual(await page.evaluate(() => window.periodCalls.at(-1)), { p_from: null, p_to: null, p_student_id: '1001' });
+        await page.getByRole('button', { name: '30 дней', exact: true }).click();
         assert.equal(await row.locator('td').nth(1).innerText(), '2 / 2');
         assert.equal(await page.locator('#journal-to').inputValue(), '2026-10-10');
         // No button for another period is clicked: simply return ten days later.
@@ -60,7 +69,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'C:/Users/shubi/.c
         await page.getByRole('button', { name: '30 дней', exact: true }).click();
         assert.equal(await page.locator('#journal-to').inputValue(), '2026-11-02');
         assert.equal(await row.locator('td').nth(1).innerText(), '4 / 4');
+        await page.getByRole('button', { name: 'За всё время', exact: true }).click();
+        assert.equal(await row.locator('td').nth(1).innerText(), '6 / 6');
+        assert.equal(await page.locator('#journal-period-label').innerText(), 'За всё время');
+        assert.equal(await page.locator('#journal-to').inputValue(), '');
         assert.deepEqual(errors, []);
-        console.log('PASS journal periods: roster catches up after ten days, month rollover, focus recovery, explicit historical dates preserved.');
+        console.log('PASS journal periods: all-time default and detail, switches, ten-day refresh, month rollover, explicit dates preserved.');
     } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

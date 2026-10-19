@@ -8,7 +8,7 @@ const JOURNAL_STATUSES = {
 const JOURNAL_TYPES = { daily: 'Ежедневное', weekly: 'Еженедельное', individual: 'Индивидуальное' };
 let journalStudents = [], journalDetail = null, journalStudentId = null;
 let journalRequest = 0, journalDetailRequest = 0, journalSaving = false;
-let journalPeriodPreset = 'recent';
+let journalPeriodPreset = 'all';
 
 function journalNode(tag, className, text) {
     const node = document.createElement(tag);
@@ -56,6 +56,7 @@ function journalError(error) {
     return 'Не удалось выполнить запрос. Проверьте соединение и попробуйте снова.';
 }
 function journalPresetDates(preset) {
+    if (preset === 'all') return { from: '', to: '' };
     const today = getTodayMSK();
     const monthStart = today.slice(0, 7) + '-01';
     let from = monthStart, to = today;
@@ -83,15 +84,16 @@ function journalPeriod() {
         fromInput.value = dates.from; toInput.value = dates.to;
     }
     const from = fromInput.value, to = toInput.value;
-    if (!from || !to || to < from || daysBetweenDates(from, to) > 92) {
+    const allTime = journalPeriodPreset === 'all';
+    if (!allTime && (!from || !to || to < from || daysBetweenDates(from, to) > 92)) {
         throw new Error('Выберите обе даты: период должен составлять от 1 до 93 дней.');
     }
-    const names = { recent: 'Последние 30 дней', month: 'Текущий месяц', previous: 'Прошлый месяц', custom: 'Выбранные даты' };
-    document.getElementById('journal-period-label').textContent = `${names[journalPeriodPreset]} · ${journalDate(from)} — ${journalDate(to)}`;
+    const names = { all: 'За всё время', recent: 'Последние 30 дней', month: 'Текущий месяц', previous: 'Прошлый месяц', custom: 'Выбранные даты' };
+    document.getElementById('journal-period-label').textContent = allTime ? names.all : `${names[journalPeriodPreset]} · ${journalDate(from)} — ${journalDate(to)}`;
     document.querySelectorAll('[data-journal-period]').forEach(button => {
         button.setAttribute('aria-pressed', String(button.dataset.journalPeriod === journalPeriodPreset));
     });
-    return { p_from: from, p_to: to };
+    return { p_from: allTime ? null : from, p_to: allTime ? null : to };
 }
 async function loadJournal() {
     if (!db) return;
@@ -203,7 +205,7 @@ function renderJournalDetail() {
     const student = journalDetail.students[0];
     const head = journalNode('div', 'journal-heading');
     const title = journalNode('div'); title.append(journalNode('h2', '', student.name || 'Без имени'),
-        journalNode('p', '', `${student.group_name || 'Без группы'} · ${journalDate(document.getElementById('journal-from').value)} — ${journalDate(document.getElementById('journal-to').value)}`));
+        journalNode('p', '', `${student.group_name || 'Без группы'} · ${document.getElementById('journal-period-label').textContent}`));
     head.append(title, journalButton('Закрыть карточку', closeJournalStudent)); box.append(head);
     const filters = journalNode('div', 'journal-detail-filters');
     const type = journalNode('select'), status = journalNode('select');
