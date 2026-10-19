@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="shared.js?v=20261020"></script>
     <link rel="stylesheet" href="styles/teacher.css">
-    <link rel="stylesheet" href="styles/teacher-journal.css?v=20261020">
+    <link rel="stylesheet" href="styles/teacher-journal.css?v=20261020.2">
     <link rel="stylesheet" href="styles/season-v3-preview.css">
     <link rel="stylesheet" href="styles/season-cosmetics-preview.css?v=9">
 </head>
@@ -54,14 +54,15 @@
     <div id="tab-journal" class="content-area">
         <div class="journal-heading"><div><h2>Электронный журнал</h2><p>Успеваемость, домашние работы и исправления отчётов</p></div><button type="button" class="btn-secondary" onclick="loadJournal()">Обновить</button></div>
         <div class="journal-filters">
-            <div class="journal-period-buttons"><button type="button" class="btn-secondary" onclick="setJournalPeriod('month')">Текущий месяц</button><button type="button" class="btn-secondary" onclick="setJournalPeriod('previous')">Прошлый месяц</button><button type="button" class="btn-secondary" onclick="setJournalPeriod('recent')">30 дней</button></div>
-            <label>С даты<input type="date" id="journal-from" onchange="loadJournal()"></label>
-            <label>По дату<input type="date" id="journal-to" onchange="loadJournal()"></label>
+            <div class="journal-period-buttons"><button type="button" class="btn-secondary" data-journal-period="month" aria-pressed="false" onclick="setJournalPeriod('month')">Текущий месяц</button><button type="button" class="btn-secondary" data-journal-period="previous" aria-pressed="false" onclick="setJournalPeriod('previous')">Прошлый месяц</button><button type="button" class="btn-secondary" data-journal-period="recent" aria-pressed="true" onclick="setJournalPeriod('recent')">30 дней</button></div>
+            <label>С даты<input type="date" id="journal-from" onchange="changeJournalPeriod()"></label>
+            <label>По дату<input type="date" id="journal-to" onchange="changeJournalPeriod()"></label>
             <label>Группа<select id="journal-group" onchange="renderJournal()"><option value="">Все группы</option></select></label>
             <label>Найти ученика<input type="search" id="journal-search" placeholder="Имя или username" oninput="renderJournal()"></label>
             <label class="journal-attention"><input type="checkbox" id="journal-attention" onchange="renderJournal()"> Только с пропусками и возвратами</label>
         </div>
         <p class="journal-hint">Выберите период до 93 дней. Нажмите на ученика, чтобы увидеть задания, фотографии и историю исправлений. Даты указаны по Москве.</p>
+        <p id="journal-period-label" class="journal-hint"></p>
         <div id="journal-message" role="status" aria-live="polite"></div>
         <div id="journal-summary" class="journal-summary"></div>
         <div id="journal-list"></div>
@@ -332,7 +333,7 @@
     <script src="js/teacher-review.js"></script>
     <script src="js/teacher-planning.js?v=20261020"></script>
     <script src="js/teacher-students.js?v=20261020"></script>
-    <script src="js/teacher-journal.js?v=20261020"></script>
+    <script src="js/teacher-journal.js?v=20261020.2"></script>
     <script src="js/teacher-titles.js"></script>
     <script src="js/teacher-quests.js"></script>
     <script src="js/teacher-auth.js?v=20261020"></script>

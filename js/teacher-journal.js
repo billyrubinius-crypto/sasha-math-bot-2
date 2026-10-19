@@ -8,6 +8,7 @@ const JOURNAL_STATUSES = {
 const JOURNAL_TYPES = { daily: 'Ежедневное', weekly: 'Еженедельное', individual: 'Индивидуальное' };
 let journalStudents = [], journalDetail = null, journalStudentId = null;
 let journalRequest = 0, journalDetailRequest = 0, journalSaving = false;
+let journalPeriodPreset = 'recent';
 
 function journalNode(tag, className, text) {
     const node = document.createElement(tag);
@@ -54,7 +55,7 @@ function journalError(error) {
     }
     return 'Не удалось выполнить запрос. Проверьте соединение и попробуйте снова.';
 }
-function setJournalPeriod(preset) {
+function journalPresetDates(preset) {
     const today = getTodayMSK();
     const monthStart = today.slice(0, 7) + '-01';
     let from = monthStart, to = today;
@@ -62,20 +63,34 @@ function setJournalPeriod(preset) {
         to = addDaysToDate(monthStart, -1);
         from = to.slice(0, 7) + '-01';
     } else if (preset === 'recent') from = addDaysToDate(today, -29);
-    document.getElementById('journal-from').value = from;
-    document.getElementById('journal-to').value = to;
+    return { from, to };
+}
+function setJournalPeriod(preset) {
+    journalPeriodPreset = preset;
+    return loadJournal();
+}
+function changeJournalPeriod() {
+    journalPeriodPreset = 'custom';
     return loadJournal();
 }
 function journalPeriod() {
     const fromInput = document.getElementById('journal-from');
     const toInput = document.getElementById('journal-to');
-    if (!fromInput.value && !toInput.value) {
-        toInput.value = getTodayMSK(); fromInput.value = addDaysToDate(toInput.value, -29);
+    // A relative range follows today's MSK date on EVERY request. It must not
+    // stay pinned to the day the teacher first opened the journal.
+    if (journalPeriodPreset !== 'custom') {
+        const dates = journalPresetDates(journalPeriodPreset);
+        fromInput.value = dates.from; toInput.value = dates.to;
     }
     const from = fromInput.value, to = toInput.value;
     if (!from || !to || to < from || daysBetweenDates(from, to) > 92) {
         throw new Error('Выберите обе даты: период должен составлять от 1 до 93 дней.');
     }
+    const names = { recent: 'Последние 30 дней', month: 'Текущий месяц', previous: 'Прошлый месяц', custom: 'Выбранные даты' };
+    document.getElementById('journal-period-label').textContent = `${names[journalPeriodPreset]} · ${journalDate(from)} — ${journalDate(to)}`;
+    document.querySelectorAll('[data-journal-period]').forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset.journalPeriod === journalPeriodPreset));
+    });
     return { p_from: from, p_to: to };
 }
 async function loadJournal() {
@@ -85,6 +100,7 @@ async function loadJournal() {
     journalStudents = []; journalDetail = null;
     document.getElementById('journal-list').replaceChildren();
     document.getElementById('journal-summary').replaceChildren();
+    document.getElementById('journal-period-label').textContent = '';
     document.getElementById('journal-detail').hidden = true;
     const message = document.getElementById('journal-message');
     message.textContent = 'Загрузка журнала…';
@@ -304,4 +320,15 @@ function clearTeacherJournal() {
     document.getElementById('journal-list').replaceChildren();
     document.getElementById('journal-summary').replaceChildren();
     document.getElementById('journal-message').textContent = '';
+    document.getElementById('journal-period-label').textContent = '';
 }
+
+function refreshJournalPeriodAfterSleep() {
+    if (!db || document.visibilityState === 'hidden' || journalPeriodPreset === 'custom'
+        || !document.getElementById('tab-journal').classList.contains('active')) return;
+    const dates = journalPresetDates(journalPeriodPreset);
+    if (document.getElementById('journal-from').value !== dates.from
+        || document.getElementById('journal-to').value !== dates.to) loadJournal();
+}
+document.addEventListener('visibilitychange', refreshJournalPeriodAfterSleep);
+window.addEventListener('focus', refreshJournalPeriodAfterSleep);
