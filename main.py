@@ -80,10 +80,13 @@ def is_effectively_active(row: dict, today: str) -> bool:
 
 
 def group_counts_by_student(rows: list, today: str) -> dict:
-    """{student_id: {'daily': n, 'weekly': n, 'individual': n}}; ежедневные считаются только на сегодняшнюю дату — как в index.html."""
+    """Доступные задания: daily на сегодня, weekly своей недели, individual без срока."""
     counts = {}
+    current_week_label = week_start_of(datetime.strptime(today, '%Y-%m-%d').date())
     for row in rows:
         if row['type'] == 'daily' and row.get('scheduled_date') != today:
+            continue
+        if row['type'] == 'weekly' and row.get('week_label') != current_week_label:
             continue
         student_counts = counts.setdefault(row['student_id'], {'daily': 0, 'weekly': 0, 'individual': 0})
         if row['type'] in student_counts:

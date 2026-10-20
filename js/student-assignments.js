@@ -1,4 +1,10 @@
 // student-assignments.js — задания: активация, actionable, активные/загрузка/архив (R01)
+        let assignmentsLoadedDate = null, assignmentsResumePromise = null;
+        function assignmentWeekStart(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00Z');
+            date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
+            return date.toISOString().slice(0, 10);
+        }
         // --- АКТИВАЦИЯ ЗАДАНИЙ (АВТОПИЛОТ) ---
         async function checkAndActivateAssignments() {
             // secure path (JWT активен) — через gateway activate_due_assignments_self (T10-06E):
@@ -15,7 +21,7 @@
             // Ищем запланированные задания для текущего пользователя, срок которых настал
             const { data: toActivate, error } = await db
                 .from('assignments')
-                .select('id')
+                .select('id, type, week_label')
                 .eq('student_id', currentUser.id)
                 .eq('activation_status', 'scheduled')
                 .lte('scheduled_date', todayMSK);
@@ -24,7 +30,8 @@
 
             if (toActivate && toActivate.length > 0) {
                 // Массово меняем статус на active
-                const ids = toActivate.map(a => a.id);
+                const ids = toActivate.filter(a => a.type !== 'weekly' || a.week_label === assignmentWeekStart(todayMSK)).map(a => a.id);
+                if (!ids.length) return;
                 await db.from('assignments')
                     .update({ activation_status: 'active' })
                     .in('id', ids);
@@ -34,9 +41,12 @@
 
         // --- ДЕЙСТВИЯ, КОТОРЫЕ МОЖНО ВЫПОЛНИТЬ ПРЯМО СЕЙЧАС ---
         async function getActionableAssignments() {
+            // A page can remain open over Monday. Activate this week's new slot
+            // before reading, rather than waiting for another full app launch.
+            await checkAndActivateAssignments();
             const { data, error } = await db
                 .from('assignments')
-                .select('id, title, type, task_count, content_url, teacher_feedback, scheduled_date, status, approval_status, revision_deadline_at, created_at')
+                .select('id, title, type, week_label, task_count, content_url, teacher_feedback, scheduled_date, status, approval_status, revision_deadline_at, created_at')
                 .eq('student_id', currentUser.id)
                 .eq('activation_status', 'active')
                 .or('status.eq.assigned,and(status.eq.checked,approval_status.eq.rejected)')
@@ -44,6 +54,7 @@
             if (error) throw error;
 
             const todayMSK = getTodayMSK();
+            assignmentsLoadedDate = todayMSK;
             const nowInstant = new Date();
             const typeOrder = { daily: 0, weekly: 1, individual: 2 };
             return (data || [])
@@ -118,15 +129,31 @@
         // Доступно ли задание для отправки прямо сейчас (W03). Возвращённая ежедневка
         // (checked+rejected) остаётся доступной, пока действует серверное окно исправления
         // revision_deadline_at (W04) — её НЕ отсекает scheduled_date !== today. Назначенная
-        // ежедневка доступна только в свой день по МСК. weekly/individual — как раньше.
+        // ежедневка доступна только в свой день по МСК, weekly — в свою неделю.
         // Признак берётся из серверных полей, новое право в JS не вычисляется (SPEC §6).
         function isAssignmentAvailable(a, nowInstant, todayMSK) {
+            if (a.type === 'weekly') return a.week_label === assignmentWeekStart(todayMSK);
             if (a.type !== 'daily') return true;
             if (a.status === 'checked' && a.approval_status === 'rejected') {
                 return a.revision_deadline_at != null && new Date(a.revision_deadline_at) > nowInstant;
             }
             return a.scheduled_date === todayMSK;
         }
+
+        function refreshAssignmentsAfterSleep() {
+            if (!db || !currentUser || document.visibilityState === 'hidden'
+                || !assignmentsLoadedDate || assignmentsLoadedDate === getTodayMSK()) return;
+            if (!assignmentsResumePromise) {
+                assignmentsResumePromise = (async () => {
+                    await loadAssignmentsSummary();
+                    await loadActiveAssignments();
+                    await loadWeekBlock();
+                })().catch(e => log(e.message)).finally(() => { assignmentsResumePromise = null; });
+            }
+            return assignmentsResumePromise;
+        }
+        document.addEventListener('visibilitychange', refreshAssignmentsAfterSleep);
+        window.addEventListener('focus', refreshAssignmentsAfterSleep);
 
         // --- ЗАГРУЗКА АКТИВНЫХ ЗАДАНИЙ (ИСПРАВЛЕНО) ---
         async function loadActiveAssignments() {
@@ -270,11 +297,8 @@
             if (assignment.type === 'individual') {
                 deadlineMSK = null; // Без дедлайна
             } else if (assignment.type === 'weekly') {
-                const [ty, tm, td] = todayMSK.split('-').map(Number);
-                const currentDay = new Date(Date.UTC(ty, tm - 1, td)).getUTCDay();
-                let daysUntilMonday = (1 - currentDay + 7) % 7;
-                if (daysUntilMonday === 0) daysUntilMonday = 7;
-                const monday = new Date(Date.UTC(ty, tm - 1, td + daysUntilMonday));
+                const [ty, tm, td] = assignment.week_label.split('-').map(Number);
+                const monday = new Date(Date.UTC(ty, tm - 1, td + 7));
                 deadlineMSK = moscowDateTimeToInstant(monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), 0, 0);
             } else if (assignment.status === 'checked' && assignment.approval_status === 'rejected') {
                 // Возвращённая ежедневка: дедлайн — серверное окно исправления (W04),
