@@ -81,7 +81,7 @@
         <!-- Планирование: создание нового -->
         <div id="plan-create" class="plan-view active">
             <div class="week-planner">
-                <h3 style="margin-top:0">🗓️ Запланировать следующую неделю</h3>
+                <h3 style="margin-top:0">🗓️ Назначить задания на неделю</h3>
                 <p style="font-size:13px; color:#666; margin-bottom:15px;">Задания станут активными автоматически в 00:00 МСК указанной даты.</p>
 
                 <div style="margin-bottom:15px;">
@@ -93,7 +93,15 @@
                     </div>
                 </div>
 
+                <div style="margin-bottom:15px;">
+                    <label for="activation-date" style="font-weight:bold; display:block; margin-bottom:5px;">Дата начала недели (понедельник):</label>
+                    <input type="date" id="activation-date" style="width:100%; max-width:100%; box-sizing:border-box; -webkit-appearance:none; appearance:none; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
+                </div>
+
+                <h4>📅 Ежедневные задания</h4>
+                <p style="font-size:13px; color:#666;">Отправляются отдельно от еженедельного. Пустые дни сохраняют ранее назначенные задания.</p>
                 <div id="days-container"></div>
+                <button class="btn-primary" id="btn-schedule-week" onclick="scheduleWeek('daily')">Назначить ежедневные</button>
 
                 <!-- Блок еженедельного задания -->
                 <div style="margin-top:20px; padding:15px; background:#f9f9f9; border-radius:8px; border-left:4px solid var(--primary);">
@@ -105,14 +113,9 @@
                     </div>
                     <input type="number" id="weekly-count" min="1" max="200" step="1" placeholder="Сколько задач в задании (1–200)" style="width:100%; padding:8px; margin-bottom:5px; border:1px solid #ddd; border-radius:6px;">
                     <textarea id="weekly-comment" placeholder="Комментарий ученику (необязательно)" style="width:100%; padding:8px; margin-top:5px; border:1px solid #ddd; border-radius:6px; min-height:40px; resize:none;"></textarea>
+                    <p style="font-size:13px; color:#666;">Назначается отдельно и сохраняет все ежедневные задания выбранной недели.</p>
+                    <button class="btn-primary" id="btn-schedule-weekly" onclick="scheduleWeek('weekly')">Назначить еженедельное</button>
                 </div>
-
-                <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee;">
-                    <label style="font-weight:bold; display:block; margin-bottom:5px;">Дата активации:</label>
-                    <input type="date" id="activation-date" style="width:100%; max-width:100%; box-sizing:border-box; -webkit-appearance:none; appearance:none; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:16px;">
-                </div>
-
-                <button class="btn-primary" id="btn-schedule-week" onclick="scheduleWeek()">🚀 Запланировать неделю</button>
             </div>
 
             <div class="week-planner">
@@ -331,7 +334,7 @@
     <script src="js/season-cosmetics.js?v=9"></script>
     <script src="js/teacher-core.js?v=20261020"></script>
     <script src="js/teacher-review.js"></script>
-    <script src="js/teacher-planning.js?v=20261020"></script>
+    <script src="js/teacher-planning.js?v=20261028"></script>
     <script src="js/teacher-students.js?v=20261020"></script>
     <script src="js/teacher-journal.js?v=20261020.3"></script>
     <script src="js/teacher-titles.js"></script>

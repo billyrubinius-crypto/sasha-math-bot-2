@@ -38,7 +38,7 @@ const sdkPath = process.env.SUPABASE_SDK_PATH || path.join(os.tmpdir(), 'sasha-m
             } else if (url.pathname.endsWith('/students')) {
                 data = [{ telegram_id: 12345, name: 'Тестовый ученик', group_name: '11А' }];
             } else if (url.pathname.endsWith('/get_review_queue_self')) data = { items: [], pending_count: 0 };
-            else if (url.pathname.endsWith('/publish_weekly_plan_self')) {
+            else if (url.pathname.endsWith('/publish_homework_self')) {
                 publications.push(route.request().postDataJSON()); data = { students_synced: 1 };
             } else if (url.pathname.endsWith('/get_teacher_journal_self')) {
                 const args = route.request().postDataJSON(); journalPeriods.push(args);

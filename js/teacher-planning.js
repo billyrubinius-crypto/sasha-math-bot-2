@@ -15,50 +15,54 @@
             return [...document.querySelectorAll('.week-group-checkbox:checked')].map(cb => cb.value);
         }
 
-        function clearWeekForm() {
-            for (let i = 0; i < 7; i++) {
+        function clearWeekForm(type) {
+            if (type === 'daily') for (let i = 0; i < 7; i++) {
                 document.getElementById(`day-title-${i}`).value = '';
                 document.getElementById(`day-url-${i}`).value = '';
                 document.getElementById(`day-comment-${i}`).value = '';
                 document.getElementById(`day-count-${i}`).value = '';
             }
-            document.getElementById('weekly-title').value = '';
-            document.getElementById('weekly-url').value = '';
-            document.getElementById('weekly-comment').value = '';
-            document.getElementById('weekly-count').value = '';
-            document.getElementById('week-group-all').checked = true;
-            document.querySelectorAll('.week-group-checkbox').forEach(cb => cb.checked = false);
+            if (type === 'weekly') {
+                document.getElementById('weekly-title').value = '';
+                document.getElementById('weekly-url').value = '';
+                document.getElementById('weekly-comment').value = '';
+                document.getElementById('weekly-count').value = '';
+            }
         }
 
-        // Публикация недели идёт только через publish_weekly_plan (W01): RPC сам создаёт план,
-        // раскладывает его по ученикам одной транзакцией и не даёт дублей при повторе.
-        // Несколько выбранных групп — отдельный план на каждую группу (SPEC §4.1), а не одна
-        // строка «Группа A, Группа B».
-        async function scheduleWeek() {
+        // Отправляем один тип заданий. Сервер атомарно сохраняет остальные слоты плана.
+        // Несколько групп по-прежнему публикуются отдельными транзакциями с безопасным повтором.
+        let publishingHomework = false;
+        async function scheduleWeek(type = 'daily') {
+            if (publishingHomework) return;
+            if (type !== 'daily' && type !== 'weekly') return;
             const weekStart = document.getElementById('activation-date').value;
             if (!weekStart) return alert('Выберите дату активации!');
             if (!isMonday(weekStart)) return alert('Неделя начинается только с понедельника — выберите понедельник.');
 
             const items = [];
             try {
-                for (let i = 0; i < 7; i++) {
+                if (type === 'daily') for (let i = 0; i < 7; i++) {
                     const title = document.getElementById(`day-title-${i}`).value.trim();
                     const url = document.getElementById(`day-url-${i}`).value.trim();
                     const comment = document.getElementById(`day-comment-${i}`).value.trim();
 
-                    if (title && url) {
+                    const count = document.getElementById(`day-count-${i}`).value;
+                    if (title || url || comment || count) {
+                        if (!title || !url) throw new Error(`${DAY_NAMES[i + 1]}: укажите название и ссылку.`);
                         items.push({
                             type: 'daily', day_of_week: i + 1, title, content_url: url, teacher_comment: comment,
-                            task_count: parseTaskCount(document.getElementById(`day-count-${i}`).value, DAY_NAMES[i + 1])
+                            task_count: parseTaskCount(count, DAY_NAMES[i + 1])
                         });
                     }
                 }
 
-                const weeklyTitle = document.getElementById('weekly-title').value.trim();
-                const weeklyUrl = document.getElementById('weekly-url').value.trim();
-                const weeklyComment = document.getElementById('weekly-comment').value.trim();
+                if (type === 'weekly') {
+                    const weeklyTitle = document.getElementById('weekly-title').value.trim();
+                    const weeklyUrl = document.getElementById('weekly-url').value.trim();
+                    const weeklyComment = document.getElementById('weekly-comment').value.trim();
 
-                if (weeklyTitle && weeklyUrl) {
+                    if (!weeklyTitle || !weeklyUrl) throw new Error('Еженедельное задание: укажите название и ссылку.');
                     items.push({
                         type: 'weekly', title: weeklyTitle, content_url: weeklyUrl, teacher_comment: weeklyComment,
                         task_count: parseTaskCount(document.getElementById('weekly-count').value, 'Еженедельное задание')
@@ -66,7 +70,7 @@
                 }
             } catch(e) { return alert(e.message); }
 
-            if (!items.length) return alert('Заполните хотя бы одно задание!');
+            if (!items.length) return alert('Заполните хотя бы одно ежедневное задание!');
 
             const selectedGroups = getSelectedWeekGroups();
             if (!selectedGroups.length && !document.getElementById('week-group-all').checked) {
@@ -76,13 +80,15 @@
                 ? selectedGroups.map(g => ({ audience_type: 'group', group_name: g }))
                 : [{ audience_type: 'all', group_name: null }];
 
-            // Блокируем кнопку на время сохранения — двойной клик отправил бы неделю дважды
-            const btn = document.getElementById('btn-schedule-week');
-            btn.disabled = true;
+            // Не допускаем одновременную отправку двух блоков или повторный клик.
+            const buttons = [document.getElementById('btn-schedule-week'), document.getElementById('btn-schedule-weekly')];
+            publishingHomework = true;
+            buttons.forEach(btn => btn.disabled = true);
             try {
                 const published = [];
                 for (const aud of audiences) {
-                    const { data, error } = await db.rpc('publish_weekly_plan_self', {
+                    const { data, error } = await db.rpc('publish_homework_self', {
+                        p_task_type: type,
                         p_week_start: weekStart,
                         p_audience_type: aud.audience_type,
                         p_group_name: aud.group_name,
@@ -97,10 +103,13 @@
                     published.push(`${aud.group_name || 'Все ученики'} — ${data.students_synced} уч.`);
                 }
 
-                alert(`Неделя от ${weekStart} опубликована.\n${published.join('\n')}`);
-                clearWeekForm();
+                alert(`${type === 'daily' ? 'Ежедневные задания назначены' : 'Еженедельное задание назначено'} на неделю от ${weekStart}.\n${published.join('\n')}`);
+                clearWeekForm(type);
             } catch(e) { alert('Ошибка: ' + e.message); }
-            finally { btn.disabled = false; }
+            finally {
+                publishingHomework = false;
+                buttons.forEach(btn => btn.disabled = false);
+            }
         }
 
         // --- ПОДВКЛАДКИ ВНУТРИ "ПЛАНИРОВАНИЕ" ---
